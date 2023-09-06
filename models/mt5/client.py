@@ -3,7 +3,7 @@ from MetaTrader5 import TradePosition, TradeOrder, TradeDeal
 import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
-from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
+from enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
@@ -18,6 +18,8 @@ from typing import List, Any
 import os
 from dotenv import load_dotenv
 
+import pandas as pd
+
 # Carga las variables de entorno desde un archivo .env
 load_dotenv()
     
@@ -27,29 +29,38 @@ class MT5Api:
 
     Esta clase proporciona métodos para conectarse a MetaTrader 5, obtener información de la cuenta, colocar órdenes y más.
     """    
-    def initialize() -> bool:
+    def initialize(sleep: int = 0) -> bool:
         """
         Inicializa la conexión con MetaTrader 5.
 
-        Esta función inicializa la conexión con MetaTrader 5 utilizando la ruta predefinida en la clase MT5Api.
-        
+        Esta función inicializa la conexión con MetaTrader 5 utilizando la ruta predefinida en la variable de entorno MT5_PATH.
+
+        Args:
+            sleep (int, optional): El tiempo en segundos para esperar después de la inicialización antes de retornar. 
+                Valor predeterminado es 0, lo que significa que no se espera ningún tiempo.
+
         Returns:
             bool: True si la inicialización fue exitosa, False en caso contrario.
         """
         request = mt5.initialize(path=os.getenv("MT5_PATH"))
+        time.sleep(sleep)
         return request
         
-    def shutdown():
+    def shutdown(sleep: int = 0):
         """
         Detiene la conexión con MetaTrader 5.
 
         Esta función detiene la conexión con MetaTrader 5 y debe llamarse al finalizar la interacción con MetaTrader 5.
 
+        Args:
+            sleep (int, optional): El tiempo en segundos para esperar después de la detención antes de retornar. 
+                Valor predeterminado es 0, lo que significa que no se espera ningún tiempo.
+
         Returns:
             None
         """
         request = mt5.shutdown()
-        time.sleep(2)
+        time.sleep(sleep)
         return request
 
     def get_rates_from_date(symbol:str, timeframe:TimeFrame, date_from:datetime, count: int) -> ndarray[FieldType.rates_dtype]:
@@ -89,8 +100,7 @@ class MT5Api:
             )
         if rates is None:
             return None
-        rates_array = np.array(rates, dtype=FieldType.rates_dtype)
-        return rates_array
+        return rates
     
     def get_rates_from_pos(symbol:str, timeframe:TimeFrame, start_pos:int, count: int) -> ndarray[FieldType.rates_dtype]:
         """
@@ -130,8 +140,7 @@ class MT5Api:
             )
         if rates is None:
             return None
-        rates_array = np.array(rates, dtype=FieldType.rates_dtype)
-        return rates_array
+        return rates
     
     def get_rates_range(symbol:str, timeframe:TimeFrame, date_from:datetime, date_to:datetime) -> ndarray[FieldType.rates_dtype]:
         """
@@ -171,37 +180,35 @@ class MT5Api:
             )
         if rates is None:
             return None
-        rates_array = np.array(rates, dtype=FieldType.rates_dtype)
-        return rates_array
+        return rates
     
-    # def get_ticks_from(symbol: str, date_from: datetime, count: int, flag: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
-    #     """
-    #     Obtiene ticks del terminal MetaTrader 5 a partir de la fecha indicada.
+    def get_ticks_from(symbol: str, date_from: datetime, count: int, flag: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
+        """
+        Obtiene ticks del terminal MetaTrader 5 a partir de la fecha indicada.
 
-    #     Args:
-    #         symbol (str): El nombre del instrumento financiero (por ejemplo, "EURUSD").
-    #         date_from (datetime): La fecha a partir de la cual se solicitan los ticks (hora en UTC).
-    #         count (int): Número de ticks que se deben obtener.
-    #         flags (CopyTicks): Bandera que determina el tipo de ticks solicitados (COPY_TICKS_ALL, COPY_TICKS_INFO, o COPY_TICKS_TRADE).
+        Args:
+            symbol (str): El nombre del instrumento financiero (por ejemplo, "EURUSD").
+            date_from (datetime): La fecha a partir de la cual se solicitan los ticks (hora en UTC).
+            count (int): Número de ticks que se deben obtener.
+            flags (CopyTicks): Bandera que determina el tipo de ticks solicitados (COPY_TICKS_ALL, COPY_TICKS_INFO, o COPY_TICKS_TRADE).
 
-    #     Returns:
-    #         np.ndarray: Un arreglo NumPy que contiene los ticks en forma de matriz con las columnas nombradas 'time', 'bid', 'ask', 'last' y 'flags'.
-    #             El valor 'flags' es una combinación de banderas de la enumeración TickFlag.
-    #         None: En caso de error durante la obtención de datos, se retorna None.
-    #             La información detallada sobre el error se puede obtener mediante last_error().
-    #     """
-    #     ticks = mt5.copy_ticks_from(
-    #         symbol,       # nombre del símbolo
-    #         date_from,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
-    #         count,        # número de ticks
-    #         flag          # combinación de banderas que determina el tipo de ticks solicitados
-    #     )
-    #     if ticks is None:
-    #         return None
-    #     ticks_array = np.array(ticks, dtype=FieldType.ticks_dtype)
-    #     return ticks_array
+        Returns:
+            np.ndarray: Un arreglo NumPy que contiene los ticks en forma de matriz con las columnas nombradas 'time', 'bid', 'ask', 'last' y 'flags'.
+                El valor 'flags' es una combinación de banderas de la enumeración TickFlag.
+            None: En caso de error durante la obtención de datos, se retorna None.
+                La información detallada sobre el error se puede obtener mediante last_error().
+        """
+        ticks = mt5.copy_ticks_from(
+            symbol,       # nombre del símbolo
+            date_from,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
+            count,        # número de ticks
+            flag          # combinación de banderas que determina el tipo de ticks solicitados
+        )
+        if ticks is None:
+            return None
+        return ticks
     
-    # def get_ticks_range(symbol: str, date_from: datetime, date_to: datetime, flags: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
+    def get_ticks_range(symbol: str, date_from: datetime, date_to: datetime, flags: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
         """
         Obtiene ticks del terminal MetaTrader 5 en un intervalo de fechas indicado.
 
@@ -226,8 +233,7 @@ class MT5Api:
         )
         if ticks is None:
             return None
-        ticks_array = np.array(ticks, dtype=FieldType.ticks_dtype)
-        return ticks_array
+        return ticks
 
     def get_price(symbol:str, type:str = 'buy')->float:
         """
@@ -273,18 +279,17 @@ class MT5Api:
     
     def convert_to_mt5_timezone(date: datetime) -> datetime:
         """
-        Convierte una fecha y hora a la zona horaria utilizada en MetaTrader 5 (MT5).
+        Suma 3 horas a la fecha y hora proporcionada.
 
-        Arg:
+        Args:
             date (datetime): Fecha y hora en cualquier zona horaria.
 
-        Return:
-            datetime: Fecha y hora en la zona horaria de MT5.
+        Returns:
+            datetime: La fecha y hora resultante después de sumar 3 horas.
         """
-        # Define la zona horaria de Europa
-        europe_timezone = pytz.timezone('Europe/Istanbul')
-        # Convierte la fecha zona horaria de Europa
-        dt_mt5 = date.astimezone(europe_timezone)
+        # Suma 3 horas a la fecha y hora original
+        dt_mt5 = date + timedelta(hours=3)
+        
         return dt_mt5
 
     def get_history_orders(date_from: datetime, date_to: datetime, symbol: str) -> List[TradeOrder]:
@@ -300,13 +305,12 @@ class MT5Api:
         Return:
             List[TradeOrder]: Lista de objetos TradeOrder que representan las órdenes obtenidas.
         """
-        # Convierte las fechas a GMT+3
-        date_from_gmt_plus_3 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_plus_3 = MT5Api.convert_to_mt5_timezone(date_to)
-        
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
         history_orders = mt5.history_orders_get(
-            date_from_gmt_plus_3,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
-            date_to_gmt_plus_3,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
+            date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
+            date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
             group=symbol           # Filtro de selección de órdenes según los símbolos
         )
         return history_orders
@@ -324,13 +328,13 @@ class MT5Api:
         Return:
             List[TradeDeal]: Lista de objetos TradeDeal que representan las transacciones obtenidas.
         """
-        # Convierte las fechas a GMT+3
-        date_from_gmt_plus_3 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_plus_3 = MT5Api.convert_to_mt5_timezone(date_to)
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
         
         history_deals = mt5.history_deals_get(
-            date_from_gmt_plus_3,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
-            date_to_gmt_plus_3,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
+            date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
+            date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
             group=symbol           # Filtro de selección de órdenes según los símbolos
         )
         return history_deals
@@ -368,8 +372,6 @@ class MT5Api:
         request['action'] = TradeActions.TRADE_ACTION_DEAL
         request['symbol'] = symbol
         request['volume'] = volume
-        request["sl"] = request["price"] - request["price"]*0.1
-        request["tp"] = request["price"] + request["price"]*0.1
 
         if comment is not None:
             request["comment"] = comment
@@ -384,5 +386,8 @@ class MT5Api:
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la compra. Código de error: {result.retcode}")
             return None
+        else:
+            print("Orden completada.")
 
         return result.order
+

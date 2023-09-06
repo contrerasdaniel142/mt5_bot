@@ -2,18 +2,16 @@
 Bot de MT5 para Operaciones Bursátiles
 
 ### Descripción
-El proyecto es un bot de trading desarrollado en la plataforma MetaTrader 5 (MT5) diseñado para operar en los mercados financieros de manera automatizada y eficiente. Este bot se diferencia por su capacidad para conectarse a la API de Alpaca y utilizarla como fuente de datos y ejecución de operaciones.
+El proyecto es un bot de trading desarrollado en la plataforma MetaTrader 5 (MT5) diseñado para operar en los mercados financieros de manera automatizada y eficiente.
 
 ### Características Clave
-1) Días de Mercado: El bot puede identificar y operar únicamente en los días de mercado, utilizando la información proporcionada por la API de Alpaca para determinar cuándo están abiertos los mercados y cuándo deben realizarse las operaciones.
+1) Estrategias de Trading (En progreso): El bot implementa estrategias de trading definidas previamente. Puede realizar operaciones de compra y venta basadas en indicadores técnicos, análisis fundamental o cualquier otra estrategia personalizada diseñada por el usuario.
 
-2) Estrategias de Trading: El bot implementa estrategias de trading definidas previamente. Puede realizar operaciones de compra y venta basadas en indicadores técnicos, análisis fundamental o cualquier otra estrategia personalizada diseñada por el usuario.
+2) Multiproceso: Utiliza multiproceso para ejecutar tareas de forma paralela y aumentar la velocidad de procesamiento. Esto permite realizar múltiples operaciones simultáneas y aprovechar las oportunidades de mercado de manera más eficiente. Además, se utiliza colas (queue) para gestionar y distribuir los datos entre procesos.
 
-3) Multiproceso: Utiliza multiproceso para ejecutar tareas de forma paralela y aumentar la velocidad de procesamiento. Esto permite realizar múltiples operaciones simultáneas y aprovechar las oportunidades de mercado de manera más eficiente.
+3) Gestión de Riesgos (En progreso): Incorpora sistemas de gestión de riesgos para proteger la inversión. Esto incluye límites de pérdida predefinidos y la capacidad de detener automáticamente las operaciones en caso de condiciones de mercado adversas.
 
-4) Gestión de Riesgos (En progreso): Incorpora sistemas de gestión de riesgos para proteger la inversión. Esto incluye límites de pérdida predefinidos y la capacidad de detener automáticamente las operaciones en caso de condiciones de mercado adversas.
-
-5) Registro de Actividades (En progreso): El bot mantiene un registro detallado de todas las actividades de trading, facilitando la revisión y el análisis posterior de las operaciones realizadas.
+4) Registro de Actividades (En progreso): El bot mantiene un registro detallado de todas las actividades de trading, facilitando la revisión y el análisis posterior de las operaciones realizadas.
 
 ### Beneficios
 - Automatización: Elimina la necesidad de realizar operaciones manuales, ahorrando tiempo y reduciendo errores.

@@ -58,19 +58,54 @@ class BotController:
             return business_hours
         return business_hours   
     
-    def _send_order(self, send_order_queue:Queue):
-        # Inicializa metatrader 5
-        MT5Api.initialize()
+    def _send_order(self, send_order_queue: Queue):
+        """
+        Procesa y envía órdenes a MetaTrader 5 desde una cola de órdenes.
+
+        Esta función procesa continuamente órdenes que se encuentran en una cola y las envía a MetaTrader 5.
+        Cada orden es enviada después de inicializar la conexión con MetaTrader 5 y se cierra la conexión 
+        después de enviar la orden.
+
+        Args:
+            send_order_queue (Queue): Una cola de órdenes que contiene diccionarios con información de las órdenes a enviar.
+
+        Returns:
+            None
+        """
         while True:
+            # Espera la orden
             order: Dict[str, Any] = send_order_queue.get()
+            print("Enviando orden")
+            
+            # Abre la conexión con MetaTrader 5
+            MT5Api.initialize()
+            
+            # Envía la orden a MetaTrader 5
             MT5Api.send_order(**order)
+            
+            # Cierra la conexión con MetaTrader 5
+            MT5Api.shutdown()
         
-    def _prepare_hedge_order(self, hedge_strategy_queue:Queue, send_order_queue:Queue):
-        # Inicializa metatrader 5
-        MT5Api.initialize()
+    def _prepare_hedge_order(self, hedge_strategy_queue: Queue, send_order_queue: Queue):
+        """
+        Prepara órdenes para una estrategia de cobertura (hedge) a partir de datos en una cola de estrategias de cobertura.
+
+        Esta función procesa continuamente datos de estrategias de cobertura que se encuentran en una cola y prepara órdenes para
+        enviarlas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos y se coloca en una cola de órdenes 
+        listas para ser enviadas.
+
+        Args:
+            hedge_strategy_queue (Queue): Una cola de estrategias de cobertura que contiene datos relevantes para preparar órdenes.
+            send_order_queue (Queue): Una cola de órdenes donde se colocarán las órdenes preparadas para ser enviadas.
+
+        Returns:
+            None
+        """
         while True:
             data = hedge_strategy_queue.get()
-            # Pre establece los datos de la orden que se enviara
+
+            print("Preparando orden ", str(data['symbol']))
+            # Pre establece los datos de la orden que se enviará
             order = {
                 "symbol": data['symbol'], 
                 "order_type": None, 
@@ -82,17 +117,30 @@ class BotController:
                 "comment": None
             }
             
-            # Consultamos el numero de ordenes realizadas para el symbolo
-            start_time = datetime.now().replace(hour=9,minute=0,second=0,microsecond=0).astimezone(pytz.utc)
-            current_time = datetime.now().astimezone(pytz.utc)
-            orders_placed = MT5Api.get_history_orders(start_time, current_time, order['symbol'])
+            # Obtener la hora actual en la zona horaria de Nueva York
+            ny_timezone = pytz.timezone('America/New_York')
+            current_time_in_ny = datetime.now(ny_timezone)
+
+            # Establecer el horario de inicio y finalización en Nueva York y convertirlo a UTC
+            start_time = current_time_in_ny.replace(hour=9, minute=30, second=0, microsecond=0).astimezone(pytz.utc)
+            end_time = current_time_in_ny.astimezone(pytz.utc)
+
+            # Abre la conexión con MetaTrader 5
+            MT5Api.initialize()
+
+            # Consultar el número de órdenes realizadas para el símbolo
+            orders_placed = MT5Api.get_history_orders(start_time, end_time, order['symbol'])
+            
+            # Cierra la conexión con MetaTrader 5
+            MT5Api.shutdown()
+
             # size = 2^(orders_placed) cuando orders_placed = 0 size = 1, 
             # cuando orders_placed = 1 size = 2, cuando orders_placed = 2 size = 4 ...
             size = 2 ** (len(orders_placed))
             order['volume'] = 0.01 * size
-            # El tipo de compra que se realizara
             
-            # Se establece los demas campos de la orden
+            # El tipo de compra que se realizará y 
+            # se establecen los demás campos de la orden
             if data['type'] == 'buy':
                 order['order_type'] = OrderType.MARKET_BUY
                 order['take_profit'] = data['high'] + (data['size']*2)
@@ -104,9 +152,9 @@ class BotController:
                 
             order['comment'] = "Mt5_bot: Hedge -> " + str(size)
             
-            # Se envia la orden por la cola de comunicación
-            send_order_queue.put(order)    
-            
+            # Se envía la orden por la cola de comunicación
+            send_order_queue.put(order)
+             
     def _hedge_strategy(self, symbols: List[str], hedge_strategy_queue: Queue):
         """
         Función para verificar los símbolos y tomar decisiones de compra/venta para la estrategia .
@@ -122,20 +170,24 @@ class BotController:
         Returns:
             None
         """
-        # Inicializa metatrader 5
-        MT5Api.initialize()
+        
         # Obtener la hora actual en la zona horaria de Nueva York
         ny_timezone = pytz.timezone('America/New_York')
         current_time_in_ny = datetime.now(ny_timezone)
+        
         # Establecer el horario de inicio y finalización en Nueva York
         start_time = current_time_in_ny.replace(hour=9, minute=0, second=0, microsecond=0)
         end_time = current_time_in_ny.replace(hour=9, minute=30, second=0, microsecond=0)
+        
         # Convierte las horas de inicio y finalización a UTC
         start_time = start_time.astimezone(pytz.utc)
         end_time = end_time.astimezone(pytz.utc)
         
         # Diccionario para almacenar rangos de precios de símbolos
         ranges: Dict[str, Dict[str, float]] = {}
+        
+        # Abre conexion con metatrader 5
+        MT5Api.initialize()
         
         # Obtener el máximo y mínimo en el rango de precio para cada símbolo
         for symbol in symbols:
@@ -145,9 +197,13 @@ class BotController:
             ranges[symbol]['low'] = np.min(rates_in_range['low'])
             ranges[symbol]['size'] = ranges[symbol]['high'] - ranges[symbol]['low']
         
+        # cierra conexion con metatrader 5
+        MT5Api.shutdown()
+        
         while True:
             # Salir del bucle si no quedan símbolos en el diccionario de rangos
             if not ranges:
+                print("No hay mas símbolos por analizar.")
                 break
             
             # Esperar hasta que termine el minuto actual para tomar una decision
@@ -156,11 +212,16 @@ class BotController:
             segundos_faltantes = (next_minute - current_time).total_seconds()
             time.sleep(segundos_faltantes)
             
+            print("Símbolos por analizar ", str(symbols))
+            
             # Volver a calcular el tiempo actual
             current_time = datetime.now().astimezone(pytz.utc)
             
             # Copia del diccionario de rangos para poder eliminar símbolos
             copy_ranges = ranges.copy()
+            
+            # Abre conexion con metatrader 5
+            MT5Api.initialize()
             
             for symbol, data in copy_ranges.items():
                 # Se obtienen los deals realizados desde la apertura
@@ -179,7 +240,7 @@ class BotController:
                     # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
                     type = positions[-1].type
                 penultimate_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
-                close = penultimate_bar['close']
+                close = penultimate_bar['close'][0]
                 if close < data['low'] and (type == 0 or type is None):
                     data_to_send = {
                         'symbol': symbol,
@@ -200,6 +261,9 @@ class BotController:
                     # Enviar datos de compra a la cola de comunicación
                     hedge_strategy_queue.put(data_to_send)
             
+            # cierra conexion con metatrader 5
+            MT5Api.shutdown()
+            
     def _get_seconds_before_next_start()->int:
         return
         
@@ -218,6 +282,9 @@ class BotController:
         """
         business_hours = self._get_business_hours_today()
         if True:
+            # Abre mt5 y espera 4 segundos
+            MT5Api.initialize(sleep=4)
+            
             # Establece los symbolos
             symbols= ["US30.cash"]
             
@@ -230,13 +297,13 @@ class BotController:
             
             # Se crean los procesos
             hedge_strategy_process = multiprocessing.Process(target=self._hedge_strategy, args=(symbols, hedge_strategy_queue,))
-            send_order_process = multiprocessing.Process(target=self._send_order, args=(send_order_queue,))
             prepare_hedge_order_process = multiprocessing.Process(target=self._prepare_hedge_order, args=(hedge_strategy_queue, send_order_queue,))
-
+            send_order_process = multiprocessing.Process(target=self._send_order, args=(send_order_queue,))
+            
             # Se inician los procesos
             hedge_strategy_process.start()
             prepare_hedge_order_process.start()
-            send_order_process.start
+            send_order_process.start()
             
             # Espera a que termine el proceso
             hedge_strategy_process.join()
@@ -244,5 +311,8 @@ class BotController:
             # Termina los procesos
             prepare_hedge_order_process.terminate()
             send_order_process.terminate()
+            
+            # Cierra conexion con metatrader
+            MT5Api.shutdown(sleep=2)
             
 
