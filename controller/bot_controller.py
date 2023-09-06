@@ -28,36 +28,8 @@ import time
 class BotController:
     def __init__(self) -> None:
         self._alpaca_api = AlpacaApi()
-            
-    def _get_business_hours_today(self):
-        """
-        Obtiene las horas de apertura y cierre del mercado para el día de hoy.
 
-        Returns:
-            dict: Un diccionario con las horas de apertura y cierre ajustadas a mt5. 
-                  Si el diccionario está vacío, significa que no hubo mercado hoy.
-
-        Example:
-            Usar esta función para obtener las horas de apertura y cierre del mercado hoy:
-            mi_instancia = MiClase()
-            horas_mercado = mi_instancia.get_business_hours_today()
-            
-            if horas_mercado:
-                print(f"Hora de apertura del mercado: {horas_mercado['open']}")
-                print(f"Hora de cierre del mercado: {horas_mercado['close']}")
-            else:
-                print("Hoy no hubo mercado.")
-        """
-        # Obtiene la hora de apertura y cierre del mercado para el dia de hoy en el horario de estados unidos
-        calendar_today = self._alpaca_api.get_next_days_of_market(0)
-        business_hours = {}
-        if calendar_today:
-            # Convierte el open y close al tiempo manejado en mt5
-            business_hours['open'] = calendar_today[0].open.astimezone(pytz.utc)
-            business_hours['close'] = calendar_today[0].close.astimezone(pytz.utc)
-            return business_hours
-        return business_hours   
-    
+#region hedge_strategy
     def _send_order(self, send_order_queue: Queue):
         """
         Procesa y envía órdenes a MetaTrader 5 desde una cola de órdenes.
@@ -206,11 +178,8 @@ class BotController:
                 print("No hay mas símbolos por analizar.")
                 break
             
-            # Esperar hasta que termine el minuto actual para tomar una decision
-            current_time = datetime.now()
-            next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
-            segundos_faltantes = (next_minute - current_time).total_seconds()
-            time.sleep(segundos_faltantes)
+            # Espera que el minuto termine para iniciar
+            self.sleep_to_next_minute()
             
             print("Símbolos por analizar ", str(symbols))
             
@@ -263,9 +232,88 @@ class BotController:
             
             # cierra conexion con metatrader 5
             MT5Api.shutdown()
+#endregion
+
+#region utilities
+    def _get_business_hours_today(self):
+        """
+        Obtiene las horas de apertura y cierre del mercado para el día de hoy.
+
+        Returns:
+            dict: Un diccionario con las horas de apertura y cierre ajustadas a utc. 
+                  Si el diccionario está vacío, significa que no hubo mercado hoy.
+
+        Example:
+            Usar esta función para obtener las horas de apertura y cierre del mercado hoy:
+            mi_instancia = MiClase()
+            horas_mercado = mi_instancia.get_business_hours_today()
             
-    def _get_seconds_before_next_start()->int:
-        return
+            if horas_mercado:
+                print(f"Hora de apertura del mercado: {horas_mercado['open']}")
+                print(f"Hora de cierre del mercado: {horas_mercado['close']}")
+            else:
+                print("Hoy no hubo mercado.")
+        """
+        # Obtiene la hora de apertura y cierre del mercado para el dia de hoy en el horario de estados unidos
+        calendar_today = self._alpaca_api.get_next_days_of_market(0)
+        business_hours = {}
+        if calendar_today:
+            # Convierte el open y close al tiempo manejado en utc
+            business_hours['open'] = calendar_today[0].open.astimezone(pytz.utc)
+            business_hours['close'] = calendar_today[0].close.astimezone(pytz.utc)
+            return business_hours
+        return business_hours   
+    
+    def sleep_to_next_minute(self):
+        """
+        Espera hasta que finalice el minuto actual antes de tomar una decisión.
+
+        Este método calcula cuántos segundos faltan para que finalice el minuto actual,
+        y luego espera ese tiempo antes de continuar.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Obtener la hora actual
+        current_time = datetime.now()
+
+        # Calcular el momento en que comienza el próximo minuto (segundo 1, microsegundo 0)
+        next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
+
+        # Calcular la cantidad de segundos que faltan hasta el próximo minuto
+        seconds = (next_minute - current_time).total_seconds()
+
+        # Dormir durante la cantidad de segundos necesarios
+        time.sleep(seconds)
+
+    def sleep_to_next_market_open(self, business_hours_utc: Dict[str, datetime]):
+        """
+        Espera hasta la próxima apertura del mercado según el horario comercial especificado en formato UTC.
+
+        Args:
+            business_hours_utc (Dict[str, datetime]): Un diccionario que contiene las horas de apertura y cierre del mercado en formato UTC.
+                Debe tener las claves 'open' y 'close' que corresponden a las horas de apertura y cierre del mercado.
+
+        Returns:
+            None
+        """
+        # Obtener la hora actual en UTC
+        current_time = datetime.now(pytz.utc)
+        
+        # Obtener la hora de apertura del mercado
+        market_open = business_hours_utc['open']
+        
+        # Calcular la cantidad de segundos que faltan hasta la apertura
+        seconds = (market_open - current_time).total_seconds()
+        
+        # Si segundos es positivo, significa que la apertura del día de hoy aún no ha ocurrido, por lo tanto, esperamos
+        if seconds > 0:
+            time.sleep(seconds)
+    
+#endregion
         
     def start(self):
         """
@@ -280,8 +328,12 @@ class BotController:
         Returns:
             None
         """
-        business_hours = self._get_business_hours_today()
-        if True:
+        business_hours_utc = self._get_business_hours_today()
+        if business_hours_utc:
+            
+            # Revisa si aun falta tiempo para la apertura de mercado y espera
+            self.sleep_to_next_market_open(business_hours_utc)
+            
             # Abre mt5 y espera 4 segundos
             MT5Api.initialize(sleep=4)
             

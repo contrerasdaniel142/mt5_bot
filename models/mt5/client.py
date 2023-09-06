@@ -3,7 +3,7 @@ from MetaTrader5 import TradePosition, TradeOrder, TradeDeal
 import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
-from enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
+from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
