@@ -114,7 +114,7 @@ class BotController:
             # 1 orden = 2       4 orden = 16
             # 2 orden = 4       .......
             size = 2 ** (len(orders_placed))
-            order['volume'] = data['trade_risk'] * size
+            order['volume'] = round((data['trade_risk'] * size),2)
             
             # El tipo de compra que se realizará y 
             # se establecen los demás campos de la orden

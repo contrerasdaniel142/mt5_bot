@@ -385,6 +385,7 @@ class MT5Api:
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la compra. Código de error: {result.retcode}")
+            print(f"Comentario: {result.comment}")
             return None
         else:
             print("Orden completada.")
