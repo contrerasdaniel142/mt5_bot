@@ -27,6 +27,8 @@ class MT5Api:
 
     Esta clase proporciona métodos para conectarse a MetaTrader 5, obtener información de la cuenta, colocar órdenes y más.
     """    
+    
+    #region Lifecycle
     def initialize(sleep: int = 0) -> bool:
         """
         Inicializa la conexión con MetaTrader 5.
@@ -60,7 +62,9 @@ class MT5Api:
         request = mt5.shutdown()
         time.sleep(sleep)
         return request
+    #endregion
 
+    #region Getters
     def get_rates_from_date(symbol:str, timeframe:TimeFrame, date_from:datetime, count: int) -> ndarray[FieldType.rates_dtype]:
         """
         Obtiene datos históricos de precios (velas) para un símbolo y marco temporal específicos a partir de una fecha dada.
@@ -91,7 +95,7 @@ class MT5Api:
             >>> historical_data = api.get_rates_from_date(symbol, timeframe, date_from, count)
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         rates = mt5.copy_rates_from(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
@@ -174,8 +178,8 @@ class MT5Api:
             >>> historical_data = api.get_rates_range(symbol, timeframe, date_from, date_to)
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
         rates = mt5.copy_rates_range(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
@@ -203,7 +207,7 @@ class MT5Api:
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         ticks = mt5.copy_ticks_from(
             symbol,       # nombre del símbolo
             date_from_mt5,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
@@ -231,8 +235,8 @@ class MT5Api:
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
         flags_value = sum(flags.value)
         ticks = mt5.copy_ticks_range(
             symbol,       # nombre del símbolo
@@ -286,21 +290,6 @@ class MT5Api:
         positions = mt5.positions_get(symbol=symbol)
         return positions
     
-    def convert_to_mt5_timezone(date: datetime) -> datetime:
-        """
-        Suma 3 horas a la fecha y hora proporcionada.
-
-        Args:
-            date (datetime): Fecha y hora en formato UTC.
-
-        Returns:
-            datetime: La fecha y hora resultante después de sumar 3 horas.
-        """
-        # Suma 3 horas a la fecha y hora original
-        dt_mt5 = date + timedelta(hours=3)
-        
-        return dt_mt5
-
     def get_history_orders(date_from: datetime, date_to: datetime, symbol: str) -> List[TradeOrder]:
         """
         Obtiene un historial de órdenes de trading en un rango de fechas y para un símbolo específico.
@@ -315,8 +304,8 @@ class MT5Api:
             List[TradeOrder]: Lista de objetos TradeOrder que representan las órdenes obtenidas.
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
         history_orders = mt5.history_orders_get(
             date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
             date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
@@ -338,8 +327,8 @@ class MT5Api:
             List[TradeDeal]: Lista de objetos TradeDeal que representan las transacciones obtenidas.
         """
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
         
         history_deals = mt5.history_deals_get(
             date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
@@ -347,7 +336,9 @@ class MT5Api:
             group=symbol           # Filtro de selección de órdenes según los símbolos
         )
         return history_deals
+    #endregion
 
+    #region Setters
     def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None) -> int:
         """
         Envía una orden al servidor de MetaTrader 5.
@@ -400,3 +391,21 @@ class MT5Api:
             print("Orden completada.")
 
         return result.order
+    #endregion
+    
+    #region Utilities
+    def convert_utc_to_mt5_timezone(date: datetime) -> datetime:
+        """
+        Suma 3 horas a la fecha y hora proporcionada.
+
+        Args:
+            date (datetime): Fecha y hora en formato UTC.
+
+        Returns:
+            datetime: La fecha y hora resultante después de sumar 3 horas.
+        """
+        # Suma 3 horas a la fecha y hora original
+        dt_mt5 = date + timedelta(hours=3)
+        
+        return dt_mt5
+    #endregion

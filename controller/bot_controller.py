@@ -166,11 +166,6 @@ class BotController:
         # Obtener el máximo y mínimo en el rango de precio para cada símbolo
         for symbol in symbols:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
-            # creamos un DataFrame de los datos obtenidos
-            rates_frame = pd.DataFrame(rates_in_range)
-            # convertimos la hora en segundos al formato datetime
-            rates_frame['time']=pd.to_datetime(rates_frame['time'], unit='s')        
-            print(rates_frame)
             ranges[symbol] = {}
             ranges[symbol]['symbol'] = symbol
             ranges[symbol]['high'] = np.max(rates_in_range['high'])
@@ -348,6 +343,25 @@ class BotController:
             print("El mercado está cerrado.")
             return False
 
+    def print_mt5_rates(data):
+        """
+        Esta función imprime los rates obtenidos de MT5.
+
+        Parameters:
+            data (list of dict): Una lista de diccionarios que contiene datos de tasas.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: Si los datos no están en el formato esperado.
+
+        """
+        # creamos un DataFrame de los datos obtenidos
+        rates_frame = pd.DataFrame(data)
+        # convertimos la hora en segundos al formato datetime
+        rates_frame['time']=pd.to_datetime(rates_frame['time'], unit='s')        
+        print(rates_frame)
 #endregion
         
     def start(self):
