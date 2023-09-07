@@ -27,6 +27,9 @@ import time
 
 class BotController:
     def __init__(self) -> None:
+        # Estos horarios estan en utc
+        self._market_opening_time = {'hour':13, 'minute':30}
+        self._market_closed_time = {'hour':20, 'minute':0}
         self._alpaca_api = AlpacaApi()
 
 #region hedge_strategy
@@ -105,21 +108,23 @@ class BotController:
             
             # Cierra la conexión con MetaTrader 5
             MT5Api.shutdown()
-
-            # size = 2^(orders_placed) cuando orders_placed = 0 size = 1, 
-            # cuando orders_placed = 1 size = 2, cuando orders_placed = 2 size = 4 ...
+            
+            # size = 2^(orders_placed) con esta formula nos aseguramos que el size siempre sea el doble del anterior
+            # 0 orden = 1       3 orden = 8
+            # 1 orden = 2       4 orden = 16
+            # 2 orden = 4       .......
             size = 2 ** (len(orders_placed))
-            order['volume'] = 0.01 * size
+            order['volume'] = data['trade_risk'] * size
             
             # El tipo de compra que se realizará y 
             # se establecen los demás campos de la orden
             if data['type'] == 'buy':
                 order['order_type'] = OrderType.MARKET_BUY
-                order['take_profit'] = data['high'] + (data['size']*2)
+                order['take_profit'] = data['high'] + (data['range']*2)
                 order['stop_loss'] = data['low']
             else:
                 order['order_type'] = OrderType.MARKET_SELL
-                order['take_profit'] = data['low'] - (data['size']*2)
+                order['take_profit'] = data['low'] - (data['range']*2)
                 order['stop_loss'] = data['high']
                 
             order['comment'] = "Mt5_bot: Hedge -> " + str(size)
@@ -127,15 +132,17 @@ class BotController:
             # Se envía la orden por la cola de comunicación
             send_order_queue.put(order)
              
-    def _hedge_strategy(self, symbols: List[str], hedge_strategy_queue: Queue):
+    def _hedging_strategy_every_minute(self, user_risk:float, symbols: List[str], hedge_strategy_queue: Queue):
         """
-        Función para verificar los símbolos y tomar decisiones de compra/venta para la estrategia .
+        Función para verificar los símbolos y tomar decisiones de compra/venta para la estrategia.
 
         Esta función se encarga de verificar los símbolos proporcionados y tomar decisiones
-        de compra o venta basadas en ciertas condiciones. Se ejecuta en un bucle infinito.
+        de compra o venta basadas en ciertas condiciones. Se ejecuta en un bucle infinito
+        y toma decisiones al inicio de cada minuto durante el horario de mercado, antes de finalizar.
 
         Args:
             self: La instancia de la clase que llama a esta función.
+            user_risk (float): El nivel de riesgo del usuario.
             symbols (List[str]): Una lista de símbolos a verificar.
             hedge_strategy_queue (Queue): Cola de comunicación para enviar datos de compra/venta.
 
@@ -165,9 +172,11 @@ class BotController:
         for symbol in symbols:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
             ranges[symbol] = {}
+            ranges[symbol]['symbol'] = symbol
             ranges[symbol]['high'] = np.max(rates_in_range['high'])
             ranges[symbol]['low'] = np.min(rates_in_range['low'])
-            ranges[symbol]['size'] = ranges[symbol]['high'] - ranges[symbol]['low']
+            ranges[symbol]['range'] = abs(ranges[symbol]['high'] - ranges[symbol]['low'])
+            ranges[symbol]['trade_risk'] =  user_risk / data[symbol]['range']
         
         # cierra conexion con metatrader 5
         MT5Api.shutdown()
@@ -178,6 +187,10 @@ class BotController:
                 print("No hay mas símbolos por analizar.")
                 break
             
+            if not self.is_in_market_hours():
+                print("Finalizo el horario de mercado.")
+                break
+            
             # Espera que el minuto termine para iniciar
             self.sleep_to_next_minute()
             
@@ -186,7 +199,7 @@ class BotController:
             # Volver a calcular el tiempo actual
             current_time = datetime.now().astimezone(pytz.utc)
             
-            # Copia del diccionario de rangos para poder eliminar símbolos
+            # Copia del diccionario de rangos para poder eliminar símbolos que alcancen el profit
             copy_ranges = ranges.copy()
             
             # Abre conexion con metatrader 5
@@ -211,24 +224,16 @@ class BotController:
                 penultimate_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
                 close = penultimate_bar['close'][0]
                 if close < data['low'] and (type == 0 or type is None):
-                    data_to_send = {
-                        'symbol': symbol,
-                        'high': data['high'],
-                        'low': data['low'],
-                        'size': data['size'],
-                        'type': 'sell',
-                    }
+                    # Se agrega el tipo de orden
+                    data['type'] = 'sell'
                     # Enviar datos de venta a la cola de comunicación
-                    hedge_strategy_queue.put(data_to_send)
+                    hedge_strategy_queue.put(data)
+                    
                 elif close > data['high'] and (type == 1 or type is None):
-                    data_to_send = {
-                        'symbol': symbol,
-                        'threshold': data['high'],
-                        'size': data['size'],
-                        'type': 'buy',
-                    }
+                    # Se agrega el tipo de orden
+                    data['type']= 'buy'
                     # Enviar datos de compra a la cola de comunicación
-                    hedge_strategy_queue.put(data_to_send)
+                    hedge_strategy_queue.put(data)
             
             # cierra conexion con metatrader 5
             MT5Api.shutdown()
@@ -289,30 +294,60 @@ class BotController:
         # Dormir durante la cantidad de segundos necesarios
         time.sleep(seconds)
 
-    def sleep_to_next_market_open(self, business_hours_utc: Dict[str, datetime]):
+    def sleep_to_next_market_opening(self):
         """
-        Espera hasta la próxima apertura del mercado según el horario comercial especificado en formato UTC.
+        Espera hasta la próxima apertura del mercado.
+
+        La función calcula el tiempo restante hasta la próxima apertura del mercado en el día actual
+        y pausa la ejecución del programa durante ese tiempo, a menos que la apertura ya haya ocurrido
+        y el tiempo actual se encuentra fuera del horario de mercado, en cuyo caso no se realizará ninguna pausa.
 
         Args:
-            business_hours_utc (Dict[str, datetime]): Un diccionario que contiene las horas de apertura y cierre del mercado en formato UTC.
-                Debe tener las claves 'open' y 'close' que corresponden a las horas de apertura y cierre del mercado.
+            None
 
         Returns:
             None
         """
+        
         # Obtener la hora actual en UTC
         current_time = datetime.now(pytz.utc)
         
-        # Obtener la hora de apertura del mercado
-        market_open = business_hours_utc['open']
+        # Crear un objeto datetime para la hora de apertura del mercado hoy
+        market_open_today = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
         
         # Calcular la cantidad de segundos que faltan hasta la apertura
-        seconds = (market_open - current_time).total_seconds()
+        seconds = (market_open_today - current_time).total_seconds()
         
         # Si segundos es positivo, significa que la apertura del día de hoy aún no ha ocurrido, por lo tanto, esperamos
         if seconds > 0:
             time.sleep(seconds)
+        elif not self.is_in_market_hours():
+            market_open_tomorrow = market_open_today + timedelta(days=1)
+            # Calcular la cantidad de segundos que faltan hasta la apertura
+            seconds = (market_open_tomorrow - current_time).total_seconds()
+            time.sleep(seconds)
+            
     
+    def is_in_market_hours(self):
+        """
+        Comprueba si el momento actual se encuentra en horario de mercado.
+
+        Returns:
+            bool: True si se encuentra en horario de mercado, False si no lo está.
+        """
+        # Obtener la hora y minutos actuales en UTC
+        current_time = datetime.now(pytz.utc).time()
+
+        # Crear objetos time para el horario de apertura y cierre del mercado
+        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'])
+
+        # Verificar si la hora actual está dentro del horario de mercado
+        if market_open <= current_time <= market_close:
+            return True
+        else:
+            return False
+
 #endregion
         
     def start(self):
@@ -328,43 +363,52 @@ class BotController:
         Returns:
             None
         """
-        business_hours_utc = self._get_business_hours_today()
-        if business_hours_utc:
+        while True:
+            business_hours_utc = self._get_business_hours_today()
+            if business_hours_utc:
+                # Revisa si aun falta tiempo para la apertura de mercado y espera
+                self.sleep_to_next_market_opening()
+                
+                # Abre mt5 y espera 4 segundos
+                MT5Api.initialize(sleep=4)
+                
+                # Establece los symbolos
+                symbols= ["US30.cash"]
+                
+                # Establece el riesgo por operacion
+                user_risk = 100 
+                
+                # Crea el administrador
+                manager = multiprocessing.Manager()
+                
+                # Se crean las colas de comunicacion
+                hedge_strategy_queue = manager.Queue()
+                send_order_queue = manager.Queue()
+                
+                # Se crean los procesos
+                hedge_strategy_process = multiprocessing.Process(target=self._hedging_strategy_every_minute, args=(user_risk, symbols, hedge_strategy_queue,))
+                prepare_hedge_order_process = multiprocessing.Process(target=self._prepare_hedge_order, args=(hedge_strategy_queue, send_order_queue,))
+                send_order_process = multiprocessing.Process(target=self._send_order, args=(send_order_queue,))
+                
+                # Se inician los procesos
+                hedge_strategy_process.start()
+                prepare_hedge_order_process.start()
+                send_order_process.start()
+                
+                # Espera a que termine el proceso
+                hedge_strategy_process.join()
+                
+                # Termina los procesos
+                prepare_hedge_order_process.terminate()
+                send_order_process.terminate()
+                
+                # Cierra conexion con metatrader
+                MT5Api.shutdown(sleep=2)
             
-            # Revisa si aun falta tiempo para la apertura de mercado y espera
-            self.sleep_to_next_market_open(business_hours_utc)
-            
-            # Abre mt5 y espera 4 segundos
-            MT5Api.initialize(sleep=4)
-            
-            # Establece los symbolos
-            symbols= ["US30.cash"]
-            
-            # Crea el administrador
-            manager = multiprocessing.Manager()
-            
-            # Se crean las colas de comunicacion
-            hedge_strategy_queue = manager.Queue()
-            send_order_queue = manager.Queue()
-            
-            # Se crean los procesos
-            hedge_strategy_process = multiprocessing.Process(target=self._hedge_strategy, args=(symbols, hedge_strategy_queue,))
-            prepare_hedge_order_process = multiprocessing.Process(target=self._prepare_hedge_order, args=(hedge_strategy_queue, send_order_queue,))
-            send_order_process = multiprocessing.Process(target=self._send_order, args=(send_order_queue,))
-            
-            # Se inician los procesos
-            hedge_strategy_process.start()
-            prepare_hedge_order_process.start()
-            send_order_process.start()
-            
-            # Espera a que termine el proceso
-            hedge_strategy_process.join()
-            
-            # Termina los procesos
-            prepare_hedge_order_process.terminate()
-            send_order_process.terminate()
-            
-            # Cierra conexion con metatrader
-            MT5Api.shutdown(sleep=2)
+            # Al finalizar la ejecución del programa o si no hay mercado hoy, 
+            # se pausará el programa hasta el próximo día laborable para volver a comprobar.
+            self.sleep_to_next_market_opening()
+                
+                
             
 
