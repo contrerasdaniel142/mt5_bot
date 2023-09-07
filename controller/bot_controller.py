@@ -149,19 +149,13 @@ class BotController:
         Returns:
             None
         """
+
+        current_time = datetime.now(pytz.utc)
         
-        # Obtener la hora actual en la zona horaria de Nueva York
-        ny_timezone = pytz.timezone('America/New_York')
-        current_time_in_ny = datetime.now(ny_timezone)
-        
-        # Establecer el horario de inicio y finalización en Nueva York
-        start_time = current_time_in_ny.replace(hour=9, minute=0, second=0, microsecond=0)
-        end_time = current_time_in_ny.replace(hour=9, minute=30, second=0, microsecond=0)
-        
-        # Convierte las horas de inicio y finalización a UTC
-        start_time = start_time.astimezone(pytz.utc)
-        end_time = end_time.astimezone(pytz.utc)
-        
+        # Establecer el horario de inicio y finalización del mercado
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
+                
         # Diccionario para almacenar rangos de precios de símbolos
         ranges: Dict[str, Dict[str, float]] = {}
         
@@ -176,7 +170,7 @@ class BotController:
             ranges[symbol]['high'] = np.max(rates_in_range['high'])
             ranges[symbol]['low'] = np.min(rates_in_range['low'])
             ranges[symbol]['range'] = abs(ranges[symbol]['high'] - ranges[symbol]['low'])
-            ranges[symbol]['trade_risk'] =  user_risk / data[symbol]['range']
+            ranges[symbol]['trade_risk'] =  user_risk / ranges[symbol]['range']
         
         # cierra conexion con metatrader 5
         MT5Api.shutdown()
@@ -325,8 +319,7 @@ class BotController:
             market_open_tomorrow = market_open_today + timedelta(days=1)
             # Calcular la cantidad de segundos que faltan hasta la apertura
             seconds = (market_open_tomorrow - current_time).total_seconds()
-            time.sleep(seconds)
-            
+            time.sleep(seconds)        
     
     def is_in_market_hours(self):
         """
