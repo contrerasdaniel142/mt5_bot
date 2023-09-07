@@ -150,7 +150,7 @@ class BotController:
         Returns:
             None
         """
-
+        print("preparando la estrategia hedge..")
         current_time = datetime.now(pytz.utc)
         
         # Establecer el horario de inicio y finalización del mercado
@@ -177,6 +177,7 @@ class BotController:
         MT5Api.shutdown()
         
         while True:
+            print("Iniciando la estrategia hedge.")
             # Salir del bucle si no quedan símbolos en el diccionario de rangos
             if not ranges:
                 print("No hay mas símbolos por analizar.")
@@ -357,6 +358,7 @@ class BotController:
             ValueError: Si los datos no están en el formato esperado.
 
         """
+        print("Imprimiendo rates")
         # creamos un DataFrame de los datos obtenidos
         rates_frame = pd.DataFrame(data)
         # convertimos la hora en segundos al formato datetime
