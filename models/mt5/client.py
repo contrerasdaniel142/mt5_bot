@@ -18,8 +18,6 @@ from typing import List, Any
 import os
 from dotenv import load_dotenv
 
-import pandas as pd
-
 # Carga las variables de entorno desde un archivo .env
 load_dotenv()
     
@@ -92,10 +90,12 @@ class MT5Api:
             >>> count = 100
             >>> historical_data = api.get_rates_from_date(symbol, timeframe, date_from, count)
         """
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
         rates = mt5.copy_rates_from(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
-            date_from,    # fecha de apertura de la barra inicial
+            date_from_mt5,    # fecha de apertura de la barra inicial
             count         # número de barras
             )
         if rates is None:
@@ -132,6 +132,7 @@ class MT5Api:
             >>> count = 100
             >>> historical_data = api.get_rates_from_pos(symbol, timeframe, start_pos, count)
         """
+        
         rates = mt5.copy_rates_from_pos(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
@@ -172,11 +173,14 @@ class MT5Api:
             >>> date_to = datetime(2023, 2, 1, tzinfo=timezone.utc)  # Fecha final en hora UTC
             >>> historical_data = api.get_rates_range(symbol, timeframe, date_from, date_to)
         """
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
         rates = mt5.copy_rates_range(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
-            date_from,    # fecha a partir de la cual se solicitan las barras
-            date_to       # fecha hasta la cual se solicitan las barras
+            date_from_mt5,    # fecha a partir de la cual se solicitan las barras
+            date_to_gmt_mt5       # fecha hasta la cual se solicitan las barras
             )
         if rates is None:
             return None
@@ -198,9 +202,11 @@ class MT5Api:
             None: En caso de error durante la obtención de datos, se retorna None.
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
         ticks = mt5.copy_ticks_from(
             symbol,       # nombre del símbolo
-            date_from,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
+            date_from_mt5,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
             count,        # número de ticks
             flag          # combinación de banderas que determina el tipo de ticks solicitados
         )
@@ -224,11 +230,14 @@ class MT5Api:
             None: En caso de error durante la obtención de datos, se retorna None.
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_to_mt5_timezone(date_to)
         flags_value = sum(flags.value)
         ticks = mt5.copy_ticks_range(
             symbol,       # nombre del símbolo
-            date_from,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
-            date_to,      # fecha hasta la cual se solicitan los ticks (hora en UTC)
+            date_from_mt5,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
+            date_to_gmt_mt5,      # fecha hasta la cual se solicitan los ticks (hora en UTC)
             flags_value   # combinación de banderas que determina el tipo de ticks solicitados
         )
         if ticks is None:
@@ -282,7 +291,7 @@ class MT5Api:
         Suma 3 horas a la fecha y hora proporcionada.
 
         Args:
-            date (datetime): Fecha y hora en cualquier zona horaria.
+            date (datetime): Fecha y hora en formato UTC.
 
         Returns:
             datetime: La fecha y hora resultante después de sumar 3 horas.
@@ -391,4 +400,3 @@ class MT5Api:
             print("Orden completada.")
 
         return result.order
-

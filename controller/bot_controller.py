@@ -1,5 +1,6 @@
 import os
 import sys
+import pandas as pd
 # Obtiene la ruta absoluta del directorio actual
 current_file = os.path.abspath(os.getcwd())
 # Agrega el directorio actual al sys.path para poder ejecutar el programa
@@ -28,7 +29,7 @@ import time
 class BotController:
     def __init__(self) -> None:
         # Estos horarios estan en utc
-        self._market_opening_time = {'hour':13, 'minute':30}
+        self._market_opening_time = {'hour':13, 'minute':29}
         self._market_closed_time = {'hour':20, 'minute':0}
         self._alpaca_api = AlpacaApi()
 
@@ -165,6 +166,11 @@ class BotController:
         # Obtener el máximo y mínimo en el rango de precio para cada símbolo
         for symbol in symbols:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
+            # creamos un DataFrame de los datos obtenidos
+            rates_frame = pd.DataFrame(rates_in_range)
+            # convertimos la hora en segundos al formato datetime
+            rates_frame['time']=pd.to_datetime(rates_frame['time'], unit='s')        
+            print(rates_frame)
             ranges[symbol] = {}
             ranges[symbol]['symbol'] = symbol
             ranges[symbol]['high'] = np.max(rates_in_range['high'])
@@ -288,40 +294,37 @@ class BotController:
         # Dormir durante la cantidad de segundos necesarios
         time.sleep(seconds)
 
-    def sleep_to_next_market_opening(self):
+    def sleep_to_next_market_opening(self, sleep_to_tomorrow:bool = False):
         """
         Espera hasta la próxima apertura del mercado.
 
-        La función calcula el tiempo restante hasta la próxima apertura del mercado en el día actual
-        y pausa la ejecución del programa durante ese tiempo, a menos que la apertura ya haya ocurrido
-        y el tiempo actual se encuentra fuera del horario de mercado, en cuyo caso no se realizará ninguna pausa.
+        Esta función calcula el tiempo restante hasta la próxima apertura del mercado. Si la apertura ya ha ocurrido o si se especifica
+        `sleep_to_tomorrow` como True, el programa esperará hasta la apertura del próximo día.
 
         Args:
-            None
+            sleep_to_tomorrow (bool, optional): Si es True, el programa esperará hasta la apertura del mercado del día siguiente.
+                Por defecto, es False.
 
         Returns:
             None
         """
+        if not self.is_in_market_hours() or sleep_to_tomorrow == True:
+            # Obtener la hora actual en UTC
+            current_time = datetime.now(pytz.utc)
         
-        # Obtener la hora actual en UTC
-        current_time = datetime.now(pytz.utc)
-        
-        # Crear un objeto datetime para la hora de apertura del mercado hoy
-        market_open_today = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
-        
-        # Calcular la cantidad de segundos que faltan hasta la apertura
-        seconds = (market_open_today - current_time).total_seconds()
-        
-        # Si segundos es positivo, significa que la apertura del día de hoy aún no ha ocurrido, por lo tanto, esperamos
-        if seconds > 0:
-            print("El mercado está cerrado. Esperando hasta la próxima apertura.")
-            time.sleep(seconds)
-        elif not self.is_in_market_hours():
-            print("El mercado está cerrado. Esperando hasta la próxima apertura.")
-            market_open_tomorrow = market_open_today + timedelta(days=1)
+            # Crear un objeto datetime para la hora de apertura del mercado hoy
+            market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
+            
+            # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
+            if sleep_to_tomorrow:
+                print("Esperar hasta la apertura de mañana.")
+                market_open = market_open + timedelta(days=1)
+            
             # Calcular la cantidad de segundos que faltan hasta la apertura
-            seconds = (market_open_tomorrow - current_time).total_seconds()
-            time.sleep(seconds)        
+            seconds = (market_open - current_time).total_seconds()
+            
+            print("Esperando la apertura...")
+            time.sleep(seconds)      
     
     def is_in_market_hours(self):
         """
@@ -339,8 +342,10 @@ class BotController:
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close:
+            print("El mercado está abierto.")
             return True
         else:
+            print("El mercado está cerrado.")
             return False
 
 #endregion
@@ -404,7 +409,7 @@ class BotController:
             
             # Al finalizar la ejecución del programa o si no hay mercado hoy, 
             # se pausará el programa hasta el próximo día laborable para volver a comprobar.
-            self.sleep_to_next_market_opening()
+            self.sleep_to_next_market_opening(sleep_to_tomorrow=True)
                 
                 
             
