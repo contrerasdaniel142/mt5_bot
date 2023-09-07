@@ -314,8 +314,10 @@ class BotController:
         
         # Si segundos es positivo, significa que la apertura del día de hoy aún no ha ocurrido, por lo tanto, esperamos
         if seconds > 0:
+            print("El mercado está cerrado. Esperando hasta la próxima apertura.")
             time.sleep(seconds)
         elif not self.is_in_market_hours():
+            print("El mercado está cerrado. Esperando hasta la próxima apertura.")
             market_open_tomorrow = market_open_today + timedelta(days=1)
             # Calcular la cantidad de segundos que faltan hasta la apertura
             seconds = (market_open_tomorrow - current_time).total_seconds()
@@ -356,7 +358,9 @@ class BotController:
         Returns:
             None
         """
+        print("Iniciando bot..")
         while True:
+            print("Comprobando mercado...")
             business_hours_utc = self._get_business_hours_today()
             if business_hours_utc:
                 # Revisa si aun falta tiempo para la apertura de mercado y espera
