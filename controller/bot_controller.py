@@ -38,17 +38,6 @@ class BotController:
         self._market_closed_time = {'hour':19, 'minute':55}
         self._alpaca_api = AlpacaApi()
 
-    #region hedge_strategy   
-    
-            # size = 2^(orders_placed) con esta formula nos aseguramos que el size siempre sea el doble del anterior
-            # 0 orden = 1       3 orden = 8
-            # 1 orden = 2       4 orden = 16
-            # 2 orden = 4       .......
-            # size = 2 ** (len(orders_placed))
-            # order['volume'] = (data['trade_risk'] * size)
-        
-    #endregion
-
     #region Positions Management
     def manage_positions(self, strategies: List[object]):
         print("Iniciando administrador de posiciones abiertas.")
@@ -124,7 +113,6 @@ class BotController:
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close:
-            print("El mercado está abierto.")
             return True
         else:
             print("El mercado está cerrado.")
@@ -216,7 +204,7 @@ class BotController:
                         
             if business_hours_utc:
                 # Revisa si aun falta tiempo para la apertura de mercado y espera
-                #self._sleep_to_next_market_opening()
+                self._sleep_to_next_market_opening()
                 
                 # Se crea una lista que contendra a los objetos de las estrategias creadas
                 strategies = []
@@ -239,7 +227,7 @@ class BotController:
                 #region Every-minute breakout
                 # Se crea el objeto de la estrategia breakout cada minuto
                 symbols_em_breakout = manager.list(symbols)
-                em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= False)
+                em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
                 # Se agrega rt_breakout_symbols
                 strategies.append(em_breakoutTrading)                      
                 # Se crea el proceso que incia la estrategia
@@ -251,7 +239,7 @@ class BotController:
                 #endregion
                 
                 # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-                manage_positions_process = multiprocessing.Process(target=self.manage_positions(strategies=strategies))
+                manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
                 manage_positions_process.start()
                                 
                 # Espera a que termine el proceso
@@ -264,6 +252,21 @@ class BotController:
             # se pausará el programa hasta el próximo día laborable para volver a comprobar.
             self._sleep_to_next_market_opening(sleep_to_tomorrow=True)                
     #endregion
+
+
+
+    #region hedge_strategy   
+    
+            # size = 2^(orders_placed) con esta formula nos aseguramos que el size siempre sea el doble del anterior
+            # 0 orden = 1       3 orden = 8
+            # 1 orden = 2       4 orden = 16
+            # 2 orden = 4       .......
+            # size = 2 ** (len(orders_placed))
+            # order['volume'] = (data['trade_risk'] * size)
+        
+    #endregion
+    
+    
     
 class BreakoutTrading:
     def __init__(self, data:DictProxy, symbols: ListProxy, number_stops:int = 4, in_real_time: bool = False) -> None:
@@ -365,7 +368,6 @@ class BreakoutTrading:
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close:
-            print("El mercado está abierto.")
             return True
         else:
             print("El mercado está cerrado.")
@@ -438,7 +440,7 @@ class BreakoutTrading:
             minute=0,
             second=0,
             microsecond=0
-        ) - timedelta(days=3)
+        )
         end_time = current_time.replace(
             hour=self._market_opening_time['hour'],
             minute=self._market_opening_time['minute'],
@@ -475,73 +477,51 @@ class BreakoutTrading:
         # Actualiza la variable compartida
         self._data.update(data)
     
-    def _breakout_strategy(self, user_risk:float):
+    def _breakout_strategy(self):
         """
         Ejecuta la estrategia.
 
         Esta función verifica los símbolos proporcionados y toma decisiones de compra o venta basadas en ciertas condiciones.
 
-        Args:
-            user_risk (float): El nivel de riesgo del usuario.
         Returns:
             None
         """
-        
-        # Prepara la data de la estrategia antes de iniciar
-        self._prepare_breakout_data(user_risk)
-        
+        # Verifica que tipo de ejecucion es
         if self._in_real_time:
-            print("Breakout: Símbolos por analizar en tiempo real ", self.symbols)
-        else:
-            print("Breakout: Símbolos por analizar cada minuto ", self.symbols)
+            # Espera que el minuto termine para iniciar
+            self._sleep_to_next_minute()
         
-        while True:
-            print("")
-            # Salir del bucle si no quedan símbolos
-            if not self.symbols:
-                print("Breakout: No hay símbolos por analizar.")
-                break
+        # Se crea una copia para evitar errores cuando se modifique la original
+        copy_symbols = list(self.symbols)
+        
+        for symbol in copy_symbols:                    
+            # Se obtienen las posiciones abiertas
+            positions = MT5Api.get_positions(symbol)
+            type = None
+            # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
+            if positions:
+                type = positions[-1].type
             
-            # Salir del bucle si termino el mercado
-            if not self._is_in_market_hours():
-                print("Breakout: Finalizo el horario de mercado.")
-                break
+            # Obtenemos la ultima informacion actualizada del symbolo
+            info_tick = MT5Api.get_symbol_info_tick(symbol)
             
-            if self._in_real_time:
-                # Espera que el minuto termine para iniciar
-                self._sleep_to_next_minute()
+            # Precio ask (venta) como precio de compra
+            if info_tick.bid < self._data[symbol]['low'] and (type == 0 or type is None):
+                # Se agrega el tipo de orden
+                self._data[symbol]['type'] = 'sell'
+                # Crear orden y enviarla
+                self._breakout_order(symbol)
+                # Remueve los símbolos tradeados segun la estrategia
+                self.symbols.remove(symbol)
             
-            # Se crea una copia para evitar errores cuando se modifique la original
-            copy_symbols = list(self.symbols)
-            
-            for symbol in copy_symbols:                    
-                # Se obtienen las posiciones abiertas
-                positions = MT5Api.get_positions(symbol)
-                type = None
-                # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
-                if positions:
-                    type = positions[-1].type
-                
-                # Obtenemos la ultima informacion actualizada del symbolo
-                info_tick = MT5Api.get_symbol_info_tick(symbol)
-                
-                # Precio ask (venta) como precio de compra
-                if info_tick.bid < self._data[symbol]['low'] and (type == 0 or type is None):
-                    # Se agrega el tipo de orden
-                    self._data[symbol]['type'] = 'sell'
-                    # Crear orden y enviarla
-                    self._breakout_order(symbol)
-                    # Remueve los símbolos tradeados segun la estrategia
-                    self.symbols.remove(symbol)
-                
-                # Precio bid (oferta) como precio de venta
-                elif info_tick.ask > self._data[symbol]['high'] and (type == 1 or type is None):
-                    # Se agrega el tipo de orden
-                    self._data[symbol]['type']= 'buy'
-                    # Crear orden y enviarla
-                    self._breakout_order(symbol)
-                    # Remueve los símbolos tradeados segun la estrategia
-                    self.symbols.remove(symbol)
+            # Precio bid (oferta) como precio de venta
+            elif info_tick.ask > self._data[symbol]['high'] and (type == 1 or type is None):
+                # Se agrega el tipo de orden
+                self._data[symbol]['type']= 'buy'
+                # Crear orden y enviarla
+                self._breakout_order(symbol)
+                # Remueve los símbolos tradeados segun la estrategia
+                self.symbols.remove(symbol)
     #endregion
     
     #region Positions Management
@@ -638,21 +618,33 @@ class BreakoutTrading:
         
         if self._in_real_time:
             print("Breakout: Iniciando estrategia (tiempo real)...")
+            print("Breakout: Símbolos por analizar en tiempo real ", self.symbols)
         else:
             print("Breakout: Iniciando estrategia (cada minuto)...")
+            print("Breakout: Símbolos por analizar cada minuto ", self.symbols)
 
-        # Se crean los procesos
-        breakout_strategy_process = multiprocessing.Process(target=self._breakout_strategy, args=(user_risk,))
+        # Prepara la data de la estrategia antes de iniciar
+        self._prepare_breakout_data(user_risk)            
         
-        # Se inician los procesos
-        breakout_strategy_process.start()
-        
-        # Espera a que termine el proceso
-        breakout_strategy_process.join()
+        # Inicio del cilco
+        while True:
+            print("")
+            # Salir del bucle si no quedan símbolos
+            if not self.symbols:
+                print("Breakout: No hay símbolos por analizar.")
+                break
+            
+            # Salir del bucle si termino el mercado
+            if not self._is_in_market_hours():
+                print("Breakout: Finalizo el horario de mercado.")
+                break
+            
+            # Ejecuta la estrategia
+            self._breakout_strategy()
+        # Fin del ciclo
         
         if self._in_real_time:
             print("Breakout: Finalizando estrategia (tiempo real)...")
         else:
-            print("Breakout: Finalizando estrategia (cada minuto)...")
-                
+            print("Breakout: Finalizando estrategia (cada minuto)...")             
     #endregion
