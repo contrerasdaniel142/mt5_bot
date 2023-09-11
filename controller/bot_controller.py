@@ -273,7 +273,6 @@ class BotController:
     #endregion
 
 
-
     #region hedge_strategy   
     
             # size = 2^(orders_placed) con esta formula nos aseguramos que el size siempre sea el doble del anterior
