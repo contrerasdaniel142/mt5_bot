@@ -1,9 +1,9 @@
 import MetaTrader5 as mt5   # Para conectarse y realizar solicitudes a una terminal de metatrader5
-from MetaTrader5 import TradePosition, TradeOrder, TradeDeal
 import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
 from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
+from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
@@ -12,7 +12,7 @@ import time
 import pytz
 
 # Importaciones necesarias para definir tipos de datos
-from typing import List, Any
+from typing import List, Tuple, Any
 
 # Importación de módulos externos
 import os
@@ -94,6 +94,9 @@ class MT5Api:
             >>> count = 100
             >>> historical_data = api.get_rates_from_date(symbol, timeframe, date_from, count)
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
         # Convierte las fechas a MT5
         date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         rates = mt5.copy_rates_from(
@@ -104,6 +107,9 @@ class MT5Api:
             )
         if rates is None:
             return None
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return rates
     
     def get_rates_from_pos(symbol:str, timeframe:TimeFrame, start_pos:int, count: int) -> ndarray[FieldType.rates_dtype]:
@@ -136,6 +142,8 @@ class MT5Api:
             >>> count = 100
             >>> historical_data = api.get_rates_from_pos(symbol, timeframe, start_pos, count)
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
         
         rates = mt5.copy_rates_from_pos(
             symbol,       # nombre del símbolo
@@ -145,6 +153,9 @@ class MT5Api:
             )
         if rates is None:
             return None
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return rates
     
     def get_rates_range(symbol:str, timeframe:TimeFrame, date_from:datetime, date_to:datetime) -> ndarray[FieldType.rates_dtype]:
@@ -177,6 +188,9 @@ class MT5Api:
             >>> date_to = datetime(2023, 2, 1, tzinfo=timezone.utc)  # Fecha final en hora UTC
             >>> historical_data = api.get_rates_range(symbol, timeframe, date_from, date_to)
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
         # Convierte las fechas a MT5
         date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
@@ -188,6 +202,9 @@ class MT5Api:
             )
         if rates is None:
             return None
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return rates
     
     def get_ticks_from(symbol: str, date_from: datetime, count: int, flag: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
@@ -206,6 +223,9 @@ class MT5Api:
             None: En caso de error durante la obtención de datos, se retorna None.
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
         # Convierte las fechas a MT5
         date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         ticks = mt5.copy_ticks_from(
@@ -216,6 +236,9 @@ class MT5Api:
         )
         if ticks is None:
             return None
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return ticks
     
     def get_ticks_range(symbol: str, date_from: datetime, date_to: datetime, flags: CopyTicks) -> np.ndarray[FieldType.ticks_dtype]:
@@ -234,6 +257,9 @@ class MT5Api:
             None: En caso de error durante la obtención de datos, se retorna None.
                 La información detallada sobre el error se puede obtener mediante last_error().
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
         # Convierte las fechas a MT5
         date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
@@ -246,100 +272,156 @@ class MT5Api:
         )
         if ticks is None:
             return None
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return ticks
 
-    def get_price(symbol:str, type:str = 'buy')->float:
+    def get_positions(symbol: str = None, ticket: int = None)-> Tuple[TradePosition, ...]:
         """
-        Obtiene el precio actual de un símbolo en MetaTrader 5 (MT5).
+        Obtiene las posiciones abiertas para un símbolo específico en MetaTrader 5.
+        
+        Si se llama el metodo sin argumentos, devuelve las posiciones para todos los símbolos.
 
         Args:
-            symbol (str): El símbolo del instrumento financiero para el que se desea obtener el precio.
-            type (str): El tipo de precio que se desea obtener ('buy' para precio de compra o 'sell' para precio de venta).
+            symbol (str, optional): El símbolo del instrumento financiero para el cual se desean obtener las posiciones.
+            ticket (int, optional): El número de ticket de la posición que se desea obtener de manera específica.
 
         Returns:
-            float: El precio actual del símbolo en la plataforma MT5.
-
-        Note:
-            - Si el tipo es 'buy', se devuelve el precio ask (venta) como precio de compra.
-            - Si el tipo es 'sell', se devuelve el precio bid (oferta) como precio de venta.
-
-        Example:
-            >>> get_price('EURUSD', 'buy')
-            1.12345
+            Tuple[TradePosition, ...] or None: Una tupla de objetos TradePosition que representan las posiciones abiertas.
         """
-        tick = mt5.symbol_info_tick(symbol)
-        price = None
-        if tick is None:
-            print(f"No se pudo obtener el precio actual para {symbol}.")
-        if type == 'buy':
-            price = tick.ask  # Precio ask (venta) como precio de compra
-        elif type == 'sell':
-            price = tick.bid  # Precio bid (oferta) como precio de venta
-        return price
-    
-    def get_positions(symbol: str)->List[TradePosition]:
-        """
-        Obtiene las posiciones abierta para un símbolo específico en MetaTrader 5.
-
-        Args:
-            symbol (str): El símbolo del instrumento financiero.
-
-        Returns:
-            TradePosition or None: La última posición abierta si se encuentra una, None si no se encuentran posiciones abiertas.
-        """
-        positions = mt5.positions_get(symbol=symbol)
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        if ticket is not None:
+            positions = mt5.positions_get(ticket=ticket)
+        elif symbol is not None:
+            positions = mt5.positions_get(symbol=symbol)
+        else:
+            positions = mt5.positions_get()
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return positions
     
-    def get_history_orders(date_from: datetime, date_to: datetime, symbol: str) -> List[TradeOrder]:
+    def get_history_orders(date_from: datetime, date_to: datetime, symbol: str = None) -> Tuple[TradeOrder, ...]:
         """
-        Obtiene un historial de órdenes de trading en un rango de fechas y para un símbolo específico.
+        Obtiene un historial de órdenes de trading en un rango de fechas y, opcionalmente, para un símbolo específico.
         Las fechas se convierten a la zona horaria del broker.
 
-        Arg:
+        Args:
             date_from (datetime): Fecha a partir de la cual se solicitan las órdenes en UTC.
             date_to (datetime): Fecha hasta la cual se solicitan las órdenes en UTC.
-            symbol (str): Símbolo o grupo de órdenes a filtrar.
+            symbol (str, optional): Símbolo o grupo de órdenes a filtrar (opcional).
 
-        Return:
-            List[TradeOrder]: Lista de objetos TradeOrder que representan las órdenes obtenidas.
+        Returns:
+            Tuple[TradeOrder, ...]: Tupla de objetos TradeOrder que representan las órdenes obtenidas.
         """
-        # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
-        history_orders = mt5.history_orders_get(
-            date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
-            date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
-            group=symbol           # Filtro de selección de órdenes según los símbolos
-        )
-        return history_orders
-
-    def get_history_deals(date_from: datetime, date_to: datetime, symbol: str)-> List[TradeDeal]:
-        """
-        Obtiene un historial de transacciones de trading en un rango de fechas y para un símbolo específico.
-        Las fechas se convierten a la zona horaria del broker.
-
-        Arg:
-            date_from (datetime): Fecha a partir de la cual se solicitan las transacciones en UTC.
-            date_to (datetime): Fecha hasta la cual se solicitan las transacciones en UTC.
-            symbol (str): Símbolo o grupo de órdenes a filtrar.
-
-        Return:
-            List[TradeDeal]: Lista de objetos TradeDeal que representan las transacciones obtenidas.
-        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
         # Convierte las fechas a MT5
         date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
         
-        history_deals = mt5.history_deals_get(
-            date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
-            date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
-            group=symbol           # Filtro de selección de órdenes según los símbolos
-        )
+        if symbol is None:
+            history_orders = mt5.history_orders_get(
+                date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
+                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
+            )
+        else:
+            history_orders = mt5.history_orders_get(
+                date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
+                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
+                group=symbol           # Filtro de selección de órdenes según los símbolos
+            )
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        return history_orders
+
+    def get_history_deals(date_from: datetime, date_to: datetime, symbol: str = None)-> Tuple[TradeDeal, ...]:
+        """
+        Obtiene un historial de transacciones de trading en un rango de fechas y, opcionalmente, para un símbolo específico.
+        Las fechas se convierten a la zona horaria del broker.
+
+        Args:
+            date_from (datetime): Fecha a partir de la cual se solicitan las transacciones en UTC.
+            date_to (datetime): Fecha hasta la cual se solicitan las transacciones en UTC.
+            symbol (str, optional): Símbolo o grupo de órdenes a filtrar (opcional).
+
+        Returns:
+            Tuple[TradeDeal, ...]: Tupla de objetos TradeDeal que representan las transacciones obtenidas.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        # Convierte las fechas a MT5
+        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
+        
+        if symbol is None:
+            history_deals = mt5.history_deals_get(
+                date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
+                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
+            )
+        else:
+            history_deals = mt5.history_deals_get(
+                date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
+                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
+                group=symbol           # Filtro de selección de órdenes según los símbolos
+            )
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         return history_deals
+    
+    def get_symbol_info(symbol: str) -> SymbolInfo:
+        """
+        Obtiene información detallada del símbolo especificado en MetaTrader 5.
+
+        Args:
+            symbol (str): El nombre del símbolo que deseas consultar.
+
+        Returns:
+            SymbolInfo: Un objeto SymbolInfo que contiene información detallada del símbolo.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        # Obtiene la información del símbolo
+        symbol_info = mt5.symbol_info(symbol)
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        
+        return symbol_info
+
+    def get_symbol_info_tick(symbol: str)->Tick :
+        """
+        Obtiene información de la última cotización (tick) del símbolo especificado en MetaTrader 5.
+
+        Args:
+            symbol (str): El nombre del símbolo del que deseas obtener la última cotización.
+
+        Returns:
+            SymbolInfoTick: Un objeto SymbolInfoTick que contiene información del último tick del símbolo.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        # Obtiene la información del último tick del símbolo
+        symbol_info_tick = mt5.symbol_info_tick(symbol)
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        
+        return symbol_info_tick
+    
     #endregion
 
     #region Setters
-    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None) -> int:
+    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None) -> MqlTradeResult:
         """
         Envía una orden al servidor de MetaTrader 5.
 
@@ -353,11 +435,12 @@ class MT5Api:
             comment (str, optional): Comentario opcional para la orden.
 
         Returns:
-            int: El número de ticket de la orden creada.
+            MqlTradeResult: Contiene la informacion sobre el resultado de la orden, None si la orden no es valida.
 
-        Raises:
-            ValueError: Si se proporciona un tipo de orden no válido.
         """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+
         request = {}
         if price is None:
             # Si no se especifica el precio, obtener el precio actual del mercado
@@ -372,6 +455,7 @@ class MT5Api:
         request['action'] = TradeActions.TRADE_ACTION_DEAL
         request['symbol'] = symbol
         request['volume'] = volume
+        request["deviation"]: 10
 
         if comment is not None:
             request["comment"] = comment
@@ -382,15 +466,148 @@ class MT5Api:
         if take_profit is not None:
             request["tp"] = take_profit
 
-        result = mt5.order_send(request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"No se pudo realizar la compra. Código de error: {result.retcode}")
-            print(f"Comentario: {result.comment}")
+        order_request: MqlTradeResult = mt5.order_send(request)
+        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
+            print(f"Comentario: {order_request.comment}")
             return None
         else:
             print("Orden completada.")
 
-        return result.order
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        return order_request
+    
+    def send_sell_partial_position(symbol: str, volume_to_sell: float, ticket:int):
+        """
+        Vende una parte de una posición abierta en MT5.
+
+        Args:
+            symbol (str): El símbolo del instrumento.
+            volume_to_sell (float): El volumen de la posición a vender.
+            ticket (int): El número de ticket de la posición a vender.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+
+        position = mt5.positions_get(ticket=ticket)
+        
+        request_type = 0
+        
+        if position is not None and position[-1].type == 0:
+            request_type = OrderType.MARKET_SELL
+        else:
+            request_type = OrderType.MARKET_BUY
+                
+        request = {
+            "action": TradeActions.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": volume_to_sell,
+            "type": request_type,
+            "price": mt5.symbol_info_tick(symbol).ask,
+            "position": ticket,
+        }
+
+        order_request = mt5.order_send(request)
+
+        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+            print(f"Comentario: {order_request.comment}")
+            return None
+        else:
+            print("Venta parcial completada.")
+            
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+    
+    def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int):
+        """
+        Cambia el nivel de stop loss de una posición abierta en MT5.
+
+        Args:
+            symbol (str): El símbolo del instrumento.
+            new_stop_loss (float): El nuevo nivel de stop loss.
+            ticket (int): El número de ticket de la posición a modificar.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+
+        modify_request = {
+            "action": TradeActions.TRADE_ACTION_SLTP,
+            "symbol": symbol,
+            "position": ticket,
+            "sl": new_stop_loss,
+        }
+
+        modify_result = mt5.order_send(modify_request)
+
+        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"Orden de modificación del stop loss ejecutada: {modify_result.order}")
+        else:
+            print(f"Error al ejecutar la orden de modificación del stop loss: {modify_result.retcode}")
+            print(f"Comentario: {modify_result.comment}")
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        
+    def send_change_take_profit(symbol:str, new_take_profit: float, ticket:int):
+        """
+        Cambia el nivel de take profit de una posición abierta en MT5.
+
+        Args:
+            symbol (str): El símbolo del instrumento.
+            new_take_profit (float): El nuevo nivel de take profit.
+            ticket (int): El número de ticket de la posición a modificar.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        modify_request = {
+            "action": TradeActions.TRADE_ACTION_SLTP,
+            "symbol": symbol,
+            "position": ticket,
+            "tp": new_take_profit,
+        }
+
+        modify_result = mt5.order_send(modify_request)
+
+        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"Orden de modificación del take profit ejecutada: {modify_result.order}")
+        else:
+            print(f"Error al ejecutar la orden de modificación del take profit: {modify_result.retcode}")
+            print(f"Comentario: {modify_result.comment}")
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+    
+    def send_close_all_position():
+        """
+        Cierra todas las posiciones abiertas en la plataforma MetaTrader 5.
+        
+        Esta función se conecta a MetaTrader 5, obtiene todas las posiciones abiertas,
+        y las cierra una por una. Luego muestra un mensaje de éxito o error para cada posición cerrada.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        # Obtiene todas las posiciones abiertas
+        positions = mt5.positions_get()
+        
+        if positions is not None:
+            # Itera sobre todas las posiciones abiertas y las cierra
+            for position in positions:  
+                close_result = mt5.Close(position.symbol,ticket=position.ticket)
+                
+                if close_result:
+                    print(f"Posición en {position.symbol} cerrada con éxito")
+                else:
+                    print(f"Error al cerrar la posición en {position.symbol}")
+                    
+        else:
+            print("No hay posiciones abiertas para cerrar")
+            
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
     #endregion
     
     #region Utilities

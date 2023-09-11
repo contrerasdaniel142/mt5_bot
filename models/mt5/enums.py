@@ -41,7 +41,7 @@ class TimeFrame:
     WEEK_1                              = 1  | 0x8000
     MONTHLY_1                           = 1  | 0xC000
     
-class CopyTicks():
+class CopyTicks:
     """
     Enum de las opciones disponibles para la copia de ticks en MetaTrader 5.
 
@@ -54,7 +54,7 @@ class CopyTicks():
     COPY_TICKS_INFO                     = 1
     COPY_TICKS_TRADE                    = 2
     
-class TickFlag():
+class TickFlag:
     """
     Enum de las banderas de ticks en MetaTrader 5.
 
