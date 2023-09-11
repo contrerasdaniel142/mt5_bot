@@ -40,31 +40,47 @@ class BotController:
 
     #region Positions Management
     def manage_positions(self, strategies: List[object]):
+        """
+        Administra las posiciones abiertas según las estrategias proporcionadas.
+
+        Este método revisa las estrategias proporcionadas y gestiona las posiciones abiertas de acuerdo con ellas.
+        
+        Args:
+            strategies (List[object]): Una lista de objetos que representan las estrategias a seguir.
+
+        Returns:
+            None
+        """
         print("Iniciando administrador de posiciones abiertas.")
         while True:
             number_of_active_positions = 0
             number_of_active_strategies = 0
             all_positions = MT5Api.get_positions()
+            
+            # Iterar a través de las estrategias proporcionadas
             for strategy in strategies:
-                #Revisa si la estrategia esta activa aun
+                # Revisa si la estrategia está activa aún
                 if strategy.symbols:
                     number_of_active_strategies += 1
+                
                 # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
                 positions = [position for position in all_positions if strategy.comment in position.comment]
                 if positions:
-                    number_of_active_positions +=1
+                    number_of_active_positions += 1
+                    # Llama al método 'manage_positions' de la estrategia para gestionar las posiciones
                     strategy.manage_positions(positions)
 
+            # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
             if number_of_active_positions == 0 and number_of_active_strategies == 0:
-                print("Sin pocisiones abiertas ni estrategias activas.")
+                print("Sin posiciones abiertas ni estrategias activas.")
                 break
-            
-            # Salir del bucle si termino el mercado
+
+            # Salir del bucle si terminó el horario de mercado
             if not self._is_in_market_hours():
-                print("Finalizo el horario de mercado. Cerrando posiciones abiertas")
+                print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
+                # Envia una solicitud para cerrar todas las posiciones abiertas
                 MT5Api.send_close_all_position()
                 break
-    
     #endregion
 
     #region utilities
@@ -179,7 +195,7 @@ class BotController:
         Realiza las siguientes tareas:
         1. Obtiene el horario comercial del día actual.
         2. Verifica si el horario comercial está disponible.
-        3. Si está disponible, crea colas de comunicación y procesos para realizar operaciones.
+        3. Si está disponible, inicia las estrategias.
 
         Returns:
             None
@@ -237,6 +253,9 @@ class BotController:
                 #endregion
                 
                 #endregion
+                
+                # Espera antes de comenzar con el seguimiento de posiciones
+                time.sleep(3)
                 
                 # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
                 manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
@@ -375,17 +394,17 @@ class BreakoutTrading:
     #endregion
     
     #region Breakout strategy Management
-    def _breakout_order(self, symbol: str):
+    def _breakout_order(self, symbol: str, data: Dict[str, Any]) -> None:
         """
-        Prepara órdenes para enviarlas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
+        Prepara órdenes para ser enviadas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
 
         Args:
             symbol (str): El nombre del símbolo para el cual se creará la orden.
-            
+            data (Dict[str, Any]): Los datos necesarios para preparar la orden, como precios, volúmenes, etc.
+
         Returns:
             None
         """
-        data = self._data[symbol]
         print("Breakout: Preparando orden ", str(data['symbol']))
         # Pre establece los datos de la orden que se enviará
         order = {
@@ -494,7 +513,8 @@ class BreakoutTrading:
         # Se crea una copia para evitar errores cuando se modifique la original
         copy_symbols = list(self.symbols)
         
-        for symbol in copy_symbols:                    
+        for symbol in copy_symbols:
+            data = self._data[symbol]            
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)
             type = None
@@ -506,22 +526,29 @@ class BreakoutTrading:
             info_tick = MT5Api.get_symbol_info_tick(symbol)
             
             # Precio ask (venta) como precio de compra
-            if info_tick.bid < self._data[symbol]['low'] and (type == 0 or type is None):
+            if info_tick.bid < data['low'] and (type == 0 or type is None):
                 # Se agrega el tipo de orden
-                self._data[symbol]['type'] = 'sell'
+                data['type'] = 'sell'
                 # Crear orden y enviarla
-                self._breakout_order(symbol)
+                self._breakout_order(symbol, data)
                 # Remueve los símbolos tradeados segun la estrategia
                 self.symbols.remove(symbol)
             
             # Precio bid (oferta) como precio de venta
-            elif info_tick.ask > self._data[symbol]['high'] and (type == 1 or type is None):
+            elif info_tick.ask >data['high'] and (type == 1 or type is None):
                 # Se agrega el tipo de orden
-                self._data[symbol]['type']= 'buy'
+                data['type']= 'buy'
                 # Crear orden y enviarla
-                self._breakout_order(symbol)
+                self._breakout_order(symbol, data)
                 # Remueve los símbolos tradeados segun la estrategia
                 self.symbols.remove(symbol)
+                
+            # En caso de no superar alguna de las condiciones ignfica que los precios estan alejados de su rango
+            # por lo tanto hay que quitar el símbolo
+            if symbol in self.symbols:
+                self.symbols.remove(symbol)
+            
+            
     #endregion
     
     #region Positions Management
@@ -544,39 +571,45 @@ class BreakoutTrading:
 
         Esta función implementa una estrategia de trailing stop basada en ciertas condiciones.
         """
-        symbol_data = self._data[position.symbol]  # Datos relacionados con el símbolo
+        symbol = position.symbol
+        symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
         partial_position = symbol_data['partial_position']
         
         if partial_position == 1:
             # Inicializa valores iniciales para la posición parcial
             symbol_data['first_volume'] = position.volume
             symbol_data['previous_stop_level'] = position.price_open
+            # Actualiza los valores en el diccionario compartido self._data
+            self._data.update({symbol: symbol_data})
 
         # Calcula el porcentaje de cambio de precio
         price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
         percentage_piece = (100 / self.number_stops) / 100
 
         # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-        next_partial_percentage = percentage_piece * symbol_data['partial_position']
+        next_partial_percentage = percentage_piece * partial_position
         trailing_stop_threshold = percentage_piece * (self.number_stops - 1)
 
         if price_change_percentage > next_partial_percentage and price_change_percentage < trailing_stop_threshold:
             # Calcula el nuevo volumen para la venta parcial
             new_volume = symbol_data['first_volume'] * next_partial_percentage
             # Envia la orden para la venta parcial
-            MT5Api.send_sell_partial_position(position.symbol, new_volume, position.ticket)
+            MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
             # Actualiza la posición parcial
             symbol_data['partial_position'] += 1
             # Mueve el stop loss al nivel anterior
             new_stop_loss = symbol_data['previous_stop_level']
             # Actualiza el stop loss en MT5
-            MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
             # Actualiza el nuevo previous_stop_level con el precio actual
             symbol_data['previous_stop_level'] = position.price_current
             
+            # Actualiza los valores en el diccionario compartido self._data
+            self._data.update({symbol: symbol_data})
+            
         elif price_change_percentage > trailing_stop_threshold:
             # Aplica una estrategia de trailing stop adicional
-            self._trailing_stop(position.symbol, position.ticket, price_change_percentage)
+            self._trailing_stop(symbol_data['range'], position)
 
     def _trailing_stop(self, range: float, position: TradePosition):
         """
@@ -628,7 +661,6 @@ class BreakoutTrading:
         
         # Inicio del cilco
         while True:
-            print("")
             # Salir del bucle si no quedan símbolos
             if not self.symbols:
                 print("Breakout: No hay símbolos por analizar.")
