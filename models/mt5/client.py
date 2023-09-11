@@ -490,35 +490,40 @@ class MT5Api:
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
 
-        position = mt5.positions_get(ticket=ticket)
+        positions = mt5.positions_get(ticket=ticket)
         
         request_type = 0
         
-        if position is not None and position[-1].type == 0:
-            request_type = OrderType.MARKET_SELL
-        else:
-            request_type = OrderType.MARKET_BUY
+        if positions is not None and positions:
+            position = positions[-1]
+            if position.type == 0:
+                request_type = OrderType.MARKET_SELL
+            else:
+                request_type = OrderType.MARKET_BUY
+                    
+            request = {
+                "action": TradeActions.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": volume_to_sell,
+                "type": request_type,
+                "price": mt5.symbol_info_tick(symbol).ask,
+                "position": ticket,
+                "comment": position.comment
+            }
+
+            order_request = mt5.order_send(request)
+
+            if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+                print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+                print(f"Comentario: {order_request.comment}")
+                return None
+            else:
+                print("Venta parcial completada.")
                 
-        request = {
-            "action": TradeActions.TRADE_ACTION_DEAL,
-            "symbol": symbol,
-            "volume": volume_to_sell,
-            "type": request_type,
-            "price": mt5.symbol_info_tick(symbol).ask,
-            "position": ticket,
-        }
-
-        order_request = mt5.order_send(request)
-
-        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
-            print(f"Comentario: {order_request.comment}")
-            return None
+            # Cierra la conexión con MetaTrader 5
+            MT5Api.shutdown()
         else:
-            print("Venta parcial completada.")
-            
-        # Cierra la conexión con MetaTrader 5
-        MT5Api.shutdown()
+            print(f"No se pudo realizar la venta parcial.")
     
     def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int):
         """
@@ -626,3 +631,4 @@ class MT5Api:
         
         return dt_mt5
     #endregion
+
