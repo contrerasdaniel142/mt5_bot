@@ -128,8 +128,8 @@ class BotController:
         current_time = datetime.now(pytz.utc).time()
 
         # Crear objetos time para el horario de apertura y cierre del mercado
-        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'])
+        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close:
@@ -153,22 +153,35 @@ class BotController:
             None
         """
         if not self._is_in_market_hours() or sleep_to_tomorrow == True:
+            
+            print("Iniciando esperar hasta la proxima apertura de mercado...")
+            
             # Obtener la hora actual en UTC
             current_time = datetime.now(pytz.utc)
+            
+            print("Hora actual utc: ", current_time)
         
             # Crear un objeto datetime para la hora de apertura del mercado hoy
-            market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
+            market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
             
             # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
             if sleep_to_tomorrow and current_time > market_open:
                 print("Esperar hasta la apertura de mañana.")
                 market_open = market_open + timedelta(days=1)
             
+            print("Apertura del mercado utc: ", market_open)
+            
             # Calcular la cantidad de segundos que faltan hasta la apertura
             seconds = (market_open - current_time).total_seconds()
             
             print("Esperando la apertura...")
-            time.sleep(seconds)      
+                        
+            time.sleep(seconds)
+            
+            # Obtener la hora actual en UTC
+            current_time = datetime.now(pytz.utc)
+            
+            print("Hora actual utc: ", current_time)
 
     def _find_value_in_text(self, text: str, pattern: str):
         """
@@ -204,6 +217,7 @@ class BotController:
         Returns:
             None
         """
+        print("")
         print("Iniciando bot..")
                 
         # Establece el riesgo por operacion
@@ -272,6 +286,7 @@ class BotController:
             
             # Al finalizar la ejecución del programa o si no hay mercado hoy, 
             # se pausará el programa hasta el próximo día laborable para volver a comprobar.
+            print("")
             self._sleep_to_next_market_opening(sleep_to_tomorrow=True)                
     #endregion
 
