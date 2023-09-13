@@ -613,6 +613,33 @@ class MT5Api:
             
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+    
+    def send_remove_take_profit_and_stop_loss(ticket: int):
+        """
+        Elimina el stop loss y el take profit de una posición abierta en MetaTrader 5.
+
+        Parameters:
+        ticket (int): El número de ticket de la posición que se desea modificar.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        # Verificamos si la conexión con MetaTrader 5 está establecida
+        if not mt5.initialize():
+            print("Error: No se pudo establecer la conexión con MetaTrader 5.")
+            return False
+        
+        # Configuramos los parámetros para eliminar el stop loss y el take profit
+        request = {
+            "position": ticket,
+            "action": TradeActions.TRADE_ACTION_SLTP,
+            "order": OrderType.CLOSE_BY
+        }
+
+        # Enviamos la solicitud para eliminar el stop loss y el take profit
+        result = mt5.order_send(request)
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
     #endregion
     
     #region Utilities
@@ -631,4 +658,3 @@ class MT5Api:
         
         return dt_mt5
     #endregion
-

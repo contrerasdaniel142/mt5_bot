@@ -223,6 +223,9 @@ class BotController:
         # Establece el riesgo por operacion
         user_risk = 100
         
+        # Se establece el riesgo maximo
+        max_user_risk = 1000
+        
         # Establece los symbolos
         symbols= ["US30.cash"] 
         
@@ -272,6 +275,19 @@ class BotController:
                 em_breakoutTrading._prepare_breakout_data(user_risk)      
                 # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
                 em_breakout_process.start()
+                #endregion
+                
+                #region Hedge
+                # Se crea el objeto de la estrategia hedge 
+                symbols_hedge = manager.list(symbols)
+                hedgeTrading = HedgeTrading(data= manager.dict({}), symbols=symbols_hedge)
+                strategies.append(hedgeTrading)                      
+                # Se crea el proceso que incia la estrategia
+                hedge_process = multiprocessing.Process(target=hedgeTrading.start, args=(user_risk,))
+                # Prepara la data de la estrategia antes de iniciar
+                hedgeTrading._prepare_hedge_data(user_risk= user_risk, max_user_risk= max_user_risk)    
+                # Se inicia el proceso, si no se desea que se ejecute solo comente
+                hedge_process.start()
                 #endregion
                 
                 #endregion
@@ -400,7 +416,7 @@ class BreakoutTrading:
             return False
     #endregion
     
-    #region Breakout strategy Management
+    #region Breakout strategy
     def _breakout_order(self, symbol: str, data: Dict[str, Any]) -> None:
         """
         Prepara órdenes para ser enviadas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
@@ -425,7 +441,7 @@ class BreakoutTrading:
             "comment": None
         }
                     
-        order['volume'] = data['lote_size']
+        order['volume'] = data['lot_size']
         
         # El volumen se remplaza con el maximo permitido en caso de ser mayor
         if order['volume'] > data['volume_max']:
@@ -494,7 +510,7 @@ class BreakoutTrading:
                 'high': high,
                 'low': low,
                 'range': range_value,
-                'lote_size': trade_risk,
+                'lot_size': trade_risk,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
                 'partial_position': 1
@@ -604,11 +620,13 @@ class BreakoutTrading:
             symbol_data['partial_position'] += 1
             # Mueve el stop loss al nivel anterior
             new_stop_loss = symbol_data['previous_stop_level']
+            # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
+            if symbol_data['partial_position'] == (self.number_stops-1):
+                MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
             # Actualiza el stop loss en MT5
             MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
             # Actualiza el nuevo previous_stop_level con el precio actual
             symbol_data['previous_stop_level'] = position.price_current
-            
             # Actualiza los valores en el diccionario compartido self._data
             self._data.update({symbol: symbol_data})
             
@@ -644,7 +662,7 @@ class BreakoutTrading:
     #endregion
     
     #region start
-    def start(self, user_risk: int = 100):
+    def start(self):
         """
         Inicia la estrategia de breakout trading para los símbolos especificados.
 
@@ -689,25 +707,16 @@ class BreakoutTrading:
 
     
 class HedgeTrading:
-    def __init__(self, data:DictProxy, symbols: ListProxy, number_stops:int = 4, in_real_time: bool = False) -> None:
-        # Estos horarios estan en utc
-        self._in_real_time = in_real_time
-        
+    def __init__(self, data:DictProxy, symbols: ListProxy) -> None:
         # Se guarda la lista de símbolos compartida
         self.symbols = symbols
-        
-        # Las veces que se fracionara el stop cuando se tomen ganancias con parciales
-        self.number_stops = number_stops
         
         # Variable compartida que se acutalizara entre procesos
         self._data = data 
         
         # El comentario que identificara a los trades
-        if in_real_time:
-            self.comment = "Hedge: real-time order"
-        else:
-            self.comment = "Hedge: every-minute order"
-            
+        self.comment = "Hedge"
+        
         self._market_opening_time = {'hour':13, 'minute':29}
         self._market_closed_time = {'hour':19, 'minute':55}
     
@@ -783,8 +792,8 @@ class HedgeTrading:
         current_time = datetime.now(pytz.utc).time()
 
         # Crear objetos time para el horario de apertura y cierre del mercado
-        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'])
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'])
+        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close:
@@ -792,9 +801,26 @@ class HedgeTrading:
         else:
             print("El mercado está cerrado.")
             return False
+    
+    def get_number_in_comment(self, comment:str):
+        """
+        Extrae y devuelve el último número entero encontrado en la cadena de comentario dada.
+
+        Args:
+            comment (str): La cadena de comentario de entrada.
+        Returns:
+            int: El número entero extraído si se encuentra, o None si no se encuentra ningún número en el comentario.
+        """
+        parts = comment.split()
+
+        if parts[-1].isdigit():
+            return int(parts[-1])
+        else:
+            return None
+    
     #endregion
     
-    #region Hedge strategy Management
+    #region Hedge strategy
     def _hedge_order(self, symbol: str, data: Dict[str, Any]) -> None:
         """
         Prepara órdenes para ser enviadas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
@@ -809,7 +835,7 @@ class HedgeTrading:
         print("Hedge: Preparando orden ", str(data['symbol']))
         # Pre establece los datos de la orden que se enviará
         order = {
-            "symbol": data['symbol'], 
+            "symbol": symbol, 
             "order_type": None, 
             "volume": None,
             "price": None,
@@ -818,12 +844,29 @@ class HedgeTrading:
             "ticket": None,
             "comment": None
         }
-                    
-        order['volume'] = data['lote_size']
+           
+        # Consultar el número de órdenes realizadas para el símbolo
+        positions = MT5Api.get_positions(symbol= symbol)
+        
+        # Filtra aquellos con el comentario de la estrategia
+        positions = [position for position in positions if self.comment in position.comment]
+        
+        # Obtiene el numero de la ultima posicion realizada
+        if positions:
+            number = self.get_number_in_comment(positions[-1].comment)
+        else:
+            number = 0
+            
+        # size = 2^(number) con esta formula nos aseguramos que el size siempre sea el doble del anterior
+        size = 2 ** (number)
+        order['volume'] = (data['trade_risk'] * size)         
+        order['volume'] = data['lot_size']
         
         # El volumen se remplaza con el maximo permitido en caso de ser mayor
-        if order['volume'] > data['volume_max']:
-            order['volume'] = data['volume_max']
+        if order['volume'] > data['volume_max'] or order['volume'] > data['max_lot_size'] :
+            print("Hedge: Volumen maximo de ", symbol, " alcanzado, eliminado símbolo...")
+            self.symbols.remove(symbol)
+            return None
         # El volumen se remplaza con el minimo permitido en caso de ser menor
         elif order['volume'] < data['volume_min']:
             order['volume'] = data['volume_min']
@@ -832,24 +875,26 @@ class HedgeTrading:
         # se establecen los demás campos de la orden
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
-            order['take_profit'] = data['high'] + (data['range']*2)
-            order['stop_loss'] = data['low']
+            order['take_profit'] = data['recovery_high'] + (data['recovery_range']*3)
+            order['stop_loss'] = data['recovery_low'] - (data['recovery_range']*2)
+            
         else:
             order['order_type'] = OrderType.MARKET_SELL
-            order['take_profit'] = data['low'] - (data['range']*2)
-            order['stop_loss'] = data['high']
+            order['take_profit'] = data['recovery_low'] - (data['recovery_range']*3)
+            order['stop_loss'] = data['recovery_high'] + (data['recovery_range']*2)
         
-        order['comment'] = self.comment
+        order['comment'] = self.comment + " " + str(number+1)
         
         # Se envía la orden por la cola de comunicación
         self._send_order(order)
 
-    def _prepare_hedge_data(self, user_risk: float):
+    def _prepare_hedge_data(self, user_risk: float, max_user_risk: float):
         """
         Prepara la data que se usara en la estrategia de Hedge.
 
         Args:
-            user_risk (float): Riesgo del usuario.
+            user_risk (float): Riesgo minimo del usuario.
+            max_user_risk (float): Riesgo maximo del usuario.
         """
         print("Hedge: Preparando la data...")
         current_time = datetime.now(pytz.utc)
@@ -861,6 +906,7 @@ class HedgeTrading:
             second=0,
             microsecond=0
         )
+        
         end_time = current_time.replace(
             hour=self._market_opening_time['hour'],
             minute=self._market_opening_time['minute'],
@@ -882,7 +928,8 @@ class HedgeTrading:
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
             recovery_range = range_value/3
-            trade_risk = round((user_risk / range_value), decimals)
+            min_trade_risk = round((user_risk / range_value), decimals)
+            max_trade_risk = round((max_user_risk / range_value), decimals)
             
             data[symbol] = {
                 'symbol': symbol,
@@ -890,11 +937,12 @@ class HedgeTrading:
                 'low': low,
                 'range': range_value,
                 'recovery_range': recovery_range,
-                'recovery_zone': 0,
-                'lote_size': trade_risk,
+                'recovery_high': None,
+                'recovery_low': None,
+                'lot_size': min_trade_risk,
+                'max_lot_size': max_trade_risk,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
-                'partial_position': 1
             }
             
         # Actualiza la variable compartida
@@ -924,7 +972,13 @@ class HedgeTrading:
             type = None
             # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
             if positions:
-                type = positions[-1].type
+                last_position = positions[-1]
+                type = last_position.type
+                # Elimina los symbolos que ya consiguieron ganancias y estan en traling stop
+                # Aquellos en trailing stop tendran take profit 0
+                if last_position.tp == 0:
+                    self.symbols.remove(data["symbol"])
+                    continue
             
             # Obtenemos la ultima informacion actualizada del symbolo
             info_tick = MT5Api.get_symbol_info_tick(symbol)
@@ -932,122 +986,72 @@ class HedgeTrading:
             if type is None:
                 # Precio ask (venta) como precio de compra
                 if info_tick.bid < data['low']:
-                    # Se agrega el tipo de orden
-                    data['type'] = 'sell'
                     # Se establece el recovery zone
-                    data['recovery_zone'] = data['low'] + data['recovery_range']
-                    # Crear orden y enviarla
-                    self._hedge_order(symbol, data)
+                    data['recovery_low'] = data['low']
+                    data['recovery_high'] = data['low'] + data['recovery_range']
+                    # Actualiza el diccionario compartido
+                    self._data.update({symbol: data})
                 
                 # Precio bid (oferta) como precio de venta
                 elif info_tick.ask >data['high']:
-                    # Se agrega el tipo de orden
-                    data['type']= 'buy'
                     # Se establece el recovery zone
-                    data['recovery_zone'] = data['low'] + data['recovery_range']
-                    # Crear orden y enviarla
-                    self._hedge_order(symbol, data)
+                    data['recovery_low'] = data['high'] - data['recovery_range']
+                    data['recovery_high'] = data['high']
+                    # Actualiza el diccionario compartido
+                    self._data.update({symbol: data})
             
-            elif type == 0 and info_tick.bid < (data['high'] - data['recovery_zone']):
+            if (type == 0 or type is None) and info_tick.bid < data['recovery_low']:
                 # Se agrega el tipo de orden
                     data['type'] = 'sell'
                     # Crear orden y enviarla
                     self._hedge_order(symbol, data)
             
-            elif type == 1 and info_tick.ask > (data['low'] + data['recovery_zone']):
+            elif (type == 1 or type is None) and info_tick.ask > data['recovery_high']:
                 # Se agrega el tipo de orden
                     data['type'] = 'sell'
                     # Crear orden y enviarla
                     self._hedge_order(symbol, data)
-            
-                
-            
-            # Precio ask (venta) como precio de compra
-            if info_tick.bid < data['low'] and (type == 0 or type is None):
-                # Se agrega el tipo de orden
-                data['type'] = 'sell'
-                # Crear orden y enviarla
-                self._hedge_order(symbol, data)
-                # Remueve los símbolos tradeados segun la estrategia
-                self.symbols.remove(symbol)
-            
-            # Precio bid (oferta) como precio de venta
-            elif info_tick.ask >data['high'] and (type == 1 or type is None):
-                # Se agrega el tipo de orden
-                data['type']= 'buy'
-                # Crear orden y enviarla
-                self._hedge_order(symbol, data)
-                # Remueve los símbolos tradeados segun la estrategia
-                self.symbols.remove(symbol)
-                
-            # En caso de no superar alguna de las condiciones ignfica que los precios estan alejados de su rango
-            # por lo tanto hay que quitar el símbolo
-            if symbol in self.symbols:
-                self.symbols.remove(symbol)
-            
-            
+                   
     #endregion
     
     #region Positions Management
+    
     def manage_positions(self, positions: List[TradePosition]):
         """
-        Gestiona las posiciones de Hedge.
+        Gestiona las posiciones de Hedge mediante la actualización del stop loss y el trailing stop.
 
         Args:
             positions (List[TradePosition]): Lista de posiciones de operaciones.
         """
         for position in positions:
-            self._trailing_strategy(position)
-
-    def _trailing_strategy(self, position: TradePosition):
-        """
-        Estrategia de seguimiento para una posición.
-
-        Args:
-            position (TradePosition): La posición de la operación.
-
-        Esta función implementa una estrategia de trailing stop basada en ciertas condiciones.
-        """
-        symbol = position.symbol
-        symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
-        partial_position = symbol_data['partial_position']
-        
-        if partial_position == 1:
-            # Inicializa valores iniciales para la posición parcial
-            symbol_data['first_volume'] = position.volume
-            symbol_data['previous_stop_level'] = position.price_open
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
-
-        # Calcula el porcentaje de cambio de precio
-        price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
-        percentage_piece = (100 / self.number_stops) / 100
-
-        # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-        next_partial_percentage = percentage_piece * partial_position
-        trailing_stop_threshold = percentage_piece * (self.number_stops - 1)
-
-        if price_change_percentage > next_partial_percentage and price_change_percentage < trailing_stop_threshold:
-            # Calcula el nuevo volumen para la venta parcial
-            new_volume = symbol_data['first_volume'] * next_partial_percentage
-            # Envia la orden para la venta parcial
-            MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
-            # Actualiza la posición parcial
-            symbol_data['partial_position'] += 1
-            # Mueve el stop loss al nivel anterior
-            new_stop_loss = symbol_data['previous_stop_level']
-            # Actualiza el stop loss en MT5
-            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
-            # Actualiza el nuevo previous_stop_level con el precio actual
-            symbol_data['previous_stop_level'] = position.price_current
+            data = self._data[position.symbol]
             
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
-            
-        elif price_change_percentage > trailing_stop_threshold:
-            # Aplica una estrategia de trailing stop adicional
-            self._trailing_stop(symbol_data['range'], position)
-
+            # Comprueba si la posición es de compra (long) o venta (short)
+            if position.type == 0:  # Posición de compra (long)
+                # Verifica si el stop loss está por encima del umbral superior de recuperación
+                if position.sl >= (data["recovery_high"] + (2 * data['recovery_range'])):
+                    self._trailing_stop(data['recovery_range'], position)
+                else:
+                    # Calcula el nuevo valor del stop loss
+                    new_stop_loss = position.tp - data['recovery_range']
+                    # Comprueba si el nuevo stop loss es menor que el precio actual
+                    if new_stop_loss < position.price_current:
+                        # Actualiza el stop loss en MT5
+                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+            else:  # Posición de venta (short)
+                # Verifica si el stop loss está por debajo del umbral inferior de recuperación
+                if position.sl <= (data["recovery_low"] - (2 * data['recovery_range'])):
+                    self._trailing_stop(data['recovery_range'], position)
+                else:
+                    # Calcula el nuevo valor del stop loss
+                    new_stop_loss = position.tp + data['recovery_range']
+                    # Comprueba si el nuevo stop loss es mayor que el precio actual
+                    if new_stop_loss > position.price_current:
+                        # Actualiza el stop loss en MT5
+                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                    
     def _trailing_stop(self, range: float, position: TradePosition):
         """
         Aplica un trailing stop a una posición.
@@ -1059,7 +1063,7 @@ class HedgeTrading:
         Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
         """
         # Se calcula la distancia con el rango
-        trailing_stop_distance = range * 0.5
+        trailing_stop_distance = range 
         
         if position.type == 0:
             # Calcula el nuevo stop loss para posiciones de compra
@@ -1073,22 +1077,18 @@ class HedgeTrading:
             if new_sl < position.sl:
                 # Envia la orden para cambiar el stop loss en MT5
                 MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+    
     #endregion
     
     #region start
-    def start(self, user_risk: int = 100):
+    def start(self):
         """
         Inicia la estrategia de Hedge trading para los símbolos especificados.
-
-        Args:
-            user_risk (int, opcional): El nivel de riesgo deseado para las operaciones. El valor predeterminado es 100.
         Returns:
             None
         """
 
         print("Hedge: Iniciando estrategia...")
-        # Prepara la data de la estrategia antes de iniciar
-        self._prepare_hedge_data(user_risk)            
         
         # Inicio del cilco
         while True:
@@ -1109,17 +1109,3 @@ class HedgeTrading:
           
     #endregion
 
-
-    #region hedge_strategy   
-    
-            # size = 2^(orders_placed) con esta formula nos aseguramos que el size siempre sea el doble del anterior
-            # 0 orden = 1       3 orden = 8
-            # 1 orden = 2       4 orden = 16
-            # 2 orden = 4       .......
-            # size = 2 ** (len(orders_placed))
-            # order['volume'] = (data['trade_risk'] * size)
-        
-    #endregion
-    
-    
-    
