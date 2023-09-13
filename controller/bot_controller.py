@@ -453,12 +453,12 @@ class BreakoutTrading:
         # se establecen los demás campos de la orden
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
-            order['take_profit'] = data['high'] + (data['range']*2)
-            order['stop_loss'] = data['low']
+            order['take_profit'] = round(data['high'] + (data['range']*2), data['decimals'])
+            order['stop_loss'] = round(data['low'], data['decimals'])
         else:
             order['order_type'] = OrderType.MARKET_SELL
-            order['take_profit'] = data['low'] - (data['range']*2)
-            order['stop_loss'] = data['high']
+            order['take_profit'] = round(data['low'] - (data['range']*2), data['decimals'])
+            order['stop_loss'] = round(data['high'], data['decimals'])
         
         order['comment'] = self.comment
         
@@ -866,18 +866,18 @@ class HedgeTrading:
         # El volumen se remplaza con el minimo permitido en caso de ser menor
         elif order['volume'] < data['volume_min']:
             order['volume'] = data['volume_min']
-                        
+                
         # El tipo de compra que se realizará y 
         # se establecen los demás campos de la orden
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
-            order['take_profit'] = data['recovery_high'] + (data['recovery_range']*3)
-            order['stop_loss'] = data['recovery_low'] - (data['recovery_range']*2)
+            order['take_profit'] = round(data['recovery_high'] + (data['recovery_range']*3), data['decimals'])
+            order['stop_loss'] = round(data['recovery_low'] - (data['recovery_range']*2), data['decimals'])
             
         else:
             order['order_type'] = OrderType.MARKET_SELL
-            order['take_profit'] = data['recovery_low'] - (data['recovery_range']*3)
-            order['stop_loss'] = data['recovery_high'] + (data['recovery_range']*2)
+            order['take_profit'] = round(data['recovery_low'] - (data['recovery_range']*3), data['decimals'])
+            order['stop_loss'] = round(data['recovery_high'] + (data['recovery_range']*2), data['decimals'])
         
         order['comment'] = self.comment + " " + str(number+1)
         
@@ -930,6 +930,7 @@ class HedgeTrading:
             data[symbol] = {
                 'symbol': symbol,
                 'high': high,
+                'decimals': decimals,
                 'low': low,
                 'range': range_value,
                 'recovery_range': recovery_range,
@@ -977,32 +978,33 @@ class HedgeTrading:
             info_tick = MT5Api.get_symbol_info_tick(symbol)
             
             if type is None:
-                if info_tick.ask < data['low']:
+                if info_tick.bid < data['low']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['low']
                     data['recovery_high'] = data['low'] + data['recovery_range']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
                 
-                elif info_tick.bid >data['high']:
+                elif info_tick.bid > data['high']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['high'] - data['recovery_range']
                     data['recovery_high'] = data['high']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
             
-            if (type == 0 or type is None) and info_tick.bid < data['recovery_low']:
-                # Se agrega el tipo de orden
-                    data['type'] = 'sell'
-                    # Crear orden y enviarla
-                    self._hedge_order(symbol, data)
-            
-            elif (type == 1 or type is None) and info_tick.ask > data['recovery_high']:
-                # Se agrega el tipo de orden
-                    data['type'] = 'sell'
-                    # Crear orden y enviarla
-                    self._hedge_order(symbol, data)
-                   
+            if data['recovery_low'] is not None:
+                if (type == 0 or type is None) and info_tick.bid < data['recovery_low']:
+                    # Se agrega el tipo de orden
+                        data['type'] = 'sell'
+                        # Crear orden y enviarla
+                        self._hedge_order(symbol, data)
+                
+                elif (type == 1 or type is None) and info_tick.ask > data['recovery_high']:
+                    # Se agrega el tipo de orden
+                        data['type'] = 'sell'
+                        # Crear orden y enviarla
+                        self._hedge_order(symbol, data)
+                    
     #endregion
     
     #region Positions Management
