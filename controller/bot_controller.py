@@ -709,7 +709,7 @@ class BreakoutTrading:
 class HedgeTrading:
     def __init__(self, data:DictProxy, symbols: ListProxy) -> None:
         # Se guarda la lista de símbolos compartida
-        self.symbols = symbolsA
+        self.symbols = symbols
         
         # Variable compartida que se acutalizara entre procesos
         self._data = data 
@@ -977,16 +977,14 @@ class HedgeTrading:
             info_tick = MT5Api.get_symbol_info_tick(symbol)
             
             if type is None:
-                # Precio ask (venta) como precio de compra
-                if info_tick.bid < data['low']:
+                if info_tick.ask < data['low']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['low']
                     data['recovery_high'] = data['low'] + data['recovery_range']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
                 
-                # Precio bid (oferta) como precio de venta
-                elif info_tick.ask >data['high']:
+                elif info_tick.bid >data['high']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['high'] - data['recovery_range']
                     data['recovery_high'] = data['high']
