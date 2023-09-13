@@ -256,7 +256,7 @@ class BotController:
                 # Se agrega rt_breakout_symbols
                 strategies.append(rt_breakoutTrading)                      
                 # Se crea el proceso que incia la estrategia
-                rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start, args=(user_risk,))
+                rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
                 # Prepara la data de la estrategia antes de iniciar
                 rt_breakoutTrading._prepare_breakout_data(user_risk)    
                 # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
@@ -270,7 +270,7 @@ class BotController:
                 # Se agrega rt_breakout_symbols
                 strategies.append(em_breakoutTrading)                      
                 # Se crea el proceso que incia la estrategia
-                em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start, args=(user_risk,))
+                em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
                 # Prepara la data de la estrategia antes de iniciar
                 em_breakoutTrading._prepare_breakout_data(user_risk)      
                 # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
@@ -283,7 +283,7 @@ class BotController:
                 hedgeTrading = HedgeTrading(data= manager.dict({}), symbols=symbols_hedge)
                 strategies.append(hedgeTrading)                      
                 # Se crea el proceso que incia la estrategia
-                hedge_process = multiprocessing.Process(target=hedgeTrading.start, args=(user_risk,))
+                hedge_process = multiprocessing.Process(target=hedgeTrading.start)
                 # Prepara la data de la estrategia antes de iniciar
                 hedgeTrading._prepare_hedge_data(user_risk= user_risk, max_user_risk= max_user_risk)    
                 # Se inicia el proceso, si no se desea que se ejecute solo comente
@@ -307,7 +307,6 @@ class BotController:
     #endregion
 
 
-#-------------------------------------------------------------------------------------------------------------------------------------
 
 
 class BreakoutTrading:
@@ -540,6 +539,8 @@ class BreakoutTrading:
             data = self._data[symbol]            
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)
+            # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
+            positions = [position for position in positions if self.comment in position.comment]
             type = None
             # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
             if positions:
@@ -705,11 +706,10 @@ class BreakoutTrading:
 #-------------------------------------------------------------------------------------------------------------------------------------
 
 
-    
 class HedgeTrading:
     def __init__(self, data:DictProxy, symbols: ListProxy) -> None:
         # Se guarda la lista de símbolos compartida
-        self.symbols = symbols
+        self.symbols = symbolsA
         
         # Variable compartida que se acutalizara entre procesos
         self._data = data 
@@ -735,7 +735,6 @@ class HedgeTrading:
         Returns:
             None
         """
-        print("Hedge: Enviando orden")
         # Envía la orden a MetaTrader 5
         MT5Api.send_order(**order)
     #endregion
@@ -832,8 +831,6 @@ class HedgeTrading:
         Returns:
             None
         """
-        print("Hedge: Preparando orden ", str(data['symbol']))
-        # Pre establece los datos de la orden que se enviará
         order = {
             "symbol": symbol, 
             "order_type": None, 
@@ -859,8 +856,7 @@ class HedgeTrading:
             
         # size = 2^(number) con esta formula nos aseguramos que el size siempre sea el doble del anterior
         size = 2 ** (number)
-        order['volume'] = (data['trade_risk'] * size)         
-        order['volume'] = data['lot_size']
+        order['volume'] = (data['lot_size'] * size)
         
         # El volumen se remplaza con el maximo permitido en caso de ser mayor
         if order['volume'] > data['volume_max'] or order['volume'] > data['max_lot_size'] :
@@ -957,11 +953,6 @@ class HedgeTrading:
         Returns:
             None
         """
-        # Verifica que tipo de ejecucion es
-        if self._in_real_time:
-            # Espera que el minuto termine para iniciar
-            self._sleep_to_next_minute()
-        
         # Se crea una copia para evitar errores cuando se modifique la original
         copy_symbols = list(self.symbols)
         
@@ -969,6 +960,8 @@ class HedgeTrading:
             data = self._data[symbol]            
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)
+            # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
+            positions = [position for position in positions if self.comment in position.comment]
             type = None
             # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
             if positions:

@@ -467,12 +467,12 @@ class MT5Api:
             request["tp"] = take_profit
 
         order_request: MqlTradeResult = mt5.order_send(request)
-        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
-            print(f"Comentario: {order_request.comment}")
-            return None
-        else:
-            print("Orden completada.")
+        # if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+        #     print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
+        #     print(f"Comentario: {order_request.comment}")
+        #     return None
+        # else:
+        #     print("Orden completada.")
 
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -513,12 +513,12 @@ class MT5Api:
 
             order_request = mt5.order_send(request)
 
-            if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
-                print(f"Comentario: {order_request.comment}")
-                return None
-            else:
-                print("Venta parcial completada.")
+            # if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            #     print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+            #     print(f"Comentario: {order_request.comment}")
+            #     return None
+            # else:
+            #     print("Venta parcial completada.")
                 
             # Cierra la conexión con MetaTrader 5
             MT5Api.shutdown()
@@ -546,11 +546,11 @@ class MT5Api:
 
         modify_result = mt5.order_send(modify_request)
 
-        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Orden de modificación del stop loss ejecutada: {modify_result.order}")
-        else:
-            print(f"Error al ejecutar la orden de modificación del stop loss: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
+        # if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+        #     print(f"Orden de modificación del stop loss ejecutada: {modify_result.order}")
+        # else:
+        #     print(f"Error al ejecutar la orden de modificación del stop loss: {modify_result.retcode}")
+        #     print(f"Comentario: {modify_result.comment}")
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -576,11 +576,11 @@ class MT5Api:
 
         modify_result = mt5.order_send(modify_request)
 
-        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Orden de modificación del take profit ejecutada: {modify_result.order}")
-        else:
-            print(f"Error al ejecutar la orden de modificación del take profit: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
+        # if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+        #     print(f"Orden de modificación del take profit ejecutada: {modify_result.order}")
+        # else:
+            # print(f"Error al ejecutar la orden de modificación del take profit: {modify_result.retcode}")
+            # print(f"Comentario: {modify_result.comment}")
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -598,18 +598,18 @@ class MT5Api:
         # Obtiene todas las posiciones abiertas
         positions = mt5.positions_get()
         
-        if positions is not None:
-            # Itera sobre todas las posiciones abiertas y las cierra
-            for position in positions:  
-                close_result = mt5.Close(position.symbol,ticket=position.ticket)
+        # if positions is not None:
+        #     # Itera sobre todas las posiciones abiertas y las cierra
+        #     for position in positions:  
+        #         close_result = mt5.Close(position.symbol,ticket=position.ticket)
                 
-                if close_result:
-                    print(f"Posición en {position.symbol} cerrada con éxito")
-                else:
-                    print(f"Error al cerrar la posición en {position.symbol}")
+        #         if close_result:
+        #             print(f"Posición en {position.symbol} cerrada con éxito")
+        #         else:
+        #             print(f"Error al cerrar la posición en {position.symbol}")
                     
-        else:
-            print("No hay posiciones abiertas para cerrar")
+        # else:
+        #     print("No hay posiciones abiertas para cerrar")
             
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
