@@ -138,21 +138,14 @@ class BotController:
             print("El mercado está cerrado.")
             return False
 
-    def _sleep_to_next_market_opening(self, sleep_to_tomorrow:bool = False):
+    def _sleep_to_next_market_opening(self):
         """
         Espera hasta la próxima apertura del mercado.
-
-        Esta función calcula el tiempo restante hasta la próxima apertura del mercado. Si la apertura ya ha ocurrido o si se especifica
-        `sleep_to_tomorrow` como True, el programa esperará hasta la apertura del próximo día.
-
-        Args:
-            sleep_to_tomorrow (bool, optional): Si es True, el programa esperará hasta la apertura del mercado del día siguiente.
-                Por defecto, es False.
 
         Returns:
             None
         """
-        if not self._is_in_market_hours() or sleep_to_tomorrow == True:
+        if not self._is_in_market_hours():
             
             print("Iniciando esperar hasta la proxima apertura de mercado...")
             
@@ -165,7 +158,7 @@ class BotController:
             market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
             
             # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
-            if sleep_to_tomorrow and current_time > market_open:
+            if current_time > market_open:
                 print("Esperar hasta la apertura de mañana.")
                 market_open = market_open + timedelta(days=1)
             
@@ -303,7 +296,7 @@ class BotController:
             # Al finalizar la ejecución del programa o si no hay mercado hoy, 
             # se pausará el programa hasta el próximo día laborable para volver a comprobar.
             print("")
-            self._sleep_to_next_market_opening(sleep_to_tomorrow=True)                
+            self._sleep_to_next_market_opening()                
     #endregion
 
 
