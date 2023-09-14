@@ -924,10 +924,8 @@ class HedgeTrading:
         order['volume'] = (data['lot_size'] * size)
         
         # El volumen se remplaza con el maximo permitido en caso de ser mayor
-        if order['volume'] > data['volume_max'] or order['volume'] > data['max_lot_size'] :
-            print("Hedge: Volumen maximo de ", symbol, " alcanzado, eliminado símbolo...")
-            self.symbols.remove(symbol)
-            return None
+        if order['volume'] > data['volume_max']:
+            order['volume'] = data['volume_max']
         # El volumen se remplaza con el minimo permitido en caso de ser menor
         elif order['volume'] < data['volume_min']:
             order['volume'] = data['volume_min']
