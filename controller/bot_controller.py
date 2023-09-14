@@ -145,36 +145,35 @@ class BotController:
         Returns:
             None
         """
-        if not self._is_in_market_hours():
-            
-            print("Iniciando esperar hasta la proxima apertura de mercado...")
-            
-            # Obtener la hora actual en UTC
-            current_time = datetime.now(pytz.utc)
-            
-            print("Hora actual utc: ", current_time)
         
-            # Crear un objeto datetime para la hora de apertura del mercado hoy
-            market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
-            
-            # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
-            if current_time > market_open:
-                print("Esperar hasta la apertura de mañana.")
-                market_open = market_open + timedelta(days=1)
-            
-            print("Apertura del mercado utc: ", market_open)
-            
-            # Calcular la cantidad de segundos que faltan hasta la apertura
-            seconds = (market_open - current_time).total_seconds()
-            
-            print("Esperando la apertura...")
-                        
-            time.sleep(seconds)
-            
-            # Obtener la hora actual en UTC
-            current_time = datetime.now(pytz.utc)
-            
-            print("Hora actual utc: ", current_time)
+        print("Iniciando la esperara hasta la proxima apertura de mercado...")
+        
+        # Obtener la hora actual en UTC
+        current_time = datetime.now(pytz.utc)
+        
+        print("Hora actual utc: ", current_time)
+    
+        # Crear un objeto datetime para la hora de apertura del mercado hoy
+        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
+        
+        # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
+        if current_time > market_open:
+            print("Esperar hasta la apertura de mañana.")
+            market_open = market_open + timedelta(days=1)
+        
+        print("Apertura del mercado utc: ", market_open)
+        
+        # Calcular la cantidad de segundos que faltan hasta la apertura
+        seconds = (market_open - current_time).total_seconds()
+        
+        print("Esperando la apertura...")
+                    
+        time.sleep(seconds)
+        
+        # Obtener la hora actual en UTC
+        current_time = datetime.now(pytz.utc)
+        
+        print("Hora actual utc: ", current_time)
 
     def _find_value_in_text(self, text: str, pattern: str):
         """
@@ -300,6 +299,7 @@ class BotController:
     #endregion
 
 
+#-------------------------------------------------------------------------------------------------------------------------------------
 
 
 class BreakoutTrading:
@@ -407,6 +407,94 @@ class BreakoutTrading:
             print("El mercado está cerrado.")
             return False
     #endregion
+        
+    #region Positions Management
+    def manage_positions(self, positions: List[TradePosition]):
+        """
+        Gestiona las posiciones de breakout.
+
+        Args:
+            positions (List[TradePosition]): Lista de posiciones de operaciones.
+        """
+        for position in positions:
+            self._trailing_strategy(position)
+
+    def _trailing_strategy(self, position: TradePosition):
+        """
+        Estrategia de seguimiento para una posición.
+
+        Args:
+            position (TradePosition): La posición de la operación.
+
+        Esta función implementa una estrategia de trailing stop basada en ciertas condiciones.
+        """
+        symbol = position.symbol
+        symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
+        partial_position = symbol_data['partial_position']
+        
+        if partial_position == 1:
+            # Inicializa valores iniciales para la posición parcial
+            symbol_data['first_volume'] = position.volume
+            symbol_data['previous_stop_level'] = position.price_open
+            # Actualiza los valores en el diccionario compartido self._data
+            self._data.update({symbol: symbol_data})
+
+        # Calcula el porcentaje de cambio de precio
+        price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
+        percentage_piece = (100 / self.number_stops) / 100
+
+        # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
+        next_partial_percentage = percentage_piece * partial_position
+
+        if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
+            # Calcula el nuevo volumen para la venta parcial
+            new_volume = symbol_data['first_volume'] * next_partial_percentage
+            # Envia la orden para la venta parcial
+            MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
+            # Actualiza la posición parcial
+            symbol_data['partial_position'] += 1
+            # Mueve el stop loss al nivel anterior
+            new_stop_loss = symbol_data['previous_stop_level']
+            # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
+            if symbol_data['partial_position'] == (self.number_stops-1):
+                MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+            # Actualiza el stop loss en MT5
+            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
+            # Actualiza el nuevo previous_stop_level con el precio actual
+            symbol_data['previous_stop_level'] = position.price_current
+            # Actualiza los valores en el diccionario compartido self._data
+            self._data.update({symbol: symbol_data})
+            
+        else:
+            # Aplica una estrategia de trailing stop adicional
+            self._trailing_stop(symbol_data['range'], position)
+
+    def _trailing_stop(self, range: float, position: TradePosition):
+        """
+        Aplica un trailing stop a una posición.
+
+        Args:
+            range (float): El rango para calcular el trailing stop.
+            position (TradePosition): La posición de la operación.
+
+        Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
+        """
+        # Se calcula la distancia con el rango
+        trailing_stop_distance = range * 0.5
+        
+        if position.type == 0:
+            # Calcula el nuevo stop loss para posiciones de compra
+            new_sl = position.price_current - trailing_stop_distance
+            if new_sl > position.sl:
+                # Envia la orden para cambiar el stop loss en MT5
+                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+        else:
+            # Calcula el nuevo stop loss para posiciones de venta
+            new_sl = position.price_current + trailing_stop_distance
+            if new_sl < position.sl:
+                # Envia la orden para cambiar el stop loss en MT5
+                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+    #endregion
     
     #region Breakout strategy
     def _breakout_order(self, symbol: str, data: Dict[str, Any]) -> None:
@@ -503,6 +591,7 @@ class BreakoutTrading:
                 'low': low,
                 'range': range_value,
                 'lot_size': trade_risk,
+                'decimals': decimals,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
                 'partial_position': 1
@@ -567,94 +656,6 @@ class BreakoutTrading:
                
     #endregion
     
-    #region Positions Management
-    def manage_positions(self, positions: List[TradePosition]):
-        """
-        Gestiona las posiciones de breakout.
-
-        Args:
-            positions (List[TradePosition]): Lista de posiciones de operaciones.
-        """
-        for position in positions:
-            self._trailing_strategy(position)
-
-    def _trailing_strategy(self, position: TradePosition):
-        """
-        Estrategia de seguimiento para una posición.
-
-        Args:
-            position (TradePosition): La posición de la operación.
-
-        Esta función implementa una estrategia de trailing stop basada en ciertas condiciones.
-        """
-        symbol = position.symbol
-        symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
-        partial_position = symbol_data['partial_position']
-        
-        if partial_position == 1:
-            # Inicializa valores iniciales para la posición parcial
-            symbol_data['first_volume'] = position.volume
-            symbol_data['previous_stop_level'] = position.price_open
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
-
-        # Calcula el porcentaje de cambio de precio
-        price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
-        percentage_piece = (100 / self.number_stops) / 100
-
-        # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-        next_partial_percentage = percentage_piece * partial_position
-
-        if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
-            # Calcula el nuevo volumen para la venta parcial
-            new_volume = symbol_data['first_volume'] * next_partial_percentage
-            # Envia la orden para la venta parcial
-            MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
-            # Actualiza la posición parcial
-            symbol_data['partial_position'] += 1
-            # Mueve el stop loss al nivel anterior
-            new_stop_loss = symbol_data['previous_stop_level']
-            # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
-            if symbol_data['partial_position'] == (self.number_stops-1):
-                MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-            # Actualiza el stop loss en MT5
-            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
-            # Actualiza el nuevo previous_stop_level con el precio actual
-            symbol_data['previous_stop_level'] = position.price_current
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
-            
-        else:
-            # Aplica una estrategia de trailing stop adicional
-            self._trailing_stop(symbol_data['range'], position)
-
-    def _trailing_stop(self, range: float, position: TradePosition):
-        """
-        Aplica un trailing stop a una posición.
-
-        Args:
-            range (float): El rango para calcular el trailing stop.
-            position (TradePosition): La posición de la operación.
-
-        Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
-        """
-        # Se calcula la distancia con el rango
-        trailing_stop_distance = range * 0.5
-        
-        if position.type == 0:
-            # Calcula el nuevo stop loss para posiciones de compra
-            new_sl = position.price_current - trailing_stop_distance
-            if new_sl > position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-        else:
-            # Calcula el nuevo stop loss para posiciones de venta
-            new_sl = position.price_current + trailing_stop_distance
-            if new_sl < position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-    #endregion
-    
     #region start
     def start(self):
         """
@@ -710,6 +711,9 @@ class HedgeTrading:
         # El comentario que identificara a los trades
         self.comment = "Hedge"
         
+        # El numero de intentos de cada símbolo de enviar una orden
+        self._purchase_attempts = {}
+        
         self._market_opening_time = {'hour':13, 'minute':29}
         self._market_closed_time = {'hour':19, 'minute':55}
     
@@ -729,7 +733,9 @@ class HedgeTrading:
             None
         """
         # Envía la orden a MetaTrader 5
-        MT5Api.send_order(**order)
+        request = MT5Api.send_order(**order)
+        if request is None:
+            self._purchase_attempts[order['symbol']] += 1
     #endregion
     
     #region Utilities
@@ -809,6 +815,72 @@ class HedgeTrading:
             return int(parts[-1])
         else:
             return None
+    
+    #endregion
+    
+    #region Positions Management
+    
+    def manage_positions(self, positions: List[TradePosition]):
+        """
+        Gestiona las posiciones de Hedge mediante la actualización del stop loss y el trailing stop.
+
+        Args:
+            positions (List[TradePosition]): Lista de posiciones de operaciones.
+        """
+        for position in positions:
+            data = self._data[position.symbol]
+            
+            # Comprueba si la posición es de compra (long) o venta (short)
+            if position.type == 0:  # Posición de compra (long)
+                # Verifica si el stop loss está por encima del umbral superior de recuperación
+                if position.sl >= (data["recovery_high"] + (2 * data['recovery_range'])):
+                    self._trailing_stop(data['recovery_range'], position)
+                else:
+                    # Calcula el nuevo valor del stop loss
+                    new_stop_loss = position.tp - data['recovery_range']
+                    # Comprueba si el nuevo stop loss es menor que el precio actual
+                    if new_stop_loss < position.price_current:
+                        # Actualiza el stop loss en MT5
+                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+            else:  # Posición de venta (short)
+                # Verifica si el stop loss está por debajo del umbral inferior de recuperación
+                if position.sl <= (data["recovery_low"] - (2 * data['recovery_range'])):
+                    self._trailing_stop(data['recovery_range'], position)
+                else:
+                    # Calcula el nuevo valor del stop loss
+                    new_stop_loss = position.tp + data['recovery_range']
+                    # Comprueba si el nuevo stop loss es mayor que el precio actual
+                    if new_stop_loss > position.price_current:
+                        # Actualiza el stop loss en MT5
+                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                    
+    def _trailing_stop(self, range: float, position: TradePosition):
+        """
+        Aplica un trailing stop a una posición.
+
+        Args:
+            range (float): El rango para calcular el trailing stop.
+            position (TradePosition): La posición de la operación.
+
+        Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
+        """
+        # Se calcula la distancia con el rango
+        trailing_stop_distance = range 
+        
+        if position.type == 0:
+            # Calcula el nuevo stop loss para posiciones de compra
+            new_sl = position.price_current - trailing_stop_distance
+            if new_sl > position.sl:
+                # Envia la orden para cambiar el stop loss en MT5
+                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+        else:
+            # Calcula el nuevo stop loss para posiciones de venta
+            new_sl = position.price_current + trailing_stop_distance
+            if new_sl < position.sl:
+                # Envia la orden para cambiar el stop loss en MT5
+                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
     
     #endregion
     
@@ -932,8 +1004,11 @@ class HedgeTrading:
                 'lot_size': min_trade_risk,
                 'max_lot_size': max_trade_risk,
                 'volume_min': info.volume_min,
-                'volume_max': info.volume_max,
+                'volume_max': info.volume_max
             }
+            
+            # Establece el numero de intentos de comprar en 0
+            self._purchase_attempts[symbol] = 0
             
         # Actualiza la variable compartida
         self._data.update(data)
@@ -951,7 +1026,13 @@ class HedgeTrading:
         copy_symbols = list(self.symbols)
         
         for symbol in copy_symbols:
-            data = self._data[symbol]            
+            data = self._data[symbol]
+            
+            # Asegura un numero de intentos de compra maximos para evitar que el bot se estanque
+            if self._purchase_attempts[symbol] > 5:
+                print("Numero de intentos de compra para ", symbol, " excedidos, quitando símbolo de la lista.")
+                self.symbols.remove(symbol)
+                
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)
             # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
@@ -964,7 +1045,7 @@ class HedgeTrading:
                 # Elimina los symbolos que ya consiguieron ganancias y estan en traling stop
                 # Aquellos en trailing stop tendran take profit 0
                 if last_position.tp == 0:
-                    self.symbols.remove(data["symbol"])
+                    self.symbols.remove(symbol)
                     continue
             
             # Obtenemos la ultima informacion actualizada del symbolo
@@ -978,14 +1059,14 @@ class HedgeTrading:
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
                 
-                elif info_tick.bid > data['high']:
+                elif info_tick.ask > data['high']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['high'] - data['recovery_range']
                     data['recovery_high'] = data['high']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
             
-            if data['recovery_low'] is not None:
+            if data['recovery_low'] is not None and data['recovery_high'] is not None:
                 if (type == 0 or type is None) and info_tick.bid < data['recovery_low']:
                     # Se agrega el tipo de orden
                         data['type'] = 'sell'
@@ -998,72 +1079,6 @@ class HedgeTrading:
                         # Crear orden y enviarla
                         self._hedge_order(symbol, data)
                     
-    #endregion
-    
-    #region Positions Management
-    
-    def manage_positions(self, positions: List[TradePosition]):
-        """
-        Gestiona las posiciones de Hedge mediante la actualización del stop loss y el trailing stop.
-
-        Args:
-            positions (List[TradePosition]): Lista de posiciones de operaciones.
-        """
-        for position in positions:
-            data = self._data[position.symbol]
-            
-            # Comprueba si la posición es de compra (long) o venta (short)
-            if position.type == 0:  # Posición de compra (long)
-                # Verifica si el stop loss está por encima del umbral superior de recuperación
-                if position.sl >= (data["recovery_high"] + (2 * data['recovery_range'])):
-                    self._trailing_stop(data['recovery_range'], position)
-                else:
-                    # Calcula el nuevo valor del stop loss
-                    new_stop_loss = position.tp - data['recovery_range']
-                    # Comprueba si el nuevo stop loss es menor que el precio actual
-                    if new_stop_loss < position.price_current:
-                        # Actualiza el stop loss en MT5
-                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
-            else:  # Posición de venta (short)
-                # Verifica si el stop loss está por debajo del umbral inferior de recuperación
-                if position.sl <= (data["recovery_low"] - (2 * data['recovery_range'])):
-                    self._trailing_stop(data['recovery_range'], position)
-                else:
-                    # Calcula el nuevo valor del stop loss
-                    new_stop_loss = position.tp + data['recovery_range']
-                    # Comprueba si el nuevo stop loss es mayor que el precio actual
-                    if new_stop_loss > position.price_current:
-                        # Actualiza el stop loss en MT5
-                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
-                    
-    def _trailing_stop(self, range: float, position: TradePosition):
-        """
-        Aplica un trailing stop a una posición.
-
-        Args:
-            range (float): El rango para calcular el trailing stop.
-            position (TradePosition): La posición de la operación.
-
-        Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
-        """
-        # Se calcula la distancia con el rango
-        trailing_stop_distance = range 
-        
-        if position.type == 0:
-            # Calcula el nuevo stop loss para posiciones de compra
-            new_sl = position.price_current - trailing_stop_distance
-            if new_sl > position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-        else:
-            # Calcula el nuevo stop loss para posiciones de venta
-            new_sl = position.price_current + trailing_stop_distance
-            if new_sl < position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-    
     #endregion
     
     #region start
@@ -1087,6 +1102,8 @@ class HedgeTrading:
             if not self._is_in_market_hours():
                 print("Hedge: Finalizo el horario de mercado.")
                 break
+            
+            
             
             # Ejecuta la estrategia
             self._hedge_strategy()
