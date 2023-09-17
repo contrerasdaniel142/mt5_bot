@@ -418,6 +418,20 @@ class MT5Api:
         
         return symbol_info_tick
     
+    def get_last_price(symbol:str)->float:
+        """
+        Obtiene el precio de cierre más reciente para un símbolo en MetaTrader 5.
+
+        Parameters:
+            symbol (str): El nombre del símbolo del cual se desea obtener el precio de cierre.
+
+        Returns:
+            float: El precio de cierre más reciente del símbolo.
+        """
+        last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
+        close = last_rate[-1]['close']
+        return close
+    
     #endregion
 
     #region Setters
@@ -479,7 +493,7 @@ class MT5Api:
         MT5Api.shutdown()
         return order_request
     
-    def send_sell_partial_position(symbol: str, volume_to_sell: float, ticket:int):
+    def send_sell_partial_position(symbol: str, volume_to_sell: float, ticket:int, comment:str = None):
         """
         Vende una parte de una posición abierta en MT5.
 
@@ -487,6 +501,8 @@ class MT5Api:
             symbol (str): El símbolo del instrumento.
             volume_to_sell (float): El volumen de la posición a vender.
             ticket (int): El número de ticket de la posición a vender.
+            comment (str, opcional): Un comentario opcional para la orden de venta.
+                Si no se establece, se conservará el comentario anterior de la posición.
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
@@ -501,7 +517,10 @@ class MT5Api:
                 request_type = OrderType.MARKET_SELL
             else:
                 request_type = OrderType.MARKET_BUY
-                    
+            
+            if comment is None:
+                comment = position.comment
+                
             request = {
                 "action": TradeActions.TRADE_ACTION_DEAL,
                 "symbol": symbol,
@@ -509,7 +528,7 @@ class MT5Api:
                 "type": request_type,
                 "price": mt5.symbol_info_tick(symbol).ask,
                 "position": ticket,
-                "comment": position.comment
+                "comment": comment
             }
 
             order_request = mt5.order_send(request)

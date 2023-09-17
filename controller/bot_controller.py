@@ -38,7 +38,7 @@ import time
 class BotController:
     def __init__(self) -> None:
         # Estos horarios estan en utc
-        self._market_opening_time = {'hour':13, 'minute':29}
+        self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
         self._alpaca_api = AlpacaApi()
 
@@ -132,47 +132,54 @@ class BotController:
         market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
-        if market_open <= current_time <= market_close:
+        if market_open <= current_time <= market_close and self._get_business_hours_today():
             return True
         else:
             print("El mercado está cerrado.")
             return False
 
-    def _sleep_to_next_market_opening(self):
-        """
-        Espera hasta la próxima apertura del mercado.
+    def _sleep_to_next_market_opening(self, sleep_in_market:bool = True):
+        """Espera hasta la próxima apertura del mercado.
+
+        Args:
+            sleep_in_market (bool): Indica si el método debe ejecutarse durante el mercado abierto (False) o no (True).
 
         Returns:
             None
         """
         
-        print("Iniciando la esperara hasta la proxima apertura de mercado...")
+        if sleep_in_market == False and self._is_in_market_hours():
+            print("El mercado está abierto")
+            return
         
+        print("Obteniendo proxima apertura de mercado...")
+    
         # Obtener la hora actual en UTC
         current_time = datetime.now(pytz.utc)
         
+        # Obtiene los calendarios de mercado desde el día actual hasta 10 días después.
+        calendars = self._alpaca_api.get_next_days_of_market(10)
+        
+        next_market_open = None
+        
+        for calendar in calendars:
+            next_market_open = calendar.open.astimezone(pytz.utc).replace(
+                hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute']
+            )
+            if current_time < next_market_open:
+                break
+            
         print("Hora actual utc: ", current_time)
-    
-        # Crear un objeto datetime para la hora de apertura del mercado hoy
-        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
-        
-        # Si se quiere que el programa espere hasta el dia de mañana se aumentara un dia
-        if current_time > market_open:
-            print("Esperar hasta la apertura de mañana.")
-            market_open = market_open + timedelta(days=1)
-        
-        print("Apertura del mercado utc: ", market_open)
+        print("Apertura del mercado utc: ", next_market_open)
         
         # Calcular la cantidad de segundos que faltan hasta la apertura
-        seconds = (market_open - current_time).total_seconds()
+        seconds_until_open = (next_market_open - current_time).total_seconds()
         
-        print("Esperando la apertura...")
-                    
-        time.sleep(seconds)
-        
-        # Obtener la hora actual en UTC
+        print(f"Esperando {seconds_until_open} segundos hasta la apertura...")
+        time.sleep(seconds_until_open)
+    
+        # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        
         print("Hora actual utc: ", current_time)
 
     def _find_value_in_text(self, text: str, pattern: str):
@@ -223,79 +230,77 @@ class BotController:
         
         # Crea un administrador
         manager = multiprocessing.Manager()
+        
+        # Abre mt5 y espera 4 segundos
+        MT5Api.initialize(4)
+        MT5Api.shutdown()
                 
         while True:
-            print("Comprobando mercado...")
-            business_hours_utc = self._get_business_hours_today()
-            
-            # Abre mt5 y espera 4 segundos
-            MT5Api.initialize(sleep=4)
-                        
-            if business_hours_utc:
-                # Revisa si aun falta tiempo para la apertura de mercado y espera
-                self._sleep_to_next_market_opening()
-                
-                # Se crea una lista que contendra a los objetos de las estrategias creadas
-                strategies = []
-                
-                
-                #region creación de estrategias
-                
-                #region Real-time breakout
-                # Se crea el objeto de la estrategia breakout en tiempo real
-                symbols_rt_breakout = manager.list(symbols)
-                rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
-                # Se agrega rt_breakout_symbols
-                strategies.append(rt_breakoutTrading)                      
-                # Se crea el proceso que incia la estrategia
-                rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
-                # Prepara la data de la estrategia antes de iniciar
-                rt_breakoutTrading._prepare_breakout_data(user_risk)    
-                # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
-                rt_breakout_process.start()
-                #endregion
-                
-                #region Every-minute breakout
-                # Se crea el objeto de la estrategia breakout cada minuto
-                symbols_em_breakout = manager.list(symbols)
-                em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
-                # Se agrega rt_breakout_symbols
-                strategies.append(em_breakoutTrading)                      
-                # Se crea el proceso que incia la estrategia
-                em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
-                # Prepara la data de la estrategia antes de iniciar
-                em_breakoutTrading._prepare_breakout_data(user_risk)      
-                # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
-                em_breakout_process.start()
-                #endregion
-                
-                #region Hedge
-                # Se crea el objeto de la estrategia hedge 
-                symbols_hedge = manager.list(symbols)
-                hedgeTrading = HedgeTrading(data= manager.dict({}), symbols=symbols_hedge)
-                strategies.append(hedgeTrading)                      
-                # Se crea el proceso que incia la estrategia
-                hedge_process = multiprocessing.Process(target=hedgeTrading.start)
-                # Prepara la data de la estrategia antes de iniciar
-                hedgeTrading._prepare_hedge_data(user_risk= user_risk, max_user_risk= max_user_risk)    
-                # Se inicia el proceso, si no se desea que se ejecute solo comente
-                hedge_process.start()
-                #endregion
-                
-                #endregion
-                
-                                
-                # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-                manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
-                manage_positions_process.start()
-                                
-                # Espera a que termine el proceso
-                manage_positions_process.join()
-            
-            # Al finalizar la ejecución del programa o si no hay mercado hoy, 
-            # se pausará el programa hasta el próximo día laborable para volver a comprobar.
             print("")
-            self._sleep_to_next_market_opening()                
+                                    
+            # Revisa si aun falta tiempo para la apertura de mercado y espera
+            # Si el mercado se encuentra abierto continua con el programa
+            self._sleep_to_next_market_opening(sleep_in_market= False)
+            
+            # Se crea una lista que contendra a los objetos de las estrategias creadas
+            strategies = []
+            
+            
+            #region creación de estrategias
+            
+            #region Real-time breakout
+            # Se crea el objeto de la estrategia breakout en tiempo real
+            symbols_rt_breakout = manager.list(symbols)
+            rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
+            # Se agrega rt_breakout_symbols
+            strategies.append(rt_breakoutTrading)                      
+            # Se crea el proceso que incia la estrategia
+            rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
+            # Prepara la data de la estrategia antes de iniciar
+            rt_breakoutTrading._prepare_breakout_data(user_risk)    
+            # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
+            rt_breakout_process.start()
+            #endregion
+            
+            #region Every-minute breakout
+            # Se crea el objeto de la estrategia breakout cada minuto
+            symbols_em_breakout = manager.list(symbols)
+            em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
+            # Se agrega rt_breakout_symbols
+            strategies.append(em_breakoutTrading)                      
+            # Se crea el proceso que incia la estrategia
+            em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
+            # Prepara la data de la estrategia antes de iniciar
+            em_breakoutTrading._prepare_breakout_data(user_risk)      
+            # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
+            em_breakout_process.start()
+            #endregion
+            
+            #region Hedge
+            # Se crea el objeto de la estrategia hedge 
+            symbols_hedge = manager.list(symbols)
+            hedgeTrading = HedgeTrading(data= manager.dict({}), symbols=symbols_hedge)
+            strategies.append(hedgeTrading)                      
+            # Se crea el proceso que incia la estrategia
+            hedge_process = multiprocessing.Process(target=hedgeTrading.start)
+            # Prepara la data de la estrategia antes de iniciar
+            hedgeTrading._prepare_hedge_data(user_risk= user_risk, max_user_risk= max_user_risk)    
+            # Se inicia el proceso, si no se desea que se ejecute solo comente
+            hedge_process.start()
+            #endregion
+            
+            #endregion
+            
+                            
+            # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
+            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            manage_positions_process.start()
+                            
+            # Espera a que termine el proceso
+            manage_positions_process.join()
+            self._sleep_to_next_market_opening()
+
+    
     #endregion
 
 
@@ -316,13 +321,16 @@ class BreakoutTrading:
         # Variable compartida que se acutalizara entre procesos
         self._data = data 
         
+        # El numero de intentos de cada símbolo de enviar una orden
+        self._purchase_attempts = {}
+        
         # El comentario que identificara a los trades
         if in_real_time:
             self.comment = "Breakout:rt"
         else:
             self.comment = "Breakout:em"
             
-        self._market_opening_time = {'hour':13, 'minute':29}
+        self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
     
     #region Senders
@@ -340,9 +348,11 @@ class BreakoutTrading:
         Returns:
             None
         """
-        print("Breakout: Enviando orden")
-        # Envía la orden a MetaTrader 5
-        MT5Api.send_order(**order)
+        request = MT5Api.send_order(**order)
+        if request is None:
+            self._purchase_attempts[order['symbol']] += 1
+        else:
+            self._purchase_attempts[order['symbol']] = 0
     #endregion
     
     #region Utilities
@@ -406,6 +416,46 @@ class BreakoutTrading:
         else:
             print("El mercado está cerrado.")
             return False
+    
+    def get_number_in_comment(self, comment:str)->int:
+        """
+        Extrae y devuelve el último número entero encontrado en la cadena de comentario dada.
+
+        Args:
+            comment (str): La cadena de comentario de entrada.
+        Returns:
+            int: El número entero extraído si se encuentra, o None si no se encuentra ningún número en el comentario.
+        """
+        parts = comment.split()
+
+        if parts[-1].isdigit():
+            return int(parts[-1])
+        else:
+            return None
+    
+    def get_decimal_part(number)->int:
+        """
+        Obtiene la parte decimal de un número como un entero.
+
+        Args:
+            number (float): El número del cual se quiere obtener la parte decimal.
+
+        Returns:
+            int: La parte decimal del número como un entero. Si no hay parte decimal, se devuelve un cero.
+        """
+        # Convierte el número a una cadena
+        number_str = str(number)
+        
+        # Divide la cadena en partes usando el punto decimal como separador
+        parts = number_str.split('.')
+        
+        # Si hay al menos dos partes (parte entera y parte decimal)
+        if len(parts) > 1:
+            # Devuelve la parte decimal como una cadena
+            return int(parts[1])
+        else:
+            # Si no hay parte decimal, devuelve 0
+            return 0
     #endregion
         
     #region Positions Management
@@ -417,58 +467,48 @@ class BreakoutTrading:
             positions (List[TradePosition]): Lista de posiciones de operaciones.
         """
         for position in positions:
-            self._trailing_strategy(position)
-
-    def _trailing_strategy(self, position: TradePosition):
-        """
-        Estrategia de seguimiento para una posición.
-
-        Args:
-            position (TradePosition): La posición de la operación.
-
-        Esta función implementa una estrategia de trailing stop basada en ciertas condiciones.
-        """
-        symbol = position.symbol
-        symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
-        partial_position = symbol_data['partial_position']
-        
-        if partial_position == 1:
-            # Inicializa valores iniciales para la posición parcial
-            symbol_data['first_volume'] = position.volume
-            symbol_data['previous_stop_level'] = position.price_open
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
-
-        # Calcula el porcentaje de cambio de precio
-        price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
-        percentage_piece = (100 / self.number_stops) / 100
-
-        # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-        next_partial_percentage = percentage_piece * partial_position
-
-        if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
-            # Calcula el nuevo volumen para la venta parcial
-            new_volume = symbol_data['first_volume'] * next_partial_percentage
-            # Envia la orden para la venta parcial
-            MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
-            # Actualiza la posición parcial
-            symbol_data['partial_position'] += 1
-            # Mueve el stop loss al nivel anterior
-            new_stop_loss = symbol_data['previous_stop_level']
-            # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
-            if symbol_data['partial_position'] == (self.number_stops-1):
-                MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-            # Actualiza el stop loss en MT5
-            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
-            # Actualiza el nuevo previous_stop_level con el precio actual
-            symbol_data['previous_stop_level'] = position.price_current
-            # Actualiza los valores en el diccionario compartido self._data
-            self._data.update({symbol: symbol_data})
+            symbol = position.symbol
+            symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
             
-        else:
-            # Aplica una estrategia de trailing stop adicional
-            self._trailing_stop(symbol_data['range'], position)
+            if position.tp == 0:
+                # Aplica una estrategia de trailing stop adicional
+                self._trailing_stop(symbol_data['range'], position)
+            
+            else:                  
+                partial_position = symbol_data['partial_position']
+                
+                # Calcula el porcentaje de cambio de precio
+                price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
+                percentage_piece = (100 / self.number_stops) / 100
 
+                # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
+                next_partial_percentage = percentage_piece * partial_position
+
+                if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
+                    if partial_position == 1:
+                        # Inicializa valores iniciales para la posición parcial
+                        symbol_data['first_volume'] = position.volume
+                        symbol_data['previous_stop_level'] = position.price_open
+                        # Actualiza los valores en el diccionario compartido self._data
+                        self._data.update({symbol: symbol_data})
+                    # Calcula el nuevo volumen para la venta parcial
+                    new_volume = symbol_data['first_volume'] * next_partial_percentage
+                    # Envia la orden para la venta parcial
+                    MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
+                    # Actualiza la posición parcial
+                    symbol_data['partial_position'] += 1
+                    # Mueve el stop loss al nivel anterior
+                    new_stop_loss = symbol_data['previous_stop_level']
+                    # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
+                    if symbol_data['partial_position'] == (self.number_stops-1):
+                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                    # Actualiza el stop loss en MT5
+                    MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
+                    # Actualiza el nuevo previous_stop_level con el precio actual
+                    symbol_data['previous_stop_level'] = position.price_current
+                    # Actualiza los valores en el diccionario compartido self._data
+                    self._data.update({symbol: symbol_data})
+                
     def _trailing_stop(self, range: float, position: TradePosition):
         """
         Aplica un trailing stop a una posición.
@@ -479,21 +519,24 @@ class BreakoutTrading:
 
         Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
         """
-        # Se calcula la distancia con el rango
-        trailing_stop_distance = range * 0.5
-        
-        if position.type == 0:
-            # Calcula el nuevo stop loss para posiciones de compra
-            new_sl = position.price_current - trailing_stop_distance
-            if new_sl > position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-        else:
-            # Calcula el nuevo stop loss para posiciones de venta
-            new_sl = position.price_current + trailing_stop_distance
-            if new_sl < position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+        # Se calcula la distancia del trailing stop con el rango especificado
+        trailing_stop_distance = range  * 0.5
+
+        # Calcula la diferencia entre el precio actual y el stop loss existente
+        difference = abs(position.price_current - position.sl)
+
+        # Si la diferencia es mayor que el rango especificado, se aplica el trailing stop
+        if difference > range:
+            # Calcula el nuevo stop loss
+            if position.type == 0: 
+                # Para una posición de compra (long)
+                new_sl = position.price_current - trailing_stop_distance
+            else:
+                # Para una posición de venta (short)
+                new_sl = position.price_current + trailing_stop_distance
+            
+            # Envia la orden para cambiar el stop loss en MT5
+            MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
     #endregion
     
     #region Breakout strategy
@@ -520,6 +563,18 @@ class BreakoutTrading:
             "ticket": None,
             "comment": None
         }
+        
+        # Consultar el número de órdenes realizadas para el símbolo
+        positions = MT5Api.get_positions(symbol= symbol)
+        
+        # Filtra aquellos con el comentario de la estrategia
+        positions = [position for position in positions if self.comment in position.comment]
+        
+        # Obtiene el numero de la ultima posicion realizada
+        if positions:
+            number = self.get_number_in_comment(positions[-1].comment)
+        else:
+            number = 0
                     
         order['volume'] = data['lot_size']
         
@@ -541,7 +596,8 @@ class BreakoutTrading:
             order['take_profit'] = round(data['low'] - (data['range']*2), data['decimals'])
             order['stop_loss'] = round(data['high'], data['decimals'])
         
-        order['comment'] = self.comment
+        
+        order['comment'] = self.comment + " " + str(number + 1)
         
         # Se envía la orden por la cola de comunicación
         self._send_order(order)
@@ -553,7 +609,6 @@ class BreakoutTrading:
         Args:
             user_risk (float): Riesgo del usuario.
         """
-        print("Breakout: Preparando la data...")
         current_time = datetime.now(pytz.utc)
         
         # Establecer el horario de inicio y finalización del mercado
@@ -618,7 +673,13 @@ class BreakoutTrading:
         copy_symbols = list(self.symbols)
         
         for symbol in copy_symbols:
-            data = self._data[symbol]            
+            data = self._data[symbol]
+            
+            # Asegura un numero de intentos de compra maximos para evitar que el bot se estanque
+            if self._purchase_attempts[symbol] > 5:
+                print("Numero de intentos de compra para ", symbol, " excedidos, quitando símbolo de la lista.")
+                self.symbols.remove(symbol)
+                           
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)
             # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
@@ -627,33 +688,27 @@ class BreakoutTrading:
             # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
             if positions:
                 type = positions[-1].type
+                # Remueve los símbolos tradeados segun la estrategia
+                self.symbols.remove(symbol)
+                continue
             
-            # Obtenemos la ultima informacion actualizada del symbolo
-            info_tick = MT5Api.get_symbol_info_tick(symbol)
+            # Obtiene el precio actual
+            current_price = MT5Api.get_last_price(symbol)
             
             # Precio ask (venta) como precio de compra
-            if info_tick.bid < data['low'] and (type == 0 or type is None):
+            if current_price < data['low'] and (type == 0 or type is None):
                 # Se agrega el tipo de orden
                 data['type'] = 'sell'
                 # Crear orden y enviarla
                 self._breakout_order(symbol, data)
-                # Remueve los símbolos tradeados segun la estrategia
-                self.symbols.remove(symbol)
-            
+                
             # Precio bid (oferta) como precio de venta
-            elif info_tick.ask >data['high'] and (type == 1 or type is None):
+            elif current_price > data['high'] and (type == 1 or type is None):
                 # Se agrega el tipo de orden
                 data['type']= 'buy'
                 # Crear orden y enviarla
                 self._breakout_order(symbol, data)
-                # Remueve los símbolos tradeados segun la estrategia
-                self.symbols.remove(symbol)
-                
-            # En caso de no superar alguna de las condiciones ignfica que los precios estan alejados de su rango
-            # por lo tanto hay que quitar el símbolo
-            if symbol in self.symbols:
-                self.symbols.remove(symbol)
-               
+                               
     #endregion
     
     #region start
@@ -714,7 +769,7 @@ class HedgeTrading:
         # El numero de intentos de cada símbolo de enviar una orden
         self._purchase_attempts = {}
         
-        self._market_opening_time = {'hour':13, 'minute':29}
+        self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
     
     #region Senders
@@ -736,6 +791,8 @@ class HedgeTrading:
         request = MT5Api.send_order(**order)
         if request is None:
             self._purchase_attempts[order['symbol']] += 1
+        else:
+            self._purchase_attempts[order['symbol']] = 0
     #endregion
     
     #region Utilities
@@ -800,7 +857,7 @@ class HedgeTrading:
             print("El mercado está cerrado.")
             return False
     
-    def get_number_in_comment(self, comment:str):
+    def get_number_in_comment(self, comment:str)->int:
         """
         Extrae y devuelve el último número entero encontrado en la cadena de comentario dada.
 
@@ -827,35 +884,32 @@ class HedgeTrading:
         Args:
             positions (List[TradePosition]): Lista de posiciones de operaciones.
         """
+        # Itera sobre todas las posiciones en la lista "positions"
         for position in positions:
+            # Obtiene los datos relacionados con el símbolo de la posición
             data = self._data[position.symbol]
             
-            # Comprueba si la posición es de compra (long) o venta (short)
-            if position.type == 0:  # Posición de compra (long)
-                # Verifica si el stop loss está por encima del umbral superior de recuperación
-                if position.sl >= (data["recovery_high"] + (2 * data['recovery_range'])):
-                    self._trailing_stop(data['recovery_range'], position)
-                else:
+            # Si el take profit (tp) es igual a cero, ejecuta el trailing stop
+            if position.tp == 0:
+                self._trailing_stop(data['recovery_range'], position)
+            else:               
+                # Calcula la diferencia entre el precio actual y el take profit
+                difference = abs(position.price_current - position.tp)
+                
+                # Si la diferencia es menor que el rango de recuperación
+                if difference < data['recovery_range']:
                     # Calcula el nuevo valor del stop loss
-                    new_stop_loss = position.tp - data['recovery_range']
-                    # Comprueba si el nuevo stop loss es menor que el precio actual
-                    if new_stop_loss < position.price_current:
-                        # Actualiza el stop loss en MT5
-                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
-            else:  # Posición de venta (short)
-                # Verifica si el stop loss está por debajo del umbral inferior de recuperación
-                if position.sl <= (data["recovery_low"] - (2 * data['recovery_range'])):
-                    self._trailing_stop(data['recovery_range'], position)
-                else:
-                    # Calcula el nuevo valor del stop loss
-                    new_stop_loss = position.tp + data['recovery_range']
-                    # Comprueba si el nuevo stop loss es mayor que el precio actual
-                    if new_stop_loss > position.price_current:
-                        # Actualiza el stop loss en MT5
-                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
-                        MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                    if position.type == 0: # Para una posición de compra (long)
+                        new_stop_loss = position.tp - data['recovery_range']
+                    else: # Para una posición de venta (short)
+                        new_stop_loss = position.tp + data['recovery_range']
                     
+                    # Elimina el stop loss y el take profit existentes
+                    MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                    
+                    # Actualiza el stop loss con el nuevo valor calculado
+                    MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                        
     def _trailing_stop(self, range: float, position: TradePosition):
         """
         Aplica un trailing stop a una posición.
@@ -866,22 +920,25 @@ class HedgeTrading:
 
         Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
         """
-        # Se calcula la distancia con el rango
+        # Se calcula la distancia del trailing stop con el rango especificado
         trailing_stop_distance = range 
-        
-        if position.type == 0:
-            # Calcula el nuevo stop loss para posiciones de compra
-            new_sl = position.price_current - trailing_stop_distance
-            if new_sl > position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-        else:
-            # Calcula el nuevo stop loss para posiciones de venta
-            new_sl = position.price_current + trailing_stop_distance
-            if new_sl < position.sl:
-                # Envia la orden para cambiar el stop loss en MT5
-                MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
-    
+
+        # Calcula la diferencia entre el precio actual y el stop loss existente
+        difference = abs(position.price_current - position.sl)
+
+        # Si la diferencia es mayor que el rango especificado, se aplica el trailing stop
+        if difference > range:
+            # Calcula el nuevo stop loss
+            if position.type == 0: 
+                # Para una posición de compra (long)
+                new_sl = position.price_current - trailing_stop_distance
+            else:
+                # Para una posición de venta (short), se aumenta el stop loss
+                new_sl = position.price_current + trailing_stop_distance
+            
+            # Envia la orden para cambiar el stop loss en MT5
+            MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+ 
     #endregion
     
     #region Hedge strategy
@@ -1035,45 +1092,47 @@ class HedgeTrading:
             positions = MT5Api.get_positions(symbol)
             # Usar una comprensión de lista para filtrar las posiciones que contienen el comentario
             positions = [position for position in positions if self.comment in position.comment]
-            type = None
+            last_type = None
             # En caso de exisitr almenos una posicion abierta obtiene el tipo de esta
             if positions:
                 last_position = positions[-1]
-                type = last_position.type
+                last_type = last_position.type
                 # Elimina los symbolos que ya consiguieron ganancias y estan en traling stop
                 # Aquellos en trailing stop tendran take profit 0
                 if last_position.tp == 0:
                     self.symbols.remove(symbol)
                     continue
             
-            # Obtenemos la ultima informacion actualizada del symbolo
-            info_tick = MT5Api.get_symbol_info_tick(symbol)
+            # Obtiene el precio actual
+            current_price = MT5Api.get_last_price(symbol)
             
-            if type is None:
-                if info_tick.bid < data['low']:
+            if last_type is None:
+                if current_price < data['low']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['low']
                     data['recovery_high'] = data['low'] + data['recovery_range']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
                 
-                elif info_tick.ask > data['high']:
+                elif current_price > data['high']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['high'] - data['recovery_range']
                     data['recovery_high'] = data['high']
                     # Actualiza el diccionario compartido
                     self._data.update({symbol: data})
             
+            # Se asegura de tener la recovery zone establecida antes de  tomar una decision
             if data['recovery_low'] is not None and data['recovery_high'] is not None:
-                if (type == 0 or type is None) and info_tick.bid < data['recovery_low']:
+                
+                if (last_type == 0 or last_type is None) and current_price < data['recovery_low']:
                     # Se agrega el tipo de orden
                         data['type'] = 'sell'
                         # Crear orden y enviarla
                         self._hedge_order(symbol, data)
                 
-                elif (type == 1 or type is None) and info_tick.ask > data['recovery_high']:
-                    # Se agrega el tipo de orden
-                        data['type'] = 'sell'
+                elif (last_type == 1 or last_type is None) and current_price > data['recovery_high']:
+                        # Se agrega el tipo de orden
+                        data['type']= 'buy'
                         # Crear orden y enviarla
                         self._hedge_order(symbol, data)
                     
@@ -1101,12 +1160,11 @@ class HedgeTrading:
                 print("Hedge: Finalizo el horario de mercado.")
                 break
             
-            
-            
             # Ejecuta la estrategia
             self._hedge_strategy()
         # Fin del ciclo
         print("Hedge: Finalizando estrategia...")
           
     #endregion
+
 
