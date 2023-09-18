@@ -501,7 +501,8 @@ class BreakoutTrading:
                     new_stop_loss = symbol_data['previous_stop_level']
                     # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
                     if symbol_data['partial_position'] == (self.number_stops-1):
-                        MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                        # Elimina el take profit
+                        MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
                     # Actualiza el stop loss en MT5
                     MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
                     # Actualiza el nuevo previous_stop_level con el precio actual
@@ -904,8 +905,8 @@ class HedgeTrading:
                     else: # Para una posición de venta (short)
                         new_stop_loss = position.tp + data['recovery_range']
                     
-                    # Elimina el stop loss y el take profit existentes
-                    MT5Api.send_remove_take_profit_and_stop_loss(position.ticket)
+                    # Elimina el take profit
+                    MT5Api.send_change_take_profit(position.symbol, 0.0, position.ticket)
                     
                     # Actualiza el stop loss con el nuevo valor calculado
                     MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
