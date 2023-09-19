@@ -545,7 +545,7 @@ class MT5Api:
         else:
             print(f"No se pudo realizar la venta parcial.")
     
-    def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int):
+    def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int)->bool:
         """
         Cambia el nivel de stop loss de una posición abierta en MT5.
 
@@ -553,6 +553,9 @@ class MT5Api:
             symbol (str): El símbolo del instrumento.
             new_stop_loss (float): El nuevo nivel de stop loss.
             ticket (int): El número de ticket de la posición a modificar.
+        
+        Return:
+            Bool: True Si la orden se ejecuto con exito, false si no
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
@@ -565,15 +568,17 @@ class MT5Api:
         }
 
         modify_result = mt5.order_send(modify_request)
-
-        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del stop loss ejecutada.")
-        else:
-            print(f"Error al ejecutar la modificación del stop loss: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+
+        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"Modificación del stop loss ejecutada.")
+            return True
+        else:
+            print(f"Error al ejecutar la modificación del stop loss: {modify_result.retcode}")
+            print(f"Comentario: {modify_result.comment}")
+            return False  
         
     def send_change_take_profit(symbol:str, new_take_profit: float, ticket:int):
         """

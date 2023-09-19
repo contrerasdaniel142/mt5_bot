@@ -295,10 +295,10 @@ class BotController:
             # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
             manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
             manage_positions_process.start()
-                            
             # Espera a que termine el proceso
             manage_positions_process.join()
-            self._sleep_to_next_market_opening()
+            
+            self._sleep_to_next_market_opening(sleep_in_market= True)
 
     
     #endregion
@@ -329,7 +329,10 @@ class BreakoutTrading:
             self.comment = "Breakout:rt"
         else:
             self.comment = "Breakout:em"
-            
+        
+        # Porcentaje
+        self._percentage_piece = (100 / self.number_stops) / 100
+        
         self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
     
@@ -479,10 +482,9 @@ class BreakoutTrading:
                 
                 # Calcula el porcentaje de cambio de precio
                 price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
-                percentage_piece = (100 / self.number_stops) / 100
 
                 # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-                next_partial_percentage = percentage_piece * partial_position
+                next_partial_percentage = self._percentage_piece * partial_position
 
                 if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
                     if partial_position == 1:
@@ -499,12 +501,12 @@ class BreakoutTrading:
                     symbol_data['partial_position'] += 1
                     # Mueve el stop loss al nivel anterior
                     new_stop_loss = symbol_data['previous_stop_level']
-                    # En caso de ser la ultima posicion parcial entonces elimina el take profit para obtener mas ganancias
-                    if symbol_data['partial_position'] == (self.number_stops-1):
+                    # Actualiza el stop loss en MT5
+                    request = MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
+                    # En caso de ser la ultima posicion parcial y el cambio de stopp se ejecute con exito, entonces elimina el take profit para obtener mas ganancias
+                    if symbol_data['partial_position'] == (self.number_stops-1) and request is True:
                         # Elimina el take profit
                         MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
-                    # Actualiza el stop loss en MT5
-                    MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
                     # Actualiza el nuevo previous_stop_level con el precio actual
                     symbol_data['previous_stop_level'] = position.price_current
                     # Actualiza los valores en el diccionario compartido self._data
@@ -652,6 +654,9 @@ class BreakoutTrading:
                 'volume_max': info.volume_max,
                 'partial_position': 1
             }
+            
+            # Establece el numero de intentos de comprar en 0
+            self._purchase_attempts[symbol] = 0
             
         # Actualiza la variable compartida
         self._data.update(data)
@@ -904,12 +909,14 @@ class HedgeTrading:
                         new_stop_loss = position.tp - data['recovery_range']
                     else: # Para una posición de venta (short)
                         new_stop_loss = position.tp + data['recovery_range']
-                    
-                    # Elimina el take profit
-                    MT5Api.send_change_take_profit(position.symbol, 0.0, position.ticket)
-                    
+                                        
                     # Actualiza el stop loss con el nuevo valor calculado
-                    MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                    request = MT5Api.send_change_stop_loss(position.symbol, new_stop_loss, position.ticket)
+                    
+                    # Si el cambio de stopp loss se ejecuto con extito se quita el  take profit
+                    if request is True:
+                        # Elimina el take profit
+                        MT5Api.send_change_take_profit(position.symbol, 0.0, position.ticket)
                         
     def _trailing_stop(self, range: float, position: TradePosition):
         """
