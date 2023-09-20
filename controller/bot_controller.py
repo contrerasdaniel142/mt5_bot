@@ -498,6 +498,13 @@ class BreakoutTrading:
         symbol = position.symbol
         # Obtiene los datos relacionados con el símbolo de trading.
         symbol_data = self._data[symbol]
+        # Obtiene el precio de apertura y el precio actual de la posición.
+        price_open = position.price_open
+        price_current = position.price_current
+        # Obtiene el valor de "take_profit" de la posición.
+        take_profit = position.tp
+        # Calcula la diferencia de precio entre "take_profit" y el precio de apertura.
+        profit_range = abs(take_profit - price_open)
 
         # Verifica si "first_volume" y "stop_level" no están presentes en los datos del símbolo y los inicializa si no lo están.
         if "first_volume" not in symbol_data and "stop_level" not in symbol_data:
@@ -510,14 +517,6 @@ class BreakoutTrading:
                 symbol_data['previous_stop_level'] = abs((symbol_data['range'] * 2) + take_profit)
             # Actualiza los valores en el diccionario compartido self._data.
             self._data.update({symbol: symbol_data})
-
-        # Obtiene el precio de apertura y el precio actual de la posición.
-        price_open = position.price_open
-        price_current = position.price_current
-        # Obtiene el valor de "take_profit" de la posición.
-        take_profit = position.tp
-        # Calcula la diferencia de precio entre "take_profit" y el precio de apertura.
-        profit_range = abs(take_profit - price_open)
 
         # Obtiene el número de posición parcial desde el comentario de la posición.
         partial_position_number = self.get_number_in_comment(position.comment)
