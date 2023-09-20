@@ -300,7 +300,6 @@ class BotController:
             
             self._sleep_to_next_market_opening(sleep_in_market= True)
 
-    
     #endregion
 
 
@@ -462,6 +461,7 @@ class BreakoutTrading:
     #endregion
         
     #region Positions Management
+    
     def manage_positions(self, positions: List[TradePosition]):
         """
         Gestiona las posiciones de breakout.
@@ -469,49 +469,122 @@ class BreakoutTrading:
         Args:
             positions (List[TradePosition]): Lista de posiciones de operaciones.
         """
+        # Itera sobre todas las posiciones en la lista proporcionada.
         for position in positions:
+            # Obtiene el símbolo asociado a la posición actual.
             symbol = position.symbol
-            symbol_data = self._data[symbol]  # Datos relacionados con el símbolo
             
-            if position.tp == 0:
-                # Aplica una estrategia de trailing stop adicional
-                self._trailing_stop(symbol_data['range'], position)
-            
-            else:                  
-                partial_position = symbol_data['partial_position']
-                
-                # Calcula el porcentaje de cambio de precio
-                price_change_percentage = ((position.price_current - position.price_open) / (position.tp - position.price_current))
+            # Comprueba si el símbolo ya está presente en el diccionario de datos.
+            if symbol in self._data:
+                # Verifica si el campo "tp" de la posición actual es igual a cero.
+                if position.tp == 0:
+                    # Si "tp" es cero, aplica una estrategia de trailing stop adicional.
+                    self._trailing_stop(self._data[symbol]['range'], position)
+                else:
+                    # Si "tp" no es cero, llama a la función "_partial_position" para gestionar la posición parcial.
+                    self._partial_position(position)
 
-                # Calcula el porcentaje para la próxima posición parcial y el umbral donde comienza el trailing stop
-                next_partial_percentage = self._percentage_piece * partial_position
+    def _partial_position(self, position: TradePosition):
+        """
+        Calcula y envía órdenes para gestionar una posición parcial.
 
-                if price_change_percentage > next_partial_percentage and symbol_data['partial_position'] < self.number_stops:
-                    if partial_position == 1:
-                        # Inicializa valores iniciales para la posición parcial
-                        symbol_data['first_volume'] = position.volume
-                        symbol_data['previous_stop_level'] = position.price_open
-                        # Actualiza los valores en el diccionario compartido self._data
-                        self._data.update({symbol: symbol_data})
-                    # Calcula el nuevo volumen para la venta parcial
-                    new_volume = symbol_data['first_volume'] * next_partial_percentage
-                    # Envia la orden para la venta parcial
-                    MT5Api.send_sell_partial_position(symbol, new_volume, position.ticket)
-                    # Actualiza la posición parcial
-                    symbol_data['partial_position'] += 1
-                    # Mueve el stop loss al nivel anterior
-                    new_stop_loss = symbol_data['previous_stop_level']
-                    # Actualiza el stop loss en MT5
-                    request = MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
-                    # En caso de ser la ultima posicion parcial y el cambio de stopp se ejecute con exito, entonces elimina el take profit para obtener mas ganancias
-                    if symbol_data['partial_position'] == (self.number_stops-1) and request is True:
-                        # Elimina el take profit
-                        MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
-                    # Actualiza el nuevo previous_stop_level con el precio actual
-                    symbol_data['previous_stop_level'] = position.price_current
-                    # Actualiza los valores en el diccionario compartido self._data
-                    self._data.update({symbol: symbol_data})
-                
+        Args:
+            position (TradePosition): La posición de trading actual.
+
+        Returns:
+            None
+        """
+        # Obtiene el símbolo asociado a la posición actual.
+        symbol = position.symbol
+        # Obtiene los datos relacionados con el símbolo de trading.
+        symbol_data = self._data[symbol]
+
+        # Verifica si "first_volume" y "stop_level" no están presentes en los datos del símbolo y los inicializa si no lo están.
+        if "first_volume" not in symbol_data and "stop_level" not in symbol_data:
+            # Inicializa valores iniciales para la posición parcial.
+            symbol_data['first_volume'] = position.volume
+            # Calcula el valor de "take_profit" según el tipo de posición.
+            if position.type == 0:
+                symbol_data['previous_stop_level'] = abs((symbol_data['range'] * 2) - take_profit)
+            else:
+                symbol_data['previous_stop_level'] = abs((symbol_data['range'] * 2) + take_profit)
+            # Actualiza los valores en el diccionario compartido self._data.
+            self._data.update({symbol: symbol_data})
+
+        # Obtiene el precio de apertura y el precio actual de la posición.
+        price_open = position.price_open
+        price_current = position.price_current
+        # Obtiene el valor de "take_profit" de la posición.
+        take_profit = position.tp
+        # Calcula la diferencia de precio entre "take_profit" y el precio de apertura.
+        profit_range = abs(take_profit - price_open)
+
+        # Obtiene el número de posición parcial desde el comentario de la posición.
+        partial_position_number = self.get_number_in_comment(position.comment)
+
+        # Calcula el porcentaje de volumen a vender para esta posición parcial.
+        percentage = self._percentage_piece * partial_position_number
+        # Calcula el siguiente rango parcial basado en el porcentaje de ganancia y el rango de ganancia.
+        next_partial_range = percentage * profit_range
+        # Calcula el porcentaje de volumen a vender en esta posición parcial.
+        percentage_to_sell = 1 - percentage
+
+        # Calcula el nivel de stop loss basado en el tipo de posición y el rango parcial.
+        if position.type == 0:
+            stop_level = price_open + next_partial_range
+            # Verifica si el nivel de stop es menor que el precio actual antes de enviar la orden.
+            if stop_level < price_current:
+                # Llama a la función para preparar y enviar una orden parcial.
+                self._prepare_and_send_partial_order(symbol_data, position, stop_level, percentage_to_sell,
+                                                    partial_position_number)
+        else:
+            stop_level = price_open - next_partial_range
+            # Verifica si el nivel de stop es mayor que el precio actual antes de enviar la orden.
+            if stop_level > price_current:
+                # Llama a la función para preparar y enviar una orden parcial.
+                self._prepare_and_send_partial_order(symbol_data, position, stop_level, percentage_to_sell,
+                                                    partial_position_number)
+
+    def _prepare_and_send_partial_order(self, symbol_data: Dict[str, Any], position: TradePosition, stop_level,
+                                    percentage_to_sell: float, partial_position_number: int):
+        """
+        Prepara y envía una orden para una posición parcial.
+
+        Args:
+            symbol_data (Dict[str, Any]): Datos relacionados con el símbolo de trading.
+            position (TradePosition): La posición de trading actual.
+            stop_level: Nivel de stop loss para la posición parcial.
+            percentage_to_sell (float): Porcentaje del volumen a vender en la posición parcial.
+            partial_position_number (int): Número de la posición parcial.
+
+        Returns:
+            None
+        """
+        # Obtiene el símbolo del diccionario de datos.
+        symbol = symbol_data['symbol']
+        # Calcula el número de la siguiente posición parcial.
+        next_partial_position_number = partial_position_number + 1
+        # Calcula el nuevo volumen para la venta parcial.
+        new_volume = symbol_data['first_volume'] * percentage_to_sell
+        # Crea un nuevo comentario para la orden con el número de la posición parcial.
+        new_comment = self.comment + " " + str(next_partial_position_number)
+
+        # Envía la orden de venta parcial.
+        is_order_completed = MT5Api.send_sell_partial_order(symbol, new_volume, position.ticket, new_comment)
+        if is_order_completed:
+            # Mueve el stop loss al nivel anterior.
+            new_stop_loss = symbol_data['previous_stop_level']
+            # Actualiza el stop loss en MT5.
+            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
+            # En caso de ser la última posición parcial, elimina el take profit para iniciar el trailing stop.
+            if next_partial_position_number == self.number_stops:
+                # Elimina el take profit.
+                MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
+            # Actualiza el nuevo "previous_stop_level" con el "stop_level" actual.
+            symbol_data['previous_stop_level'] = stop_level
+            # Actualiza los valores en el diccionario compartido self._data.
+            self._data.update({symbol: symbol_data})
+        
     def _trailing_stop(self, range: float, position: TradePosition):
         """
         Aplica un trailing stop a una posición.
@@ -540,6 +613,7 @@ class BreakoutTrading:
             
             # Envia la orden para cambiar el stop loss en MT5
             MT5Api.send_change_stop_loss(position.symbol, new_sl, position.ticket)
+    
     #endregion
     
     #region Breakout strategy
@@ -671,7 +745,7 @@ class BreakoutTrading:
             None
         """
         # Verifica que tipo de ejecucion es
-        if self._in_real_time:
+        if self._in_real_time == False:
             # Espera que el minuto termine para iniciar
             self._sleep_to_next_minute()
         

@@ -493,7 +493,7 @@ class MT5Api:
         MT5Api.shutdown()
         return order_request
     
-    def send_sell_partial_position(symbol: str, volume_to_sell: float, ticket:int, comment:str = None):
+    def send_sell_partial_order(symbol: str, volume_to_sell: float, ticket:int, comment:str = None)->bool:
         """
         Vende una parte de una posición abierta en MT5.
 
@@ -503,6 +503,9 @@ class MT5Api:
             ticket (int): El número de ticket de la posición a vender.
             comment (str, opcional): Un comentario opcional para la orden de venta.
                 Si no se establece, se conservará el comentario anterior de la posición.
+        
+        Returns: 
+            bool: Retorna True si la orden se ejecuto con exito, en caso contrario False
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
@@ -511,7 +514,8 @@ class MT5Api:
         
         request_type = 0
         
-        if positions is not None and positions:
+        
+        if positions is not None:
             position = positions[-1]
             if position.type == 0:
                 request_type = OrderType.MARKET_SELL
@@ -532,18 +536,23 @@ class MT5Api:
             }
 
             order_request = mt5.order_send(request)
+            
+            #Cierra la conexión con MetaTrader 5
+            MT5Api.shutdown()
 
             if order_request.retcode != mt5.TRADE_RETCODE_DONE:
                 print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
                 print(f"Comentario: {order_request.comment}")
-                return None
+                return False
             else:
                 print("Venta parcial completada.")
+                return True
                 
+        else:
             #Cierra la conexión con MetaTrader 5
             MT5Api.shutdown()
-        else:
-            print(f"No se pudo realizar la venta parcial.")
+            print("Ticket no encontrado.")
+            return False
     
     def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int)->bool:
         """
@@ -688,3 +697,4 @@ class MT5Api:
         
         return dt_mt5
     #endregion
+
