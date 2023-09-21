@@ -525,8 +525,6 @@ class BreakoutTrading:
         percentage = self._percentage_piece * partial_position_number
         # Calcula el siguiente rango parcial basado en el porcentaje de ganancia y el rango de ganancia.
         next_partial_range = percentage * profit_range
-        # Calcula el porcentaje de volumen a vender en esta posición parcial.
-        percentage_to_sell = 1 - percentage
 
         # Calcula el nivel de stop loss basado en el tipo de posición y el rango parcial.
         if position.type == 0:
@@ -534,18 +532,15 @@ class BreakoutTrading:
             # Verifica si el nivel de stop es menor que el precio actual antes de enviar la orden.
             if stop_level < price_current:
                 # Llama a la función para preparar y enviar una orden parcial.
-                self._prepare_and_send_partial_order(symbol_data, position, stop_level, percentage_to_sell,
-                                                    partial_position_number)
+                self._prepare_and_send_partial_order(symbol_data, position, stop_level, partial_position_number)
         else:
             stop_level = price_open - next_partial_range
             # Verifica si el nivel de stop es mayor que el precio actual antes de enviar la orden.
             if stop_level > price_current:
                 # Llama a la función para preparar y enviar una orden parcial.
-                self._prepare_and_send_partial_order(symbol_data, position, stop_level, percentage_to_sell,
-                                                    partial_position_number)
+                self._prepare_and_send_partial_order(symbol_data, position, stop_level, partial_position_number)
 
-    def _prepare_and_send_partial_order(self, symbol_data: Dict[str, Any], position: TradePosition, stop_level,
-                                    percentage_to_sell: float, partial_position_number: int):
+    def _prepare_and_send_partial_order(self, symbol_data: Dict[str, Any], position: TradePosition, stop_level, partial_position_number: int):
         """
         Prepara y envía una orden para una posición parcial.
 
@@ -553,7 +548,6 @@ class BreakoutTrading:
             symbol_data (Dict[str, Any]): Datos relacionados con el símbolo de trading.
             position (TradePosition): La posición de trading actual.
             stop_level: Nivel de stop loss para la posición parcial.
-            percentage_to_sell (float): Porcentaje del volumen a vender en la posición parcial.
             partial_position_number (int): Número de la posición parcial.
 
         Returns:
@@ -564,7 +558,7 @@ class BreakoutTrading:
         # Calcula el número de la siguiente posición parcial.
         next_partial_position_number = partial_position_number + 1
         # Calcula el nuevo volumen para la venta parcial.
-        new_volume = symbol_data['first_volume'] * percentage_to_sell
+        new_volume = symbol_data['first_volume'] * self._percentage_piece
         # Crea un nuevo comentario para la orden con el número de la posición parcial.
         new_comment = self.comment + " " + str(next_partial_position_number)
 
