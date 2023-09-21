@@ -665,12 +665,12 @@ class BreakoutTrading:
         # se establecen los demás campos de la orden
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
-            order['take_profit'] = round(data['high'] + (data['range']*2), data['decimals'])
-            order['stop_loss'] = round(data['low'], data['decimals'])
+            order['take_profit'] = data['high'] + (data['range']*2)
+            order['stop_loss'] = data['low']
         else:
             order['order_type'] = OrderType.MARKET_SELL
-            order['take_profit'] = round(data['low'] - (data['range']*2), data['decimals'])
-            order['stop_loss'] = round(data['high'], data['decimals'])
+            order['take_profit'] = data['low'] - (data['range']*2)
+            order['stop_loss'] = data['high']
         
         
         order['comment'] = self.comment + " " + str(number + 1)
@@ -713,7 +713,7 @@ class BreakoutTrading:
 
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
-            range_value = abs(high - low)
+            range_value = round(abs(high - low), decimals)
             trade_risk = round((user_risk / range_value), decimals)
             
             data[symbol] = {
@@ -1072,13 +1072,13 @@ class HedgeTrading:
         # se establecen los demás campos de la orden
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
-            order['take_profit'] = round(data['recovery_high'] + (data['recovery_range']*3), data['decimals'])
-            order['stop_loss'] = round(data['recovery_low'] - (data['recovery_range']*2), data['decimals'])
+            order['take_profit'] = data['recovery_high'] + (data['recovery_range']*3)
+            order['stop_loss'] = data['recovery_low'] - (data['recovery_range']*2)
             
         else:
             order['order_type'] = OrderType.MARKET_SELL
-            order['take_profit'] = round(data['recovery_low'] - (data['recovery_range']*3), data['decimals'])
-            order['stop_loss'] = round(data['recovery_high'] + (data['recovery_range']*2), data['decimals'])
+            order['take_profit'] = data['recovery_low'] - (data['recovery_range']*3)
+            order['stop_loss'] = data['recovery_high'] + (data['recovery_range']*2)
         
         order['comment'] = self.comment + " " + str(number+1)
         
@@ -1123,8 +1123,8 @@ class HedgeTrading:
 
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
-            range_value = abs(high - low)
-            recovery_range = range_value/3
+            range_value = round(abs(high - low), decimals)
+            recovery_range = round((range_value/3), decimals)
             min_trade_risk = round((user_risk / range_value), decimals)
             max_trade_risk = round((max_user_risk / range_value), decimals)
             
@@ -1137,7 +1137,7 @@ class HedgeTrading:
                 'recovery_range': recovery_range,
                 'recovery_high': None,
                 'recovery_low': None,
-                'lot_size': min_trade_risk,
+                'lot_size': 1.95,   # Prueba
                 'max_lot_size': max_trade_risk,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max
