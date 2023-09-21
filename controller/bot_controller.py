@@ -558,7 +558,7 @@ class BreakoutTrading:
         # Calcula el número de la siguiente posición parcial.
         next_partial_position_number = partial_position_number + 1
         # Calcula el nuevo volumen para la venta parcial.
-        new_volume = symbol_data['first_volume'] * self._percentage_piece
+        new_volume = round(symbol_data['first_volume'] * self._percentage_piece, symbol_data['decimals'])
         # Crea un nuevo comentario para la orden con el número de la posición parcial.
         new_comment = self.comment + " " + str(next_partial_position_number)
 
