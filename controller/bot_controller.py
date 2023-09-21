@@ -563,20 +563,19 @@ class BreakoutTrading:
         new_comment = self.comment + " " + str(next_partial_position_number)
 
         # Envía la orden de venta parcial.
-        is_order_completed = MT5Api.send_sell_partial_order(symbol, new_volume, position.ticket, new_comment)
-        if is_order_completed:
-            # Mueve el stop loss al nivel anterior.
-            new_stop_loss = symbol_data['previous_stop_level']
-            # Actualiza el stop loss en MT5.
-            MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
-            # En caso de ser la última posición parcial, elimina el take profit para iniciar el trailing stop.
-            if next_partial_position_number == self.number_stops:
-                # Elimina el take profit.
-                MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
-            # Actualiza el nuevo "previous_stop_level" con el "stop_level" actual.
-            symbol_data['previous_stop_level'] = stop_level
-            # Actualiza los valores en el diccionario compartido self._data.
-            self._data.update({symbol: symbol_data})
+        MT5Api.send_sell_partial_order(symbol, new_volume, position.ticket, new_comment)
+        # Mueve el stop loss al nivel anterior.
+        new_stop_loss = symbol_data['previous_stop_level']
+        # Actualiza el stop loss en MT5.
+        is_change_completed = MT5Api.send_change_stop_loss(symbol, new_stop_loss, position.ticket)
+        # En caso de ser la última posición parcial, elimina el take profit para iniciar el trailing stop.
+        if is_change_completed and next_partial_position_number == self.number_stops:
+            # Elimina el take profit.
+            MT5Api.send_change_take_profit(symbol, 0.0, position.ticket)
+        # Actualiza el nuevo "previous_stop_level" con el "stop_level" actual.
+        symbol_data['previous_stop_level'] = stop_level
+        # Actualiza los valores en el diccionario compartido self._data.
+        self._data.update({symbol: symbol_data})
         
     def _trailing_stop(self, range: float, position: TradePosition):
         """
