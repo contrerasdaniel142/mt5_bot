@@ -248,33 +248,33 @@ class BotController:
             
             #region creación de estrategias
             
-            #region Real-time breakout
-            # Se crea el objeto de la estrategia breakout en tiempo real
-            symbols_rt_breakout = manager.list(symbols)
-            rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
-            # Se agrega rt_breakout_symbols
-            strategies.append(rt_breakoutTrading)                      
-            # Se crea el proceso que incia la estrategia
-            rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
-            # Prepara la data de la estrategia antes de iniciar
-            rt_breakoutTrading._prepare_breakout_data(user_risk)    
-            # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
-            rt_breakout_process.start()
-            #endregion
+            # #region Real-time breakout
+            # # Se crea el objeto de la estrategia breakout en tiempo real
+            # symbols_rt_breakout = manager.list(symbols)
+            # rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
+            # # Se agrega rt_breakout_symbols
+            # strategies.append(rt_breakoutTrading)                      
+            # # Se crea el proceso que incia la estrategia
+            # rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
+            # # Prepara la data de la estrategia antes de iniciar
+            # rt_breakoutTrading._prepare_breakout_data(user_risk)    
+            # # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
+            # rt_breakout_process.start()
+            # #endregion
             
-            #region Every-minute breakout
-            # Se crea el objeto de la estrategia breakout cada minuto
-            symbols_em_breakout = manager.list(symbols)
-            em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
-            # Se agrega rt_breakout_symbols
-            strategies.append(em_breakoutTrading)                      
-            # Se crea el proceso que incia la estrategia
-            em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
-            # Prepara la data de la estrategia antes de iniciar
-            em_breakoutTrading._prepare_breakout_data(user_risk)      
-            # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
-            em_breakout_process.start()
-            #endregion
+            # #region Every-minute breakout
+            # # Se crea el objeto de la estrategia breakout cada minuto
+            # symbols_em_breakout = manager.list(symbols)
+            # em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
+            # # Se agrega rt_breakout_symbols
+            # strategies.append(em_breakoutTrading)                      
+            # # Se crea el proceso que incia la estrategia
+            # em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
+            # # Prepara la data de la estrategia antes de iniciar
+            # em_breakoutTrading._prepare_breakout_data(user_risk)      
+            # # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
+            # em_breakout_process.start()
+            # #endregion
             
             #region Hedge
             # Se crea el objeto de la estrategia hedge 
@@ -1194,9 +1194,10 @@ class HedgeTrading:
             current_price = last_bar['close']
             
             # Si el precio vuelve a estar dentro del rango de recuperación, se habilita la cobertura y se actualiza el estado.
-            if data['in_hedge'] == False and data['recovery_high'] > current_price > data['recovery_low']:
-                data['in_hedge'] = True
-                self._data.update({symbol: data})
+            if data['recovery_low'] is None and data['recovery_high'] is None:
+                if data['in_hedge'] == False and data['recovery_high'] > current_price > data['recovery_low']:
+                    data['in_hedge'] = True
+                    self._data.update({symbol: data})
             
                         
             if last_type is None and data['in_hedge'] == True:
