@@ -1194,10 +1194,9 @@ class HedgeTrading:
             current_price = last_bar['close']
             
             # Si el precio vuelve a estar dentro del rango de recuperación, se habilita la cobertura y se actualiza el estado.
-            if data['recovery_low'] is None and data['recovery_high'] is None:
-                if data['in_hedge'] == False and data['recovery_high'] > current_price > data['recovery_low']:
-                    data['in_hedge'] = True
-                    self._data.update({symbol: data})
+            if data['in_hedge'] == False and data['high'] > current_price > data['low']:
+                data['in_hedge'] = True
+                self._data.update({symbol: data})
             
                         
             if last_type is None and data['in_hedge'] == True:
