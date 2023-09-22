@@ -74,10 +74,10 @@ class BotController:
                     # Llama al método 'manage_positions' de la estrategia para gestionar las posiciones
                     strategy.manage_positions(positions)
 
-            # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
-            if number_of_active_positions == 0 and number_of_active_strategies == 0:
-                print("Sin posiciones abiertas ni estrategias activas.")
-                break
+            # # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
+            # if number_of_active_positions == 0 and number_of_active_strategies == 0:
+            #     print("Sin posiciones abiertas ni estrategias activas.")
+            #     break
 
             # Salir del bucle si terminó el horario de mercado
             if not self._is_in_market_hours():
@@ -837,7 +837,7 @@ class HedgeTrading:
         
         # El comentario que identificara a los trades
         self.comment = "Hedge"
-        
+                
         # El numero de intentos de cada símbolo de enviar una orden
         self._purchase_attempts = {}
         
@@ -1133,7 +1133,8 @@ class HedgeTrading:
                 'lot_size': 1.95,   # Prueba
                 'max_lot_size': max_trade_risk,
                 'volume_min': info.volume_min,
-                'volume_max': info.volume_max
+                'volume_max': info.volume_max,
+                'in_hedge': True    # Indica si esta la estrategia activa
             }
             
             # Establece el numero de intentos de comprar en 0
@@ -1174,13 +1175,22 @@ class HedgeTrading:
                 # Elimina los symbolos que ya consiguieron ganancias y estan en traling stop
                 # Aquellos en trailing stop tendran take profit 0
                 if last_position.tp == 0:
-                    self.symbols.remove(symbol)
+                    data['in_hedge'] = False
+                    self._data.update({symbol: data})
                     continue
-            
+                
+            # Obtiene la ultima barra
+            last_bar = MT5Api.get_last_bar(symbol)
             # Obtiene el precio actual
-            current_price = MT5Api.get_last_price(symbol)
+            current_price = last_bar['close']
             
-            if last_type is None:
+            # Si el precio vuelve a estar dentro del rango de recuperación, se habilita la cobertura y se actualiza el estado.
+            if data['in_hedge'] == False and data['recovery_high'] > current_price > data['recovery_low']:
+                data['in_hedge'] = True
+                self._data.update({symbol: data})
+            
+                        
+            if last_type is None and data['in_hedge'] == True:
                 if current_price < data['low']:
                     # Se establece el recovery zone
                     data['recovery_low'] = data['low']

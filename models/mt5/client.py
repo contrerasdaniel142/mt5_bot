@@ -431,6 +431,19 @@ class MT5Api:
         last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
         close = last_rate[-1]['close']
         return close
+
+    def get_last_bar(symbol:str)->np.ndarray[FieldType.ticks_dtype]:
+        """
+        Obtiene la barra más reciente para un símbolo en MetaTrader 5.
+
+        Parameters:
+            symbol (str): El nombre del símbolo del cual se desea obtener el precio de cierre.
+
+        Returns:
+            float: El precio de cierre más reciente del símbolo.
+        """
+        last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
+        return last_rate[-1]
     
     #endregion
 
