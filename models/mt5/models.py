@@ -216,7 +216,6 @@ class TradePosition:
     volume_current: float = None
     price_stoplimit: float = None
 
-
 class SymbolInfo:
     """
     Representa un objeto SymbolInfo de MetaTrader 5 (MT5).

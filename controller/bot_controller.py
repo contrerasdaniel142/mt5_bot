@@ -1121,6 +1121,13 @@ class HedgeTrading:
             min_trade_risk = round((user_risk / range_value), decimals)
             max_trade_risk = round((max_user_risk / range_value), decimals)
             
+            current_time = datetime.now(pytz.utc)
+            
+            if current_time < (end_time + timedelta(seconds=10)):
+                in_hedge = True
+            else:
+                in_hedge = False
+            
             data[symbol] = {
                 'symbol': symbol,
                 'high': high,
@@ -1134,7 +1141,7 @@ class HedgeTrading:
                 'max_lot_size': max_trade_risk,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
-                'in_hedge': True    # Indica si esta la estrategia activa
+                'in_hedge': in_hedge    # Indica si esta la estrategia activa
             }
             
             # Establece el numero de intentos de comprar en 0
@@ -1176,6 +1183,8 @@ class HedgeTrading:
                 # Aquellos en trailing stop tendran take profit 0
                 if last_position.tp == 0:
                     data['in_hedge'] = False
+                    data['recovery_low'] = None
+                    data['recovery_high'] = None
                     self._data.update({symbol: data})
                     continue
                 
