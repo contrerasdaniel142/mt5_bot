@@ -8,7 +8,7 @@ from numpy import ndarray
 from typing import Dict, List, Tuple, Any
 
 # Importaciones necesarias para manejar fechas y tiempo
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class vRenko:
