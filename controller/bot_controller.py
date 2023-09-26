@@ -1116,7 +1116,7 @@ class HedgeTrading:
 
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
-            range_value = round(abs(high - low), decimals)
+            range_value = abs(high - low), decimals
             recovery_range = round((range_value/3), decimals)
             min_trade_risk = round((user_risk / range_value), decimals)
             max_trade_risk = round((max_user_risk / range_value), decimals)
@@ -1127,7 +1127,7 @@ class HedgeTrading:
                 in_hedge = True
             else:
                 in_hedge = False
-            
+                        
             data[symbol] = {
                 'symbol': symbol,
                 'high': high,
@@ -1143,6 +1143,8 @@ class HedgeTrading:
                 'volume_max': info.volume_max,
                 'in_hedge': in_hedge    # Indica si esta la estrategia activa
             }
+            
+            print(data)
             
             # Establece el numero de intentos de comprar en 0
             self._purchase_attempts[symbol] = 0
@@ -1165,10 +1167,10 @@ class HedgeTrading:
         for symbol in copy_symbols:
             data = self._data[symbol]
             
-            # Asegura un numero de intentos de compra maximos para evitar que el bot se estanque
-            if self._purchase_attempts[symbol] > 5:
-                print("Numero de intentos de compra para ", symbol, " excedidos, quitando símbolo de la lista.")
-                self.symbols.remove(symbol)
+            # # Asegura un numero de intentos de compra maximos para evitar que el bot se estanque
+            # if self._purchase_attempts[symbol] > 5:
+            #     print("Numero de intentos de compra para ", symbol, " excedidos, quitando símbolo de la lista.")
+            #     self.symbols.remove(symbol)
                 
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(symbol)

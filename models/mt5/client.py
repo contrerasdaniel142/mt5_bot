@@ -500,7 +500,7 @@ class MT5Api:
             print(f"Comentario: {order_request.comment}")
             return None
         else:
-            print("Orden completada.")
+            print(f"Orden completada. {symbol}: vol[{volume}] price[{price}] sl[{stop_loss}] tp [{take_profit}]")
 
         #Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -595,7 +595,7 @@ class MT5Api:
         MT5Api.shutdown()
 
         if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del stop loss ejecutada.")
+            print(f"Modificación del stop loss ejecutada. {symbol}: {new_stop_loss}")
             return True
         else:
             print(f"Error al ejecutar la modificación del stop loss: {modify_result.retcode}")
@@ -624,7 +624,7 @@ class MT5Api:
         modify_result = mt5.order_send(modify_request)
 
         if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del take profit ejecutada.")
+            print(f"Modificación del take profit ejecutada. {symbol}: {new_take_profit}")
         else:
             print(f"Error al ejecutar la modificación del take profit: {modify_result.retcode}")
             print(f"Comentario: {modify_result.comment}")
