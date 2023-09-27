@@ -248,33 +248,33 @@ class BotController:
             
             #region creación de estrategias
             
-            # #region Real-time breakout
-            # # Se crea el objeto de la estrategia breakout en tiempo real
-            # symbols_rt_breakout = manager.list(symbols)
-            # rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
-            # # Se agrega rt_breakout_symbols
-            # strategies.append(rt_breakoutTrading)                      
-            # # Se crea el proceso que incia la estrategia
-            # rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
-            # # Prepara la data de la estrategia antes de iniciar
-            # rt_breakoutTrading._prepare_breakout_data(user_risk)    
-            # # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
-            # rt_breakout_process.start()
-            # #endregion
+            #region Real-time breakout
+            # Se crea el objeto de la estrategia breakout en tiempo real
+            symbols_rt_breakout = manager.list(symbols)
+            rt_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_rt_breakout, number_stops= 4, in_real_time= True)
+            # Se agrega rt_breakout_symbols
+            strategies.append(rt_breakoutTrading)                      
+            # Se crea el proceso que incia la estrategia
+            rt_breakout_process = multiprocessing.Process(target=rt_breakoutTrading.start)
+            # Prepara la data de la estrategia antes de iniciar
+            rt_breakoutTrading._prepare_breakout_data(user_risk)    
+            # Se inicia el proceso, si no se desea que se ejecute solo comente rt_breakout_process.start()
+            rt_breakout_process.start()
+            #endregion
             
-            # #region Every-minute breakout
-            # # Se crea el objeto de la estrategia breakout cada minuto
-            # symbols_em_breakout = manager.list(symbols)
-            # em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
-            # # Se agrega rt_breakout_symbols
-            # strategies.append(em_breakoutTrading)                      
-            # # Se crea el proceso que incia la estrategia
-            # em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
-            # # Prepara la data de la estrategia antes de iniciar
-            # em_breakoutTrading._prepare_breakout_data(user_risk)      
-            # # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
-            # em_breakout_process.start()
-            # #endregion
+            #region Every-minute breakout
+            # Se crea el objeto de la estrategia breakout cada minuto
+            symbols_em_breakout = manager.list(symbols)
+            em_breakoutTrading = BreakoutTrading(data= manager.dict({}), symbols=symbols_em_breakout, number_stops= 4, in_real_time= False)
+            # Se agrega rt_breakout_symbols
+            strategies.append(em_breakoutTrading)                      
+            # Se crea el proceso que incia la estrategia
+            em_breakout_process = multiprocessing.Process(target=em_breakoutTrading.start)
+            # Prepara la data de la estrategia antes de iniciar
+            em_breakoutTrading._prepare_breakout_data(user_risk)      
+            # Se inicia el proceso, si no se desea que se ejecute solo comente em_breakout_process.start()
+            em_breakout_process.start()
+            #endregion
             
             #region Hedge
             # Se crea el objeto de la estrategia hedge 
@@ -1066,12 +1066,12 @@ class HedgeTrading:
         if data['type'] == 'buy':
             order['order_type'] = OrderType.MARKET_BUY
             order['take_profit'] = data['recovery_high'] + (data['recovery_range']*3)
-            order['stop_loss'] = data['recovery_low'] - (data['recovery_range']*2)
+            order['stop_loss'] = data['recovery_high'] - (data['recovery_range']*3)
             
         else:
             order['order_type'] = OrderType.MARKET_SELL
             order['take_profit'] = data['recovery_low'] - (data['recovery_range']*3)
-            order['stop_loss'] = data['recovery_high'] + (data['recovery_range']*2)
+            order['stop_loss'] = data['recovery_low'] + (data['recovery_range']*3)
         
         order['comment'] = self.comment + " " + str(number+1)
         
@@ -1263,3 +1263,156 @@ class HedgeTrading:
     #endregion
 
 
+#-------------------------------------------------------------------------------------------------------------------------------------
+
+
+class HardHedgeTrading:
+    def __init__(self, symbols:List[str]) -> None:
+        # Lista de symbolos para administar dentro de la estrategia
+        self.symbols = symbols
+        
+        # Diccionario que contendra la data necesaria para ejecutar la estrategia cada symbolo
+        self.symbol_data = {}
+        
+        # El numero que identificara las ordenes de esta estrategia
+        self.magic = 33
+        
+        # True para que la estrategia siga ejecutandose y False para detenerse
+        self.is_on = True
+        
+        # Horario de apertura y cierre del mercado
+        self._market_opening_time = {'hour':13, 'minute':30}
+        self._market_closed_time = {'hour':19, 'minute':55}
+        
+    
+    #region Utilities
+    def _sleep_to_next_minute(self):
+        """
+        Espera hasta que finalice el minuto actual antes de tomar una decisión.
+
+        Este método calcula cuántos segundos faltan para que finalice el minuto actual,
+        y luego espera ese tiempo antes de continuar.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Obtener la hora actual
+        current_time = datetime.now()
+
+        # Calcular el momento en que comienza el próximo minuto (segundo 1, microsegundo 0)
+        next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
+
+        # Calcular la cantidad de segundos que faltan hasta el próximo minuto
+        seconds = (next_minute - current_time).total_seconds()
+
+        # Dormir durante la cantidad de segundos necesarios
+        time.sleep(seconds)
+
+    def _is_in_market_hours(self):
+        """
+        Comprueba si el momento actual se encuentra en horario de mercado.
+
+        Returns:
+            bool: True si se encuentra en horario de mercado, False si no lo está.
+        """
+        # Obtener la hora y minutos actuales en UTC
+        current_time = datetime.now(pytz.utc).time()
+
+        # Crear objetos time para el horario de apertura y cierre del mercado
+        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+
+        # Verificar si la hora actual está dentro del horario de mercado
+        if market_open <= current_time <= market_close:
+            return True
+        else:
+            print("El mercado está cerrado.")
+            return False
+    
+    def get_number_in_comment(self, comment:str)->int:
+        """
+        Extrae y devuelve el último número entero encontrado en la cadena de comentario dada.
+
+        Args:
+            comment (str): La cadena de comentario de entrada.
+        Returns:
+            int: El número entero extraído si se encuentra, o None si no se encuentra ningún número en el comentario.
+        """
+        parts = comment.split()
+
+        if parts[-1].isdigit():
+            return int(parts[-1])
+        else:
+            return None
+    
+    #endregion
+    
+    
+    def _preparing_symbols_data(self):
+        """
+        Prepara la data que se usara en la estrategia de Hedge.
+        """
+        print("HardHedge: Preparando la data...")
+        current_time = datetime.now(pytz.utc)
+        
+        # Establece el periodo de tiempo para calcular el rango
+        start_time = current_time.replace(
+            hour=self._market_opening_time['hour'],
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+        
+        end_time = current_time.replace(
+            hour=self._market_opening_time['hour'],
+            minute=self._market_opening_time['minute'],
+            second=0,
+            microsecond=0
+        )
+        
+        symbol_data = {}
+        
+        # Obtener la informacion necesaria para cada symbolo
+        for symbol in self.symbols:
+            rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
+            info = MT5Api.get_symbol_info(symbol)
+            
+            # Obtiene la cantidad de decimales que debe teber una orden en su volumen
+            digits = info.digits
+
+            high = np.max(rates_in_range['high'])
+            low = np.min(rates_in_range['low'])
+            range_value = abs(high - low)
+            recovery_range = round((range_value/3), digits)
+            
+            current_time = datetime.now(pytz.utc)
+                        
+            symbol_data[symbol] = {
+                'symbol': symbol,
+                'digits': digits,
+                'recovery_range': recovery_range,
+                'volume_min': info.volume_min,
+                'volume_max': info.volume_max
+            }
+            
+            print(symbol_data)
+            
+            
+        # Actualiza la variable compartida
+        self.symbol_data.update(symbol_data)
+    
+    
+    def _hedge_buyer(self):
+        while self.is_on:
+            pass
+
+
+
+
+
+
+symbol = MT5Api.get_symbol_info("US30.cash")
+print(symbol)
