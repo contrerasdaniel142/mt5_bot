@@ -337,7 +337,7 @@ class HardHedgeTrading:
         """
         try:
             with open("hedge_positions.txt", "r") as file:
-                content = file.readlines()
+                content = file.read()
                 if ticket in content:
                     return True
                 return False
