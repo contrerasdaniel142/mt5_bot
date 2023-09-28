@@ -3,7 +3,7 @@ import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
 from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
-from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition
+from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition, AccountInfo
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
@@ -448,6 +448,21 @@ class MT5Api:
         last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
         return last_rate[-1]
     
+    def get_account_info() -> AccountInfo:
+        """
+        Obtiene la información de la cuenta en MetaTrader 5.
+
+        Returns:
+            AccountInfo: Un objeto que contiene información de la cuenta en MetaTrader 5.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        # Obtener información de la cuenta
+        account_info: AccountInfo = mt5.account_info()
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        return account_info
+        
     #endregion
 
     #region Setters

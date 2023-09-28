@@ -216,6 +216,75 @@ class TradePosition:
     volume_current: float = None
     price_stoplimit: float = None
 
+class AccountInfo:
+    """
+    Representa un objeto AccountInfo en MetaTrader 5 (MT5).
+
+    Attributes:
+        assets (float): Activos.
+        balance (float): Saldo.
+        commission_blocked (float): Comisión bloqueada.
+        company (str): Nombre de la compañía.
+        credit (float): Crédito.
+        currency (str): Moneda.
+        currency_digits (int): Dígitos de la moneda.
+        equity (float): Patrimonio.
+        fifo_close (bool): Cierre FIFO.
+        leverage (int): Apalancamiento.
+        liabilities (float): Pasivos.
+        limit_orders (int): Órdenes límite.
+        login (int): Inicio de sesión.
+        margin (float): Margen.
+        margin_free (float): Margen libre.
+        margin_initial (float): Margen inicial.
+        margin_level (float): Nivel de margen.
+        margin_maintenance (float): Margen de mantenimiento.
+        margin_mode (int): Modo de margen.
+        margin_so_call (float): Margen de llamada de margen.
+        margin_so_mode (int): Modo de llamada de margen.
+        margin_so_so (float): Llamada de margen de margen.
+        n_fields (int): Número de campos.
+        n_sequence_fields (int): Número de campos de secuencia.
+        n_unnamed_fields (int): Número de campos sin nombre.
+        name (str): Nombre de la cuenta.
+        profit (float): Ganancia.
+        server (str): Servidor.
+        trade_allowed (bool): Comercio permitido.
+        trade_expert (bool): Comercio experto.
+        trade_mode (int): Modo de comercio.
+    """
+    assets: float = None
+    balance: float = None
+    commission_blocked: float = None
+    company: str = None
+    credit: float = None
+    currency: str = None
+    currency_digits: int = None
+    equity: float = None
+    fifo_close: bool = None
+    leverage: int = None
+    liabilities: float = None
+    limit_orders: int = None
+    login: int = None
+    margin: float = None
+    margin_free: float = None
+    margin_initial: float = None
+    margin_level: float = None
+    margin_maintenance: float = None
+    margin_mode: int = None
+    margin_so_call: float = None
+    margin_so_mode: int = None
+    margin_so_so: float = None
+    n_fields: int = None
+    n_sequence_fields: int = None
+    n_unnamed_fields: int = None
+    name: str = None
+    profit: float = None
+    server: str = None
+    trade_allowed: bool = None
+    trade_expert: bool = None
+    trade_mode: int = None
+
 class SymbolInfo:
     """
     Representa un objeto SymbolInfo de MetaTrader 5 (MT5).
