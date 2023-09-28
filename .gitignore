@@ -175,4 +175,7 @@ pyrightconfig.json
 
 .vscode
 
+# Positions with hedge
+hedge_positions.txt
+
 # End of https://www.toptal.com/developers/gitignore/api/python
