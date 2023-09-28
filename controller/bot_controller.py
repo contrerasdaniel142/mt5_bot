@@ -1230,7 +1230,7 @@ class HedgeTrading:
                         data['type']= 'buy'
                         # Crear orden y enviarla
                         self._hedge_order(symbol, data)
-                    
+    
     #endregion
     
     #region start
@@ -1267,9 +1267,12 @@ class HedgeTrading:
 
 
 class HardHedgeTrading:
-    def __init__(self, symbols:List[str]) -> None:
+    def __init__(self, symbols:List[str], orders_time: int = 60) -> None:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
+        
+        # Tiempo de espera en segundos que habra entre cada compra
+        self.orders_time = orders_time
         
         # Diccionario que contendra la data necesaria para ejecutar la estrategia cada symbolo
         self.symbol_data = {}
@@ -1349,8 +1352,9 @@ class HardHedgeTrading:
             return None
     
     #endregion
-    
-    
+                        
+                        
+                        
     def _preparing_symbols_data(self):
         """
         Prepara la data que se usara en la estrategia de Hedge.
@@ -1359,20 +1363,10 @@ class HardHedgeTrading:
         current_time = datetime.now(pytz.utc)
         
         # Establece el periodo de tiempo para calcular el rango
-        start_time = current_time.replace(
-            hour=self._market_opening_time['hour'],
-            minute=0,
-            second=0,
-            microsecond=0
-        )
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
         
-        end_time = current_time.replace(
-            hour=self._market_opening_time['hour'],
-            minute=self._market_opening_time['minute'],
-            second=0,
-            microsecond=0
-        )
-        
+        # Variable auxiliar
         symbol_data = {}
         
         # Obtener la informacion necesaria para cada symbolo
@@ -1386,6 +1380,7 @@ class HardHedgeTrading:
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
+            dividing_price = round(((high + low)/2), digits)
             recovery_range = round((range_value/3), digits)
             
             current_time = datetime.now(pytz.utc)
@@ -1394,6 +1389,7 @@ class HardHedgeTrading:
                 'symbol': symbol,
                 'digits': digits,
                 'recovery_range': recovery_range,
+                'dividing_price': dividing_price,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max
             }
@@ -1404,15 +1400,102 @@ class HardHedgeTrading:
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
     
-    
     def _hedge_buyer(self):
+        """
+        Prepara órdenes para ser enviadas a MetaTrader 5. Las ordenes se preparan cada self.orders_time, en función de los datos establecidos.
+        """
         while self.is_on:
-            pass
+            # Se crea una copia de la lista de symbolos para evitar al modificarse
+            copy_symbols = self.symbols.copy()
+            
+            for symbol in copy_symbols:
+                data = self.symbol_data[symbol]
+                
+                # Diccionario que contendra la informacion de la orden
+                order = {
+                    "symbol": symbol,
+                    "order_type": None, 
+                    "volume": data['volume_min'],
+                    "price": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "ticket": None,
+                    "comment": None,
+                    "magic": self.magic
+                }
+                
+                # Obtiene la ultima barra
+                last_bar = MT5Api.get_last_bar(symbol)
+                # Obtiene el precio actual
+                current_price = last_bar['close']
+                
+                # Se establece el tipo de orden, su tp y su sl
+                radius = data['recovery_range']*3
+                
+                if current_price > data['dividing_price']:
+                    recovery_high = current_price
+                    order['order_type'] = OrderType.MARKET_BUY
+                    order['take_profit'] = recovery_high + radius
+                    order['stop_loss'] = recovery_high - radius
+                    
+                else:
+                    recovery_low = current_price
+                    order['order_type'] = OrderType.MARKET_SELL
+                    order['take_profit'] = recovery_low - radius
+                    order['stop_loss'] = recovery_low + radius
+                
+                # El comment representara al numero de veces que se ha apliacado el hedge
+                order['comment'] = str(1)
+                
+                # Envía la orden a MetaTrader 5
+                MT5Api.send_order(**order)
+            
+            # Espera el tiempo establecido para volver a realizar las ordenes
+            time.sleep(self.orders_time)
+        
+    def _hedge_strategy(self):
+        """
+        Ejecuta la estrategia a las posiciones abiertas.
+        """
+        while self.is_on:
+            # Se crea una copia de la lista de symbolos para evitar al modificarse
+            copy_symbols = self.symbols.copy()
+            
+            for symbol in copy_symbols:
+                # Se obtienen las posiciones abiertas
+                positions = MT5Api.get_positions(magic=self.magic)
+                for position in positions:
+                    # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
+                    if position.tp == 0:
+                        continue
+                    data = self.symbol_data[symbol]
+                    order_type = position.type
+                    # Se establece los rangos del recovery
+                    if order_type == 0: # Compra
+                        recovery_high = position.price_open
+                        recovery_low = position.price_open - data["recovery_range"]
+                        if position.price_current < recovery_low:
+                            # Se agrega el tipo de orden
+                            next_order_type = 'sell'
+                            # Crear orden y enviarla
+                            self._hedge_order(symbol, next_order_type)
+                    elif: # Venta
+                        recovery_high = position.price_open + data["recovery_range"]
+                        recovery_low = position.price_open
+                        
+                    if (last_type == 0 or last_type is None) and current_price < data['recovery_low']:
+                        # Se agrega el tipo de orden
+                            data['type'] = 'sell'
+                            # Crear orden y enviarla
+                            self._hedge_order(symbol, data)
+                
+                    elif (last_type == 1 or last_type is None) and current_price > data['recovery_high']:
+                            # Se agrega el tipo de orden
+                            data['type']= 'buy'
+                            # Crear orden y enviarla
+                            self._hedge_order(symbol, data)
+
+    def _hedge_order(self):
+        
 
 
-
-
-
-
-symbol = MT5Api.get_symbol_info("US30.cash")
-print(symbol)

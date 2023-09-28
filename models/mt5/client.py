@@ -277,7 +277,7 @@ class MT5Api:
         MT5Api.shutdown()
         return ticks
 
-    def get_positions(symbol: str = None, ticket: int = None)-> Tuple[TradePosition, ...]:
+    def get_positions(symbol: str = None, ticket: int = None, magic:int = None)-> Tuple[TradePosition, ...]:
         """
         Obtiene las posiciones abiertas para un símbolo específico en MetaTrader 5.
         
@@ -286,6 +286,7 @@ class MT5Api:
         Args:
             symbol (str, optional): El símbolo del instrumento financiero para el cual se desean obtener las posiciones.
             ticket (int, optional): El número de ticket de la posición que se desea obtener de manera específica.
+            magic(int, optional): Identificador del experto. Permite organizar el procesamiento analítico de órdenes comerciales. Cada experto puede colocar su propio identificador único al enviar una solicitud comercial
 
         Returns:
             Tuple[TradePosition, ...] or None: Una tupla de objetos TradePosition que representan las posiciones abiertas.
@@ -293,6 +294,8 @@ class MT5Api:
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
+        if magic is not None:
+            positions = mt5.positions_get(magic=magic)
         if ticket is not None:
             positions = mt5.positions_get(ticket=ticket)
         elif symbol is not None:
@@ -448,18 +451,20 @@ class MT5Api:
     #endregion
 
     #region Setters
-    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None) -> MqlTradeResult:
+    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None, magic: int = None) -> MqlTradeResult:
         """
         Envía una orden al servidor de MetaTrader 5.
 
         Args:
-            symbol (str): El nombre del símbolo en el que deseas realizar la orden.
+            symbol (str): Nombre del instrumento comercial del que se coloca la orden. No es necesario en las operaciones de modificación de órdenes y el cierre de posiciones.
             order_type (int): El tipo de orden (por ejemplo, ORDER_TYPE_BUY o ORDER_TYPE_SELL).
-            volume (float): El volumen (cantidad) que deseas comprar o vender.
+            volume (float): Volumen de la transacción solicitado en lotes. El valor real del volumen al darse la apertura dependerá del tipo de orden según la ejecución.
             price (float, optional): El precio al que deseas realizar la orden. Si no se especifica, se utilizará el precio de mercado actual.
             stop_loss (float, optional): El nivel de Stop Loss para la orden.
             take_profit (float, optional): El nivel de Take Profit para la orden.
+            ticket (int, optional): Ticket de la orden. Es necesario para modificar las órdenes pendientes.
             comment (str, optional): Comentario opcional para la orden.
+            magic(int, optional): Identificador del experto. Permite organizar el procesamiento analítico de órdenes comerciales. Cada experto puede colocar su propio identificador único al enviar una solicitud comercial
 
         Returns:
             MqlTradeResult: Contiene la informacion sobre el resultado de la orden, None si la orden no es valida.
@@ -482,19 +487,22 @@ class MT5Api:
         request['action'] = TradeActions.TRADE_ACTION_DEAL
         request['symbol'] = symbol
         request['volume'] = volume
-        request["deviation"]= 10
         request["type"] = order_type
-
-        if comment is not None:
-            request["comment"] = comment
         
         if stop_loss is not None:
             request["sl"] = float(stop_loss)
 
         if take_profit is not None:
             request["tp"] = float(take_profit)
+        
+        if comment is not None:
+            request["comment"] = comment
+            
+        if magic is not None:
+            request["magic"] = magic
 
         order_request: MqlTradeResult = mt5.order_send(request)
+        
         if order_request.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
             print(f"Comentario: {order_request.comment}")
