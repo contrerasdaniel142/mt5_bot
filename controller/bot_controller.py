@@ -24,7 +24,6 @@ import re
 import multiprocessing
 from multiprocessing import Queue
 from multiprocessing.managers import DictProxy, ListProxy, ValueProxy
-import threading
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime, timedelta
@@ -77,12 +76,12 @@ class BotController:
             #     print("Sin posiciones abiertas ni estrategias activas.")
             #     break
 
-            # Salir del bucle si terminó el horario de mercado
-            if not self._is_in_market_hours():
-                print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
-                # Envia una solicitud para cerrar todas las posiciones abiertas
-                MT5Api.send_close_all_position()
-                break
+            # # Salir del bucle si terminó el horario de mercado
+            # if not self._is_in_market_hours():
+            #     print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
+            #     # Envia una solicitud para cerrar todas las posiciones abiertas
+            #     MT5Api.send_close_all_position()
+            #     break
     #endregion
 
     #region utilities
@@ -230,9 +229,9 @@ class BotController:
         while True:
             print("")
                                     
-            # Revisa si aun falta tiempo para la apertura de mercado y espera
-            # Si el mercado se encuentra abierto continua con el programa
-            self._sleep_to_next_market_opening(sleep_in_market= False)
+            # # Revisa si aun falta tiempo para la apertura de mercado y espera
+            # # Si el mercado se encuentra abierto continua con el programa
+            # self._sleep_to_next_market_opening(sleep_in_market= False)
             
             # Se crea una lista que contendra a los objetos de las estrategias creadas
             strategies = []
@@ -250,7 +249,7 @@ class BotController:
                 orders_time=60
             )
             hard_hedge_trading._preparing_symbols_data()
-            strategies.append(hard_hedge_trading)                      
+            strategies.append(hard_hedge_trading)
             # Se crea el proceso que administra la estrategia
             hard_hedge_process = multiprocessing.Process(target=hard_hedge_trading.start)
             hard_hedge_process.start()
@@ -315,6 +314,43 @@ class HardHedgeTrading:
             print("El mercado está cerrado.")
             return False
     
+    def save_position_in_txt(self, ticket: int):
+        """
+        Guarda la posición especificada en un archivo de texto.
+        No se aplicará hedge a las posiciones guardadas en este archivo.
+
+        Args:
+            ticket (int): El número de ticket de la posición a guardar.
+        """
+        with open("hedge_positions.txt", "a") as file:
+            file.write(f"Ticket: {ticket} ")
+
+    def find_position_in_txt(self, ticket: int) -> bool:
+        """
+        Busca si un ticket de posición está presente en el archivo de texto.
+
+        Args:
+            ticket (int): El número de ticket de la posición a buscar.
+
+        Returns:
+            bool: True si se encuentra el ticket en el archivo, False en caso contrario.
+        """
+        try:
+            with open("hedge_positions.txt", "r") as file:
+                content = file.readlines()
+                if ticket in content:
+                    return True
+                return False
+        except FileNotFoundError:
+            return False
+
+    def clean_positions_in_txt(self):
+        """
+        Limpia el archivo de texto que almacena las posiciones guardadas.            
+        """
+        with open("hedge_positions.txt", "w") as file:
+            file.truncate(0)
+        
     #endregion   
     
     #region Profit Management
@@ -496,7 +532,7 @@ class HardHedgeTrading:
             positions = MT5Api.get_positions(magic=self.magic)
             for position in positions:
                 # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
-                if position.tp == 0:
+                if self.find_position_in_txt(position.ticket):
                     continue
                 data = self.symbol_data[position.symbol]
                 
@@ -545,7 +581,9 @@ class HardHedgeTrading:
             "magic": self.magic
         }
         # Envía la orden a MetaTrader 5
-        MT5Api.send_order(**order)
+        if MT5Api.send_order(**order):
+            # Guarda la posicion en un txt para evitar volver hacerle hedge
+            self.save_position_in_txt(position.ticket)
         
     #endregion
     
@@ -568,18 +606,23 @@ class HardHedgeTrading:
                 self.is_on.value = False
                 break
             
-            # Salir del bucle si termino el mercado
-            if not self._is_in_market_hours():
-                print("HardHedge: Finalizo el horario de mercado.")
-                self.is_on.value = False
-                break
+            # # Salir del bucle si termino el mercado
+            # if not self._is_in_market_hours():
+            #     print("HardHedge: Finalizo el horario de mercado.")
+            #     self.is_on.value = False
+            #     break
             
             self._hedge_buyer()
         
         strategy_process.join()
+        
+        # Limpiamos el archivo txt para la proxima iteración
+        self.clean_positions_in_txt()
         
         # Fin del ciclo
         print("HardHedge: Finalizando estrategia...")
           
     #endregion
          
+
+
