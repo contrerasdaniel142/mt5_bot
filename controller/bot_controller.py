@@ -76,12 +76,12 @@ class BotController:
             #     print("Sin posiciones abiertas ni estrategias activas.")
             #     break
 
-            # # Salir del bucle si terminó el horario de mercado
-            # if not self._is_in_market_hours():
-            #     print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
-            #     # Envia una solicitud para cerrar todas las posiciones abiertas
-            #     MT5Api.send_close_all_position()
-            #     break
+            # Salir del bucle si terminó el horario de mercado
+            if not self._is_in_market_hours():
+                print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
+                # Envia una solicitud para cerrar todas las posiciones abiertas
+                MT5Api.send_close_all_position()
+                break
     #endregion
 
     #region utilities
@@ -229,9 +229,9 @@ class BotController:
         while True:
             print("")
                                     
-            # # Revisa si aun falta tiempo para la apertura de mercado y espera
-            # # Si el mercado se encuentra abierto continua con el programa
-            # self._sleep_to_next_market_opening(sleep_in_market= False)
+            # Revisa si aun falta tiempo para la apertura de mercado y espera
+            # Si el mercado se encuentra abierto continua con el programa
+            self._sleep_to_next_market_opening(sleep_in_market= False)
             
             # Se crea una lista que contendra a los objetos de las estrategias creadas
             strategies = []
@@ -606,11 +606,11 @@ class HardHedgeTrading:
                 self.is_on.value = False
                 break
             
-            # # Salir del bucle si termino el mercado
-            # if not self._is_in_market_hours():
-            #     print("HardHedge: Finalizo el horario de mercado.")
-            #     self.is_on.value = False
-            #     break
+            # Salir del bucle si termino el mercado
+            if not self._is_in_market_hours():
+                print("HardHedge: Finalizo el horario de mercado.")
+                self.is_on.value = False
+                break
             
             self._hedge_buyer()
         
