@@ -500,6 +500,9 @@ class HardHedgeTrading:
         while self.is_on:
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(magic=self.magic)
+            account_info = MT5Api.get_account_info()
+            if account_info.profit > 100:
+                MT5Api.send_close_all_position()
             for position in positions:
                 # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
                 if self.find_position_in_txt(position.ticket):
