@@ -590,6 +590,43 @@ class MT5Api:
             print("Ticket no encontrado.")
             return False
     
+    def send_change_stop_loss_and_take_profit(symbol:str, new_stop_loss: float,  new_take_profit: float, ticket:int)->bool:
+        """
+        Cambia el nivel de stop loss  y el take profit de una posición abierta en MT5.
+
+        Args:
+            symbol (str): El símbolo del instrumento.
+            new_stop_loss (float): El nuevo nivel de stop loss.
+            new_take_profit (float): El nuevo nivel de take profit.
+            ticket (int): El número de ticket de la posición a modificar.
+        
+        Return:
+            Bool: True Si la orden se ejecuto con exito, false si no
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+
+        modify_request = {
+            "action": TradeActions.TRADE_ACTION_SLTP,
+            "symbol": symbol,
+            "position": ticket,
+            "sl": new_stop_loss,
+            "tp": new_take_profit,
+        }
+
+        modify_result = mt5.order_send(modify_request)
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+
+        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"Modificación del sl y tp ejecutada. {symbol}: sl {new_stop_loss} tp {new_take_profit}")
+            return True
+        else:
+            print(f"Error al ejecutar la modificación del sl y tp: {modify_result.retcode}")
+            print(f"Comentario: {modify_result.comment}")
+            return False  
+    
     def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int)->bool:
         """
         Cambia el nivel de stop loss de una posición abierta en MT5.

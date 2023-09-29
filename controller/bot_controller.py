@@ -366,58 +366,23 @@ class HardHedgeTrading:
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
-            
-            # Si el take profit (tp) es igual a cero, ejecuta el trailing stop
-            if position.tp == 0:
-                self._trailing_stop(data['recovery_range'], position)
-            else:
-                submit_changes = False
-                if position.type == OrderType.MARKET_BUY:
-                    threshold_price = position.tp - data['recovery_range']
-                    if position.price_current > threshold_price:
-                        submit_changes = True
-                        
-                else:
-                    threshold_price = position.tp + data['recovery_range']
-                    if position.price_current < threshold_price:
-                        submit_changes = True
+            submit_changes = False
+            if position.type == OrderType.MARKET_BUY: # Compra
+                new_stop_loss = position.tp - data['recovery_range']
+                new_take_profit = position.tp + data['recovery_range']
+                if position.price_current > new_stop_loss:
+                    submit_changes = True
                     
-                if submit_changes:                 
-                    # Actualiza el stop loss con el nuevo valor calculado
-                    request = MT5Api.send_change_stop_loss(position.symbol, threshold_price, position.ticket)
-                    # Si el cambio de stopp loss se ejecuto con extito se quita el  take profit
-                    if request is True:
-                        # Elimina el take profit
-                        MT5Api.send_change_take_profit(position.symbol, 0.0, position.ticket)
-                        
-    def _trailing_stop(self, range: float, position: TradePosition):
-        """
-        Aplica un trailing stop a una posición.
-
-        Args:
-            range (float): El rango para calcular el trailing stop.
-            position (TradePosition): La posición de la operación.
-
-        Esta función calcula y aplica un trailing stop a una posición en función del rango especificado.
-        """
-        # Se calcula la distancia del trailing stop con el rango especificado
-        trailing_stop_distance = range
-        
-        submit_changes = False
-        
-        if position.type == OrderType.MARKET_BUY:
-            threshold_price = position.sl + trailing_stop_distance
-            if position.price_current > threshold_price:
-                submit_changes = True
+            else: # Venta
+                new_stop_loss = position.tp + data['recovery_range']
+                new_take_profit = position.tp - data['recovery_range']
+                if position.price_current < new_stop_loss:
+                    submit_changes = True
                 
-        else:
-            threshold_price = position.tp - trailing_stop_distance
-            if position.price_current < threshold_price:
-                submit_changes = True
-        
-        if submit_changes:  
-            # Actualiza el stop loss con el nuevo valor calculado
-            MT5Api.send_change_stop_loss(position.symbol, threshold_price, position.ticket)
+            if submit_changes is True:                 
+                # Actualiza el stop loss y el take profit con el nuevo valor calculado
+                MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
+
 
     #endregion             
     
