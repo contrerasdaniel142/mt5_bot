@@ -467,17 +467,21 @@ class HardHedgeTrading:
                 # Se establece el tipo de orden, su tp y su sl
                 radius = data['recovery_range']*3
                 
+                # Se establece el tp y el sl
                 if current_price > data['dividing_price']:
                     recovery_high = current_price
+                    tp = recovery_high + radius
+                    sl = recovery_high - radius
                     order['order_type'] = OrderType.MARKET_BUY
-                    order['take_profit'] = recovery_high + radius
-                    order['stop_loss'] = recovery_high - radius
                     
                 else:
                     recovery_low = current_price
+                    tp = recovery_low - radius
+                    sl = recovery_low + radius
                     order['order_type'] = OrderType.MARKET_SELL
-                    order['take_profit'] = recovery_low - radius
-                    order['stop_loss'] = recovery_low + radius
+                
+                order['take_profit'] = round(tp, data['digits'])
+                order['stop_loss'] = round(sl, data['digits'])
                 
                 # El comment representara al numero de veces que se ha apliacado el HardHedge
                 order['comment'] = str(0)
