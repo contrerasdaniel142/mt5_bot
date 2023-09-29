@@ -439,7 +439,8 @@ class HardHedgeTrading:
         # Verifica si el margen disponible es menor al 10% de el balance de la cuenta
         account_info = MT5Api.get_account_info()
         minimun_margin =  0.10 *  account_info.balance
-        if account_info.margin_free > minimun_margin:
+        positions = MT5Api.get_positions(magic=self.magic)
+        if account_info.margin_free > minimun_margin and (len(positions)*2) < account_info.limit_orders:
             # Se crea una copia de la lista de symbolos para evitar al modificarse
             copy_symbols = list(self.symbols)
             
