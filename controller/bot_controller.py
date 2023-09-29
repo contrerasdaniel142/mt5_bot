@@ -355,12 +355,12 @@ class HardHedgeTrading:
     
     #region Profit Management
     
-    def manage_profit(self, positions: List[TradePosition]):
+    def manage_profit(self, positions: Tuple[TradePosition]):
         """
         Gestiona las posiciones para maximizar las ganancias de HardHedge mediante la actualización del stop loss y el trailing stop.
 
         Args:
-            positions (List[TradePosition]): Lista de posiciones de operaciones.
+            positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
         # Itera sobre todas las posiciones en la lista "positions"
         for position in positions:
@@ -371,7 +371,7 @@ class HardHedgeTrading:
             if position.tp == 0:
                 self._trailing_stop(data['recovery_range'], position)
             else:
-                submit_changes = None
+                submit_changes = False
                 if position.type == OrderType.MARKET_BUY:
                     threshold_price = position.tp - data['recovery_range']
                     if position.price_current > threshold_price:
@@ -382,7 +382,7 @@ class HardHedgeTrading:
                     if position.price_current < threshold_price:
                         submit_changes = True
                     
-                if submit_changes is not None:                 
+                if submit_changes:                 
                     # Actualiza el stop loss con el nuevo valor calculado
                     request = MT5Api.send_change_stop_loss(position.symbol, threshold_price, position.ticket)
                     # Si el cambio de stopp loss se ejecuto con extito se quita el  take profit
@@ -403,7 +403,7 @@ class HardHedgeTrading:
         # Se calcula la distancia del trailing stop con el rango especificado
         trailing_stop_distance = range
         
-        submit_changes = None
+        submit_changes = False
         
         if position.type == OrderType.MARKET_BUY:
             threshold_price = position.sl + trailing_stop_distance
@@ -415,7 +415,7 @@ class HardHedgeTrading:
             if position.price_current < threshold_price:
                 submit_changes = True
         
-        if submit_changes is not None:  
+        if submit_changes:  
             # Actualiza el stop loss con el nuevo valor calculado
             MT5Api.send_change_stop_loss(position.symbol, threshold_price, position.ticket)
 
