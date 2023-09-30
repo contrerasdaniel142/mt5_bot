@@ -24,6 +24,7 @@ from .mt5.client import MT5Api
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime
+import pytz, time
 
 #endregion
 
@@ -174,6 +175,11 @@ class HardHedgeTrading:
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
             recovery_range = round((range_value/times_divisible), digits)
+                       
+            symbol_info = MT5Api.get_symbol_info()
+                        
+            if recovery_range < symbol_info.trade_tick_value:
+                recovery_range = symbol_info.trade_tick_value
             
             current_time = datetime.now(pytz.utc)
                         
