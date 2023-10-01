@@ -753,17 +753,18 @@ class MT5Api:
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
     
-    def send_close_position(ticket:int):
+    def send_close_position(symbol:str, ticket:int):
         """
         Cierra una posicion abiertas en la plataforma MetaTrader 5.
         
         Args:
+            symbol (str): El símbolo del instrumento.
             ticket (int): El número de ticket de la posición a vender.
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
-        close_result = mt5.Close(ticket=ticket)                
+        close_result = mt5.Close(symbol=symbol, ticket=ticket)                
         if close_result:
             print(f"Posición {ticket} cerrada con éxito")
         else:
