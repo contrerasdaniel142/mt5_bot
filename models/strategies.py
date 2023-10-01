@@ -122,30 +122,27 @@ class HardHedgeTrading:
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
-            submit_changes = False
-            
-            symbol_info = MT5Api.get_symbol_info(position.symbol)
             
             if position.type == OrderType.MARKET_BUY: # Compra
-                new_stop_loss = position.tp - data['recovery_range']
-                new_take_profit = position.tp + data['recovery_range']
-                if new_stop_loss > symbol_info.bid:
-                    new_stop_loss = symbol_info.bid - symbol_info.trade_tick_value_loss
-                if position.price_current > new_stop_loss:
-                    submit_changes = True
+                take_profit = position.price_open + (data['recovery_range']*2)
+                stop_loss = position.price_open - (data['recovery_range']*3)
+                
+                if position.price_current >= take_profit:
+                    MT5Api.send_close_position(position.ticket)
+                
+                if position.price_current <= stop_loss:
+                    MT5Api.send_close_position(position.ticket)
                     
             else: # Venta
-                new_stop_loss = position.tp + data['recovery_range']
-                new_take_profit = position.tp - data['recovery_range']
-                if new_stop_loss < symbol_info.ask:
-                    new_stop_loss = symbol_info.ask + symbol_info.trade_tick_value_loss
-                if position.price_current < new_stop_loss:
-                    submit_changes = True
+                take_profit = position.price_open - (data['recovery_range']*2)
+                stop_loss = position.price_open + (data['recovery_range']*3)
                 
-            if submit_changes is True:                 
-                # Actualiza el stop loss y el take profit con el nuevo valor calculado
-                MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
+                if position.price_current <= take_profit:
+                    MT5Api.send_close_position(position.ticket)
 
+                if position.price_current >= stop_loss:
+                    MT5Api.send_close_position(position.ticket)
+                    
     #endregion             
     
     #region HardHedge strategy           

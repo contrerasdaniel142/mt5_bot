@@ -206,7 +206,7 @@ class BotController:
         
         # Revisa si aun falta tiempo para la apertura de mercado y espera
         # Si el mercado se encuentra abierto continua con el programa
-        self._sleep_to_next_market_opening(sleep_in_market= False)
+        #self._sleep_to_next_market_opening(sleep_in_market= False)
                 
         while True:
             print("")
@@ -236,9 +236,9 @@ class BotController:
             #endregion
             
                             
-            # # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            # manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
-            # manage_positions_process.start()
+            # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
+            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            manage_positions_process.start()
             
             # Espera a que termine el proceso
             hard_hedge_process.join()
