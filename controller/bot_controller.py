@@ -236,11 +236,12 @@ class BotController:
             #endregion
             
                             
-            # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
-            manage_positions_process.start()
+            # # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
+            # manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            # manage_positions_process.start()
+            
             # Espera a que termine el proceso
-            manage_positions_process.join()
+            hard_hedge_process.join()
             
             self._sleep_to_next_market_opening(sleep_in_market= True)
 

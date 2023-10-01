@@ -246,14 +246,14 @@ class HardHedgeTrading:
                 # Se establece el tp y el sl
                 if current_price > data['dividing_price']:
                     recovery_high = current_price
-                    tp = recovery_high + radius
-                    sl = recovery_high - radius
+                    tp = recovery_high + data['recovery_range']*2
+                    sl = recovery_high - data['recovery_range']*3
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
                     recovery_low = current_price
-                    tp = recovery_low - radius
-                    sl = recovery_low + radius
+                    tp = recovery_low - data['recovery_range']*2
+                    sl = recovery_low + data['recovery_range']*3
                     order['order_type'] = OrderType.MARKET_SELL
                 
                 order['take_profit'] = round(tp, data['digits'])
@@ -310,12 +310,12 @@ class HardHedgeTrading:
                 
         if position.type == OrderType.MARKET_BUY:
             new_order_type = OrderType.MARKET_SELL
-            tp = recovery_price - radius
-            sl = recovery_price + radius
+            tp = recovery_price - data['recovery_range']*2 
+            sl = recovery_price + data['recovery_range']*3
         else:
             new_order_type = OrderType.MARKET_BUY
-            tp = recovery_price + radius
-            sl = recovery_price - radius
+            tp = recovery_price + data['recovery_range']*2
+            sl = recovery_price - data['recovery_range']*3
         
         order = {
             "symbol": position.symbol, 
