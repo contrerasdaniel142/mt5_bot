@@ -23,7 +23,7 @@ from .mt5.models import TradePosition
 from .mt5.client import MT5Api
 
 # Importaciones necesarias para manejar fechas y tiempo
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz, time
 
 #endregion
@@ -159,7 +159,7 @@ class HardHedgeTrading:
         # Establece el periodo de tiempo para calcular el rango
         start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
         end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
-
+        
         # Se usa como base para escoger el recovery range
         seconds_in_range = (end_time - start_time).total_seconds()
 
@@ -172,6 +172,10 @@ class HardHedgeTrading:
         # Obtener la informacion necesaria para cada symbolo
         for symbol in self.symbols:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
+            
+            if rates_in_range.size == 0:
+                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (start_time - timedelta(days=1)), (end_time - timedelta(days=1)))
+            
             info = MT5Api.get_symbol_info(symbol)
             
             # Obtiene la cantidad de decimales que debe teber una orden en su volumen
@@ -349,13 +353,7 @@ class HardHedgeTrading:
                 print("HardHedge: No hay símbolos por analizar.")
                 self.is_on.value = False
                 break
-            
-            # Salir del bucle si termino el mercado
-            if not self._is_in_market_hours():
-                print("HardHedge: Finalizo el horario de mercado.")
-                self.is_on.value = False
-                break
-            
+                        
             self._hedge_buyer()
         
         strategy_process.join()

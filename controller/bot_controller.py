@@ -63,17 +63,21 @@ class BotController:
                     # Llama al método 'manage_profit' de la estrategia para gestionar las posiciones
                     strategy.manage_profit(positions)
 
-            # # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
-            # if number_of_active_positions == 0 and number_of_active_strategies == 0:
-            #     print("Sin posiciones abiertas ni estrategias activas.")
-            #     break
+            # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
+            if number_of_active_positions == 0 and number_of_active_strategies == 0:
+                print("Sin posiciones abiertas ni estrategias activas.")
+                break
 
             # Salir del bucle si terminó el horario de mercado
             if not self._is_in_market_hours():
                 print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
+                # Termina las estrategias
+                for strategy in strategies:
+                    strategy.is_on.value = False
                 # Envia una solicitud para cerrar todas las posiciones abiertas
                 MT5Api.send_close_all_position()
                 break
+            
     #endregion
 
     #region utilities
@@ -199,14 +203,14 @@ class BotController:
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
         MT5Api.shutdown()
+        
+        # Revisa si aun falta tiempo para la apertura de mercado y espera
+        # Si el mercado se encuentra abierto continua con el programa
+        self._sleep_to_next_market_opening(sleep_in_market= False)
                 
         while True:
             print("")
-                                    
-            # Revisa si aun falta tiempo para la apertura de mercado y espera
-            # Si el mercado se encuentra abierto continua con el programa
-            self._sleep_to_next_market_opening(sleep_in_market= False)
-            
+                                                
             # Se crea una lista que contendra a los objetos de las estrategias creadas
             strategies = []
             
