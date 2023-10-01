@@ -173,7 +173,7 @@ class HardHedgeTrading:
         for symbol in self.symbols:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
-            if rates_in_range.size == 0:
+            if rates_in_range is None or rates_in_range.size == 0:
                 rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (start_time - timedelta(days=1)), (end_time - timedelta(days=1)))
             
             info = MT5Api.get_symbol_info(symbol)
