@@ -278,10 +278,6 @@ class HardHedgeTrading:
                 if self.find_position_in_txt(position.ticket):
                     continue
                                 
-                # Si ya se han realiozado mas de 3 hedge que no tenga en cuenta esa posicion
-                if int(position.comment) > 4:
-                    continue
-                
                 data = self.symbol_data[position.symbol]
                 
                 # Obtiene el precio actual
@@ -308,8 +304,12 @@ class HardHedgeTrading:
         # Se establece la orden y se envia
         next_hedge = int(position.comment)+1
         comment = str(next_hedge)
-        new_volume = data['volume_min'] * (2 ** (next_hedge))
-        
+                
+        if int(position.comment) < 4:
+            new_volume = data['volume_min'] * (2 ** (next_hedge))
+        else:
+            new_volume = position.volume + (data['volume_min']*10)
+                
         if new_volume > data['volume_max']:
             new_volume = float(data['volume_max'])
                 
