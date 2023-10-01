@@ -128,20 +128,20 @@ class HardHedgeTrading:
                 stop_loss = position.price_open - (data['recovery_range']*3)
                 
                 if position.price_current >= take_profit:
-                    MT5Api.send_close_position(position.ticket)
+                    MT5Api.send_close_position(position.symbol, position.ticket)
                 
                 if position.price_current <= stop_loss:
-                    MT5Api.send_close_position(position.ticket)
+                    MT5Api.send_close_position(position.symbol, position.ticket)
                     
             else: # Venta
                 take_profit = position.price_open - (data['recovery_range']*2)
                 stop_loss = position.price_open + (data['recovery_range']*3)
                 
                 if position.price_current <= take_profit:
-                    MT5Api.send_close_position(position.ticket)
+                    MT5Api.send_close_position(position.symbol, position.ticket)
 
                 if position.price_current >= stop_loss:
-                    MT5Api.send_close_position(position.ticket)
+                    MT5Api.send_close_position(position.symbol, position.ticket)
                     
     #endregion             
     
@@ -267,6 +267,11 @@ class HardHedgeTrading:
                 # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
                 if self.find_position_in_txt(position.ticket):
                     continue
+                                
+                # Si ya se han realiozado mas de 3 hedge que no tenga en cuenta esa posicion
+                if int(position.comment) > 4:
+                    continue
+                
                 data = self.symbol_data[position.symbol]
                 
                 if position.type == OrderType.MARKET_BUY: # Long
