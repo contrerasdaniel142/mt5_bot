@@ -69,14 +69,14 @@ class BotController:
                 break
 
             # Salir del bucle si terminó el horario de mercado
-            if not self._is_in_market_hours():
-                print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
-                # Termina las estrategias
-                for strategy in strategies:
-                    strategy.is_on.value = False
-                # Envia una solicitud para cerrar todas las posiciones abiertas
-                MT5Api.send_close_all_position()
-                break
+            # if not self._is_in_market_hours():
+            #     print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
+            #     # Termina las estrategias
+            #     for strategy in strategies:
+            #         strategy.is_on.value = False
+            #     # Envia una solicitud para cerrar todas las posiciones abiertas
+            #     MT5Api.send_close_all_position()
+            #     break
             
     #endregion
 
