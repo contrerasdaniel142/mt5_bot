@@ -129,16 +129,16 @@ class HardHedgeTrading:
             if position.type == OrderType.MARKET_BUY: # Compra
                 new_stop_loss = position.tp - data['recovery_range']
                 new_take_profit = position.tp + data['recovery_range']
-                if sl > symbol_info.bid:
-                    sl = symbol_info.bid - symbol_info.trade_tick_value_loss
+                if new_stop_loss > symbol_info.bid:
+                    new_stop_loss = symbol_info.bid - symbol_info.trade_tick_value_loss
                 if position.price_current > new_stop_loss:
                     submit_changes = True
                     
             else: # Venta
                 new_stop_loss = position.tp + data['recovery_range']
                 new_take_profit = position.tp - data['recovery_range']
-                if sl < symbol_info.ask:
-                    sl = symbol_info.ask + symbol_info.trade_tick_value_loss
+                if new_stop_loss < symbol_info.ask:
+                    new_stop_loss = symbol_info.ask + symbol_info.trade_tick_value_loss
                 if position.price_current < new_stop_loss:
                     submit_changes = True
                 
