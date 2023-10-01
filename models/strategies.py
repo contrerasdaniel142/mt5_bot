@@ -120,21 +120,21 @@ class HardHedgeTrading:
         """
         # Itera sobre todas las posiciones en la lista "positions"
         for position in positions:
-            # Obtiene los datos relacionados con el símbolo de la posición
-            data = self.symbol_data[position.symbol]
+            # Obtiene el precio actual
+            last_price = MT5Api.get_last_price(position.symbol)
             
             if position.type == OrderType.MARKET_BUY: # Compra
-                if position.price_current >= position.tp:
+                if last_price >= position.tp:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                 
-                if position.price_current <= position.sl:
+                if last_price <= position.sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     
             else: # Venta                
-                if position.price_current <= position.tp:
+                if last_price <= position.tp:
                     MT5Api.send_close_position(position.symbol, position.ticket)
 
-                if position.price_current >= position.sl:
+                if last_price >= position.sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     
     #endregion             
@@ -284,13 +284,16 @@ class HardHedgeTrading:
                 
                 data = self.symbol_data[position.symbol]
                 
+                # Obtiene el precio actual
+                last_price = MT5Api.get_last_price(position.symbol)
+                
                 if position.type == OrderType.MARKET_BUY: # Long
                     recovery_low = position.sl + (data["recovery_range"]*2)
-                    if position.price_current <= recovery_low:
+                    if last_price <= recovery_low:
                         self._hedge_order(position, data, recovery_low)
                 else: # Short
                     recovery_high = position.sl - (data["recovery_range"]*2)
-                    if position.price_current >= recovery_high:
+                    if last_price >= recovery_high:
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
