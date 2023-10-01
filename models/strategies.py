@@ -334,9 +334,9 @@ class HardHedgeTrading:
             "magic": self.magic
         }
         # Envía la orden a MetaTrader 5
-        if MT5Api.send_order(**order):
-            # Guarda la posicion en un txt para evitar volver hacerle hedge
-            self.save_position_in_txt(position.ticket)
+        MT5Api.send_order(**order)
+        # Guarda la posicion en un txt para evitar volver hacerle hedge
+        self.save_position_in_txt(position.ticket)
         
     #endregion
     
