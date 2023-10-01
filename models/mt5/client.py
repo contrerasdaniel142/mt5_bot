@@ -393,7 +393,7 @@ class MT5Api:
         MT5Api.initialize()
         
         # Obtiene la información del símbolo
-        symbol_info = mt5.symbol_info(symbol)
+        symbol_info: SymbolInfo = mt5.symbol_info(symbol)
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()

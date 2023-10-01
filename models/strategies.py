@@ -123,15 +123,22 @@ class HardHedgeTrading:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
             submit_changes = False
+            
+            symbol_info = MT5Api.get_symbol_info(position.symbol)
+            
             if position.type == OrderType.MARKET_BUY: # Compra
                 new_stop_loss = position.tp - data['recovery_range']
                 new_take_profit = position.tp + data['recovery_range']
+                if sl > symbol_info.bid:
+                    sl = symbol_info.bid - symbol_info.trade_tick_value_loss
                 if position.price_current > new_stop_loss:
                     submit_changes = True
                     
             else: # Venta
                 new_stop_loss = position.tp + data['recovery_range']
                 new_take_profit = position.tp - data['recovery_range']
+                if sl < symbol_info.ask:
+                    sl = symbol_info.ask + symbol_info.trade_tick_value_loss
                 if position.price_current < new_stop_loss:
                     submit_changes = True
                 
@@ -175,14 +182,12 @@ class HardHedgeTrading:
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
             recovery_range = round((range_value/times_divisible), digits)
-                       
-            symbol_info = MT5Api.get_symbol_info()
-                        
-            if recovery_range < symbol_info.trade_tick_value:
-                recovery_range = symbol_info.trade_tick_value
+
+            min_range = info.spread * info.point
             
-            current_time = datetime.now(pytz.utc)
-                        
+            if recovery_range < min_range:
+                recovery_range = min_range                      
+                                    
             symbol_data[symbol] = {
                 'symbol': symbol,
                 'digits': digits,
@@ -266,7 +271,6 @@ class HardHedgeTrading:
         while self.is_on:
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(magic=self.magic)
-            account_info = MT5Api.get_account_info()
             for position in positions:
                 # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
                 if self.find_position_in_txt(position.ticket):
@@ -297,6 +301,9 @@ class HardHedgeTrading:
         new_volume = data['volume_min'] * (2 ** (next_hedge))
         radius = data['recovery_range']*3
         
+        if new_volume > data['volume_max']:
+            new_volume = float(data['volume_max'])
+                
         if position.type == OrderType.MARKET_BUY:
             new_order_type = OrderType.MARKET_SELL
             tp = recovery_price - radius
@@ -305,7 +312,7 @@ class HardHedgeTrading:
             new_order_type = OrderType.MARKET_BUY
             tp = recovery_price + radius
             sl = recovery_price - radius
-                    
+        
         order = {
             "symbol": position.symbol, 
             "order_type": new_order_type, 

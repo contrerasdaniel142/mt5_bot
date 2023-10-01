@@ -287,107 +287,108 @@ class AccountInfo:
 
 class SymbolInfo:
     """
-    Representa un objeto SymbolInfo de MetaTrader 5 (MT5).
+    Representa un objeto SymbolInfo de MetaTrader 5 (MT5), que almacena información sobre un símbolo financiero.
 
     Attributes:
-        custom (bool): Descripción de custom.
-        chart_mode (int): Descripción de chart_mode.
-        select (bool): Descripción de select.
-        visible (bool): Descripción de visible.
-        session_deals (int): Descripción de session_deals.
-        session_buy_orders (int): Descripción de session_buy_orders.
-        session_sell_orders (int): Descripción de session_sell_orders.
-        volume (float): Descripción de volume.
-        volumehigh (float): Descripción de volumehigh.
-        volumelow (float): Descripción de volumelow.
-        time (int): Descripción de time.
-        digits (int): Descripción de digits.
-        spread (int): Descripción de spread.
-        spread_float (bool): Descripción de spread_float.
-        ticks_bookdepth (int): Descripción de ticks_bookdepth.
-        trade_calc_mode (int): Descripción de trade_calc_mode.
-        trade_mode (int): Descripción de trade_mode.
-        start_time (int): Descripción de start_time.
-        expiration_time (int): Descripción de expiration_time.
-        trade_stops_level (int): Descripción de trade_stops_level.
-        trade_freeze_level (int): Descripción de trade_freeze_level.
-        trade_exemode (int): Descripción de trade_exemode.
-        swap_mode (int): Descripción de swap_mode.
-        swap_rollover3days (int): Descripción de swap_rollover3days.
-        margin_hedged_use_leg (bool): Descripción de margin_hedged_use_leg.
-        expiration_mode (int): Descripción de expiration_mode.
-        filling_mode (int): Descripción de filling_mode.
-        order_mode (int): Descripción de order_mode.
-        order_gtc_mode (int): Descripción de order_gtc_mode.
-        option_mode (int): Descripción de option_mode.
-        option_right (int): Descripción de option_right.
-        bid (float): Descripción de bid.
-        bidhigh (float): Descripción de bidhigh.
-        bidlow (float): Descripción de bidlow.
-        ask (float): Descripción de ask.
-        askhigh (float): Descripción de askhigh.
-        asklow (float): Descripción de asklow.
-        last (float): Descripción de last.
-        lasthigh (float): Descripción de lasthigh.
-        lastlow (float): Descripción de lastlow.
-        volume_real (float): Descripción de volume_real.
-        volumehigh_real (float): Descripción de volumehigh_real.
-        volumelow_real (float): Descripción de volumelow_real.
-        option_strike (float): Descripción de option_strike.
-        point (float): Descripción de point.
-        trade_tick_value (float): Descripción de trade_tick_value.
-        trade_tick_value_profit (float): Descripción de trade_tick_value_profit.
-        trade_tick_value_loss (float): Descripción de trade_tick_value_loss.
-        trade_tick_size (float): Descripción de trade_tick_size.
-        trade_contract_size (float): Descripción de trade_contract_size.
-        trade_accrued_interest (float): Descripción de trade_accrued_interest.
-        trade_face_value (float): Descripción de trade_face_value.
-        trade_liquidity_rate (float): Descripción de trade_liquidity_rate.
-        volume_min (float): Descripción de volume_min.
-        volume_max (float): Descripción de volume_max.
-        volume_step (float): Descripción de volume_step.
-        volume_limit (float): Descripción de volume_limit.
-        swap_long (float): Descripción de swap_long.
-        swap_short (float): Descripción de swap_short.
-        margin_initial (float): Descripción de margin_initial.
-        margin_maintenance (float): Descripción de margin_maintenance.
-        session_volume (float): Descripción de session_volume.
-        session_turnover (float): Descripción de session_turnover.
-        session_interest (float): Descripción de session_interest.
-        session_buy_orders_volume (float): Descripción de session_buy_orders_volume.
-        session_sell_orders_volume (float): Descripción de session_sell_orders_volume.
-        session_open (float): Descripción de session_open.
-        session_close (float): Descripción de session_close.
-        session_aw (float): Descripción de session_aw.
-        session_price_settlement (float): Descripción de session_price_settlement.
-        session_price_limit_min (float): Descripción de session_price_limit_min.
-        session_price_limit_max (float): Descripción de session_price_limit_max.
-        margin_hedged (float): Descripción de margin_hedged.
-        price_change (float): Descripción de price_change.
-        price_volatility (float): Descripción de price_volatility.
-        price_theoretical (float): Descripción de price_theoretical.
-        price_greeks_delta (float): Descripción de price_greeks_delta.
-        price_greeks_theta (float): Descripción de price_greeks_theta.
-        price_greeks_gamma (float): Descripción de price_greeks_gamma.
-        price_greeks_vega (float): Descripción de price_greeks_vega.
-        price_greeks_rho (float): Descripción de price_greeks_rho.
-        price_greeks_omega (float): Descripción de price_greeks_omega.
-        price_sensitivity (float): Descripción de price_sensitivity.
-        basis (str): Descripción de basis.
-        category (str): Descripción de category.
-        currency_base (str): Descripción de currency_base.
-        currency_profit (str): Descripción de currency_profit.
-        currency_margin (str): Descripción de currency_margin.
-        bank (str): Descripción de bank.
-        description (str): Descripción de description.
-        exchange (str): Descripción de exchange.
-        formula (str): Descripción de formula.
-        isin (str): Descripción de isin.
-        name (str): Descripción de name.
-        page (str): Descripción de page.
-        path (str): Descripción de path.
+        custom (bool): Indica si el símbolo es personalizado.
+        chart_mode (int): El modo de gráfico asociado al símbolo.
+        select (bool): Indica si el símbolo está seleccionado.
+        visible (bool): Indica si el símbolo es visible en el mercado.
+        session_deals (int): El número de operaciones durante la sesión.
+        session_buy_orders (int): El número de órdenes de compra durante la sesión.
+        session_sell_orders (int): El número de órdenes de venta durante la sesión.
+        volume (float): El volumen de operaciones del símbolo.
+        volumehigh (float): El volumen más alto del símbolo durante la sesión.
+        volumelow (float): El volumen más bajo del símbolo durante la sesión.
+        time (int): El tiempo del último cambio en el símbolo.
+        digits (int): La cantidad de dígitos en el precio del símbolo.
+        spread (int): El spread actual del símbolo en puntos.
+        spread_float (bool): Indica si el spread del símbolo es flotante.
+        ticks_bookdepth (int): La profundidad de libro de órdenes del símbolo en ticks.
+        trade_calc_mode (int): El modo de cálculo de las operaciones del símbolo.
+        trade_mode (int): El modo de operación del símbolo.
+        start_time (int): El tiempo de inicio de las cotizaciones del símbolo.
+        expiration_time (int): El tiempo de vencimiento del símbolo.
+        trade_stops_level (int): El nivel mínimo de Stop Loss (SL) para el símbolo.
+        trade_freeze_level (int): El nivel mínimo de congelación de operaciones para el símbolo.
+        trade_exemode (int): El modo de ejecución de las operaciones del símbolo.
+        swap_mode (int): El modo de cálculo de swaps para el símbolo.
+        swap_rollover3days (int): Indica si el rollover de swaps es triple durante tres días.
+        margin_hedged_use_leg (bool): Indica si se utiliza la pernera (hedged) para el cálculo de margen.
+        expiration_mode (int): El modo de cálculo de la fecha de vencimiento del símbolo.
+        filling_mode (int): El modo de llenado de órdenes del símbolo.
+        order_mode (int): El modo de apertura de órdenes del símbolo.
+        order_gtc_mode (int): El modo de órdenes pendientes GTC (bueno hasta cancelar) del símbolo.
+        option_mode (int): El modo de opción para el símbolo.
+        option_right (int): El derecho de opción del símbolo.
+        bid (float): El precio de oferta (bid) actual del símbolo.
+        bidhigh (float): El precio de oferta más alto del símbolo durante la sesión.
+        bidlow (float): El precio de oferta más bajo del símbolo durante la sesión.
+        ask (float): El precio de demanda (ask) actual del símbolo.
+        askhigh (float): El precio de demanda más alto del símbolo durante la sesión.
+        asklow (float): El precio de demanda más bajo del símbolo durante la sesión.
+        last (float): El último precio negociado del símbolo.
+        lasthigh (float): El precio más alto negociado del símbolo durante la sesión.
+        lastlow (float): El precio más bajo negociado del símbolo durante la sesión.
+        volume_real (float): El volumen real del símbolo en el mercado.
+        volumehigh_real (float): El volumen más alto real del símbolo durante la sesión.
+        volumelow_real (float): El volumen más bajo real del símbolo durante la sesión.
+        option_strike (float): El precio de ejercicio de la opción.
+        point (float): El valor de un punto en el precio del símbolo.
+        trade_tick_value (float): El valor de un tick en la moneda de la cuenta para el símbolo.
+        trade_tick_value_profit (float): El valor de un tick para el cálculo de ganancias.
+        trade_tick_value_loss (float): El valor de un tick para el cálculo de pérdidas.
+        trade_tick_size (float): El tamaño de un tick en el símbolo.
+        trade_contract_size (float): El tamaño del contrato del símbolo.
+        trade_accrued_interest (float): El interés acumulado para el símbolo.
+        trade_face_value (float): El valor nominal del contrato del símbolo.
+        trade_liquidity_rate (float): La tasa de liquidez del símbolo.
+        volume_min (float): El volumen mínimo permitido para operaciones del símbolo.
+        volume_max (float): El volumen máximo permitido para operaciones del símbolo.
+        volume_step (float): El incremento mínimo del volumen para operaciones del símbolo.
+        volume_limit (float): El límite máximo del volumen para operaciones del símbolo.
+        swap_long (float): El valor del swap largo del símbolo.
+        swap_short (float): El valor del swap corto del símbolo.
+        margin_initial (float): El margen inicial requerido para operaciones del símbolo.
+        margin_maintenance (float): El margen de mantenimiento requerido para operaciones del símbolo.
+        session_volume (float): El volumen de operaciones durante la sesión actual.
+        session_turnover (float): El volumen de negociación durante la sesión actual.
+        session_interest (float): El interés acumulado durante la sesión actual.
+        session_buy_orders_volume (float): El volumen de órdenes de compra durante la sesión actual.
+        session_sell_orders_volume (float): El volumen de órdenes de venta durante la sesión actual.
+        session_open (float): El precio de apertura de la sesión actual.
+        session_close (float): El precio de cierre de la sesión actual.
+        session_aw (float): El precio promedio ponderado durante la sesión actual.
+        session_price_settlement (float): El precio de liquidación de la sesión actual.
+        session_price_limit_min (float): El límite mínimo de precio de la sesión actual.
+        session_price_limit_max (float): El límite máximo de precio de la sesión actual.
+        margin_hedged (float): El margen de cobertura para operaciones del símbolo.
+        price_change (float): El cambio de precio del símbolo.
+        price_volatility (float): La volatilidad del precio del símbolo.
+        price_theoretical (float): El precio teórico del símbolo.
+        price_greeks_delta (float): La sensibilidad delta del precio del símbolo.
+        price_greeks_theta (float): La sensibilidad theta del precio del símbolo.
+        price_greeks_gamma (float): La sensibilidad gamma del precio del símbolo.
+        price_greeks_vega (float): La sensibilidad vega del precio del símbolo.
+        price_greeks_rho (float): La sensibilidad rho del precio del símbolo.
+        price_greeks_omega (float): La sensibilidad omega del precio del símbolo.
+        price_sensitivity (float): La sensibilidad del precio del símbolo.
+        basis (str): La base del símbolo.
+        category (str): La categoría del símbolo.
+        currency_base (str): La moneda base del símbolo.
+        currency_profit (str): La moneda de ganancia del símbolo.
+        currency_margin (str): La moneda de margen del símbolo.
+        bank (str): El banco asociado al símbolo.
+        description (str): La descripción del símbolo.
+        exchange (str): El intercambio al que pertenece el símbolo.
+        formula (str): La fórmula de cálculo del símbolo.
+        isin (str): El código ISIN del símbolo.
+        name (str): El nombre del símbolo.
+        page (str): La página asociada al símbolo.
+        path (str): La ruta del símbolo.
 
     """
+
     custom: bool = None
     chart_mode: int = None
     select: bool = None
