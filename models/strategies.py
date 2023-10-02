@@ -29,7 +29,7 @@ import pytz, time
 #endregion
 
 class HardHedgeTrading:
-    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 60, max_hedge: int = 5) -> None:
+    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 10, max_hedge: int = 5, volume_size: int = 5) -> None:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
         
@@ -47,6 +47,10 @@ class HardHedgeTrading:
         
         # El maximo hedge permitido
         self.max_hedge = max_hedge
+        
+        # El tamaño del lote
+        
+        self.volume_size = volume_size
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
@@ -185,15 +189,15 @@ class HardHedgeTrading:
             min_range = info.spread * info.point
             
             if recovery_range < min_range:
-                recovery_range = min_range                      
-            
-            counter_hedge = 0.3
+                recovery_range = min_range
+                            
+            counter_hedge = self.volume_size
             for i in range(1, self.max_hedge):
                 if i % 2 == 0: 
-                    counter_hedge += 0.3 * (2 ** (i))
+                    counter_hedge += self.volume_size * (2 ** (i))
                 else:
-                    counter_hedge -=  0.3 * (2 ** (i))
-                
+                    counter_hedge -=  self.volume_size * (2 ** (i))
+            
                 
             symbol_data[symbol] = {
                 'symbol': symbol,
@@ -230,7 +234,7 @@ class HardHedgeTrading:
                 order = {
                     "symbol": symbol,
                     "order_type": None, 
-                    "volume": data['volume_min'],
+                    "volume": self.volume_size,
                     "price": None,
                     "stop_loss": None,
                     "take_profit": None,
@@ -319,7 +323,7 @@ class HardHedgeTrading:
         next_hedge = int(position.comment)+1
                         
         if next_hedge < self.max_hedge:
-            new_volume = data['volume_min'] * (2 ** (next_hedge))
+            new_volume = self.volume_size * (2 ** (next_hedge))
             comment = str(next_hedge)
         else:
             new_volume = data['counter_hedge']

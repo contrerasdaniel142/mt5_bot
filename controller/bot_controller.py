@@ -237,8 +237,8 @@ class BotController:
             
                             
             # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
-            manage_positions_process.start()
+            # manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            # manage_positions_process.start()
             
             # Espera a que termine el proceso
             hard_hedge_process.join()
