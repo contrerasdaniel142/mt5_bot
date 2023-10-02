@@ -203,11 +203,7 @@ class BotController:
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
         MT5Api.shutdown()
-        
-        # Revisa si aun falta tiempo para la apertura de mercado y espera
-        # Si el mercado se encuentra abierto continua con el programa
-        #self._sleep_to_next_market_opening(sleep_in_market= False)
-                
+                        
         while True:
             print("")
                                                 
@@ -224,7 +220,9 @@ class BotController:
                 symbol_data= manager.dict({}), 
                 symbols= hard_hedge_symbols, 
                 is_on=manager.Value("b", True), 
-                orders_time=60
+                orders_time=30,
+                volume_size= 5,
+                max_hedge=5
             )
             hard_hedge_trading._preparing_symbols_data()
             strategies.append(hard_hedge_trading)
@@ -241,8 +239,12 @@ class BotController:
             # manage_positions_process.start()
             
             # Espera a que termine el proceso
-            hard_hedge_process.join()
+            minutes_to_restart = 30
+            # Se espera el tiempo establecido para reiniciar la estrategia
+            time.sleep(minutes_to_restart * 60)
+            # Termina las estrategias
+            for strategy in strategies:
+                strategy.is_on.value = False
             
-            self._sleep_to_next_market_opening(sleep_in_market= True)
 
     #endregion

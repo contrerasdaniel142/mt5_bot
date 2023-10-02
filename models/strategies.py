@@ -29,7 +29,7 @@ import pytz, time
 #endregion
 
 class HardHedgeTrading:
-    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 10, max_hedge: int = 5, volume_size: int = 5) -> None:
+    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 60, max_hedge: int = 5, volume_size: int = 5) -> None:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
         
@@ -50,7 +50,7 @@ class HardHedgeTrading:
         
         # El tamaño del lote
         
-        self.volume_size = volume_size
+        self.volume_size = float(volume_size)
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
@@ -153,38 +153,32 @@ class HardHedgeTrading:
         Prepara la data que se usara en la estrategia de HardHedge.
         """
         print("HardHedge: Preparando la data...")
-        current_time = datetime.now(pytz.utc)
-        
-        # Establece el periodo de tiempo para calcular el rango
-        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
-        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
-        
-        # # Se usa como base para escoger el recovery range
-        # seconds_in_range = (end_time - start_time).total_seconds()
-
-        # # Cantidad por la que hay que dividir el rango para hallar el recovery range
-        # times_divisible = seconds_in_range / self.interval_seconds_in_orders
-        
         # Variable auxiliar
         symbol_data = {}
         
         # Obtener la informacion necesaria para cada symbolo
         for symbol in self.symbols:
-            rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
-            if rates_in_range is None or rates_in_range.size == 0:
-                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (start_time - timedelta(days=1)), (end_time - timedelta(days=1)))
+            number_bars = 30
+            
+            rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
             
             info = MT5Api.get_symbol_info(symbol)
             
             # Obtiene la cantidad de decimales que debe teber una orden en su volumen
             digits = info.digits
+            
+            # El numero de segundos en la cantidad de barras de minutos
+            seconds_in_rates = number_bars * 60
+            
+            # Cantidad por la que hay que dividir el rango para hallar el recovery range
+            times_divisible = seconds_in_rates / self.interval_seconds_in_orders
 
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
-            recovery_range = round((range_value/10), digits)
+            recovery_range = round((range_value/times_divisible), digits)
 
             min_range = info.spread * info.point
             
@@ -302,15 +296,15 @@ class HardHedgeTrading:
                 data = self.symbol_data[position.symbol]
                 
                 # Obtiene la informacion actual para el symbolo                
-                info_symbol =  MT5Api.get_symbol_info(position.symbol)
+                last_price =  MT5Api.get_last_price(position.symbol)
                 
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 2)
-                    if info_symbol.ask <= recovery_low:  # Corregido
+                    if last_price <= recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
                     recovery_high = position.sl - (data["recovery_range"] * 2)
-                    if info_symbol.bid >= recovery_high:  # Corregido
+                    if last_price >= recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
@@ -383,9 +377,7 @@ class HardHedgeTrading:
                 break
                         
             self._hedge_buyer()
-        
-        strategy_process.join()
-        
+                
         # Limpiamos el archivo txt para la proxima iteración
         self.clean_positions_in_txt()
         
