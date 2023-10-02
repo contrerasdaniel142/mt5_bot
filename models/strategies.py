@@ -323,7 +323,7 @@ class HardHedgeTrading:
             comment = str(next_hedge)
         else:
             new_volume = data['counter_hedge']
-            comment = -1
+            comment = str(-1)
                 
         if new_volume > data['volume_max']:
             new_volume = float(data['volume_max'])
