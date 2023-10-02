@@ -239,32 +239,33 @@ class HardHedgeTrading:
                     "magic": self.magic
                 }
                 
-                # Obtiene la ultima barra
-                last_bar = MT5Api.get_last_bar(symbol)
                 # Obtiene el precio actual
-                current_price = last_bar['close']
+                last_price = MT5Api.get_last_price(symbol)
                 
                 # Se establece el tipo de orden, su tp y su sl
                 radius = data['recovery_range']*3
                 
+                # Obtiene la informacion actual para el symbolo                
+                info_symbol =  MT5Api.get_symbol_info(symbol)
+                
                 # Se establece el tp y el sl
-                if current_price > data['dividing_price']:
-                    recovery_high = current_price
-                    tp = recovery_high + data['recovery_range']*2
-                    sl = recovery_high - data['recovery_range']*3
+                if last_price > data['dividing_price']:
+                    order['price'] = info_symbol.ask    # recovery high
+                    tp = order['price']+ data['recovery_range']*2
+                    sl = order['price'] - data['recovery_range']*3
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
-                    recovery_low = current_price
-                    tp = recovery_low - data['recovery_range']*2
-                    sl = recovery_low + data['recovery_range']*3
+                    order['price'] = info_symbol.bid    # recovery low
+                    tp = order['price'] - data['recovery_range']*2
+                    sl = order['price'] + data['recovery_range']*3
                     order['order_type'] = OrderType.MARKET_SELL
                     
                 order['take_profit'] = round(tp, data['digits'])
                 order['stop_loss'] = round(sl, data['digits'])
                 
                 # Se establece el tp y el sl
-                if current_price > data['dividing_price']:
+                if last_price > data['dividing_price']:
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
@@ -293,16 +294,16 @@ class HardHedgeTrading:
                 
                 data = self.symbol_data[position.symbol]
                 
-                # Obtiene el precio actual para el symbolo
-                last_price = MT5Api.get_last_price(position.symbol)
+                # Obtiene la informacion actual para el symbolo                
+                info_symbol =  MT5Api.get_symbol_info(position.symbol)
                 
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 2)
-                    if last_price <= recovery_low:  # Corregido
+                    if info_symbol.ask <= recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
                     recovery_high = position.sl - (data["recovery_range"] * 2)
-                    if last_price >= recovery_high:  # Corregido
+                    if info_symbol.bid >= recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
