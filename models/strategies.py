@@ -184,7 +184,7 @@ class HardHedgeTrading:
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
-            recovery_range = round((range_value/times_divisible), digits)
+            recovery_range = round((range_value/times_divisible), digits) * 2
 
             min_range = info.spread * info.point
             
