@@ -122,15 +122,11 @@ class HardHedgeTrading:
             positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
         # Itera sobre todas las posiciones en la lista "positions"
-        info_symbol = {}
         for position in positions:
             
-            # Obtiene el precio actual para el symbolo
-            if position.symbol not in info_symbol:
-                info_symbol[position.symbol] = MT5Api.get_symbol_info(position.symbol)
-                
-            info = info_symbol[position.symbol]
-            
+            # Obtiene el precio actual para el symbolo                
+            info =  MT5Api.get_symbol_info(position.symbol)
+                            
             if position.type == OrderType.MARKET_BUY: # Compra
                 if info.bid >= position.tp:
                     MT5Api.send_close_position(position.symbol, position.ticket)
@@ -206,7 +202,7 @@ class HardHedgeTrading:
                 'dividing_price': dividing_price,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
-                'counter_hedge': counter_hedge
+                'counter_hedge': abs(counter_hedge)
             }
             
             print(symbol_data)
@@ -288,7 +284,6 @@ class HardHedgeTrading:
         Ejecuta la estrategia a las posiciones abiertas.
         """
         while self.is_on:
-            last_price = {}
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(magic=self.magic)
             for position in positions:
@@ -299,16 +294,15 @@ class HardHedgeTrading:
                 data = self.symbol_data[position.symbol]
                 
                 # Obtiene el precio actual para el symbolo
-                if position.symbol not in last_price:
-                    last_price[position.symbol] = MT5Api.get_last_price(position.symbol)
-
+                last_price = MT5Api.get_last_price(position.symbol)
+                
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 2)
-                    if last_price[position.symbol] <= recovery_low:  # Corregido
+                    if last_price <= recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
                     recovery_high = position.sl - (data["recovery_range"] * 2)
-                    if last_price[position.symbol] >= recovery_high:  # Corregido
+                    if last_price >= recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
