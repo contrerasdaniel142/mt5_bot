@@ -159,11 +159,11 @@ class HardHedgeTrading:
         start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
         end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
         
-        # Se usa como base para escoger el recovery range
-        seconds_in_range = (end_time - start_time).total_seconds()
+        # # Se usa como base para escoger el recovery range
+        # seconds_in_range = (end_time - start_time).total_seconds()
 
-        # Cantidad por la que hay que dividir el rango para hallar el recovery range
-        times_divisible = seconds_in_range / self.interval_seconds_in_orders
+        # # Cantidad por la que hay que dividir el rango para hallar el recovery range
+        # times_divisible = seconds_in_range / self.interval_seconds_in_orders
         
         # Variable auxiliar
         symbol_data = {}
@@ -184,13 +184,16 @@ class HardHedgeTrading:
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
-            recovery_range = round((range_value/times_divisible), digits) * 2
+            recovery_range = round((range_value/10), digits)
 
             min_range = info.spread * info.point
             
             if recovery_range < min_range:
                 recovery_range = min_range
-                            
+            
+            if self.volume_size is None:
+                self.volume_size = info.volume_min
+            
             counter_hedge = self.volume_size
             for i in range(1, self.max_hedge):
                 if i % 2 == 0: 
