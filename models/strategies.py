@@ -29,7 +29,7 @@ import pytz, time
 #endregion
 
 class HardHedgeTrading:
-    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 60) -> None:
+    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 60, max_hedge: int = 5) -> None:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
         
@@ -44,6 +44,9 @@ class HardHedgeTrading:
         
         # True para que la estrategia siga ejecutandose y False para detenerse
         self.is_on = is_on
+        
+        # El maximo hedge permitido
+        self.max_hedge = max_hedge
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
@@ -107,7 +110,7 @@ class HardHedgeTrading:
         """
         with open("hedge_positions.txt", "w") as file:
             file.truncate(0)
-        
+    
     #endregion   
     
     #region Profit Management
@@ -119,24 +122,29 @@ class HardHedgeTrading:
             positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
         # Itera sobre todas las posiciones en la lista "positions"
+        info_symbol = {}
         for position in positions:
-            # Obtiene el precio actual
-            last_price = MT5Api.get_last_price(position.symbol)
+            
+            # Obtiene el precio actual para el symbolo
+            if position.symbol not in info_symbol:
+                info_symbol[position.symbol] = MT5Api.get_symbol_info(position.symbol)
+                
+            info = info_symbol[position.symbol]
             
             if position.type == OrderType.MARKET_BUY: # Compra
-                if last_price >= position.tp:
+                if info.bid >= position.tp:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                 
-                if last_price <= position.sl:
+                if info.bid <= position.sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     
-            else: # Venta                
-                if last_price <= position.tp:
+            else: # Venta
+                if info.ask <= position.tp:
                     MT5Api.send_close_position(position.symbol, position.ticket)
 
-                if last_price >= position.sl:
+                if info.ask >= position.sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
-                    
+    
     #endregion             
     
     #region HardHedge strategy           
@@ -165,7 +173,7 @@ class HardHedgeTrading:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
             if rates_in_range is None or rates_in_range.size == 0:
-                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (start_time - timedelta(days=1)), (end_time - timedelta(days=1)))
+                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (current_time - timedelta(minutes=31)), (current_time - timedelta(minutes=1)))
             
             info = MT5Api.get_symbol_info(symbol)
             
@@ -182,14 +190,23 @@ class HardHedgeTrading:
             
             if recovery_range < min_range:
                 recovery_range = min_range                      
-                                    
+            
+            counter_hedge = 0.3
+            for i in range(1, self.max_hedge):
+                if i % 2 == 0: 
+                    counter_hedge += 0.3 * (2 ** (i))
+                else:
+                    counter_hedge -=  0.3 * (2 ** (i))
+                
+                
             symbol_data[symbol] = {
                 'symbol': symbol,
                 'digits': digits,
                 'recovery_range': recovery_range,
                 'dividing_price': dividing_price,
                 'volume_min': info.volume_min,
-                'volume_max': info.volume_max
+                'volume_max': info.volume_max,
+                'counter_hedge': counter_hedge
             }
             
             print(symbol_data)
@@ -271,18 +288,20 @@ class HardHedgeTrading:
         Ejecuta la estrategia a las posiciones abiertas.
         """
         while self.is_on:
+            last_price = {}
             # Se obtienen las posiciones abiertas
             positions = MT5Api.get_positions(magic=self.magic)
             for position in positions:
                 # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
                 if self.find_position_in_txt(position.ticket):
                     continue
-                                
+                
                 data = self.symbol_data[position.symbol]
                 
-                # Obtiene el precio actual
-                last_price = MT5Api.get_last_price(position.symbol)
-                
+                # Obtiene el precio actual para el symbolo
+                if position.symbol not in last_price:
+                    last_price[position.symbol] = MT5Api.get_last_price(position.symbol)
+                    
                 if position.type == OrderType.MARKET_BUY: # Long
                     recovery_low = position.sl + (data["recovery_range"]*2)
                     if last_price <= recovery_low:
@@ -303,12 +322,13 @@ class HardHedgeTrading:
         """         
         # Se establece la orden y se envia
         next_hedge = int(position.comment)+1
-        comment = str(next_hedge)
-                
-        if int(position.comment) < 4:
+                        
+        if next_hedge < self.max_hedge:
             new_volume = data['volume_min'] * (2 ** (next_hedge))
+            comment = str(next_hedge)
         else:
-            new_volume = position.volume + (data['volume_min']*10)
+            new_volume = data['counter_hedge']
+            comment = -1
                 
         if new_volume > data['volume_max']:
             new_volume = float(data['volume_max'])
@@ -337,7 +357,8 @@ class HardHedgeTrading:
         MT5Api.send_order(**order)
         # Guarda la posicion en un txt para evitar volver hacerle hedge
         self.save_position_in_txt(position.ticket)
-        
+
+    
     #endregion
     
     #region start
@@ -352,7 +373,7 @@ class HardHedgeTrading:
         strategy_process.start()
         
         # Inicio del cilco
-        while True:
+        while self.is_on:
             # Salir del bucle si no quedan símbolos
             if not self.symbols:
                 print("HardHedge: No hay símbolos por analizar.")

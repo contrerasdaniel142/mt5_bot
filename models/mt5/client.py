@@ -464,7 +464,7 @@ class MT5Api:
         return account_info
         
     #endregion
-
+    
     #region Setters
     def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None, magic: int = None) -> MqlTradeResult:
         """
