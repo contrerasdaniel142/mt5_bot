@@ -173,7 +173,7 @@ class HardHedgeTrading:
             rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
             if rates_in_range is None or rates_in_range.size == 0:
-                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (current_time - timedelta(minutes=31)), (current_time - timedelta(minutes=1)))
+                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, (start_time - timedelta(days=1)), (end_time - timedelta(days=1)))
             
             info = MT5Api.get_symbol_info(symbol)
             
@@ -301,14 +301,14 @@ class HardHedgeTrading:
                 # Obtiene el precio actual para el symbolo
                 if position.symbol not in last_price:
                     last_price[position.symbol] = MT5Api.get_last_price(position.symbol)
-                    
-                if position.type == OrderType.MARKET_BUY: # Long
-                    recovery_low = position.sl + (data["recovery_range"]*2)
-                    if last_price <= recovery_low:
+
+                if position.type == OrderType.MARKET_BUY:  # Long
+                    recovery_low = position.sl + (data["recovery_range"] * 2)
+                    if last_price[position.symbol] <= recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
-                else: # Short
-                    recovery_high = position.sl - (data["recovery_range"]*2)
-                    if last_price >= recovery_high:
+                else:  # Short
+                    recovery_high = position.sl - (data["recovery_range"] * 2)
+                    if last_price[position.symbol] >= recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
