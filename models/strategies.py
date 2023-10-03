@@ -312,11 +312,11 @@ class HardHedgeTrading:
                 
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 3)
-                    if info.ask <= recovery_low:  # Corregido
+                    if info.ask < recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
                     recovery_high = position.sl - (data["recovery_range"] * 4)
-                    if info.bid >= recovery_high:  # Corregido
+                    if info.bid > recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
