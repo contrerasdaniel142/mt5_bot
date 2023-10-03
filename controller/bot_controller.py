@@ -67,16 +67,6 @@ class BotController:
             if number_of_active_positions == 0 and number_of_active_strategies == 0:
                 print("Sin posiciones abiertas ni estrategias activas.")
                 break
-
-            # Salir del bucle si terminó el horario de mercado
-            # if not self._is_in_market_hours():
-            #     print("Finalizó el horario de mercado. Cerrando posiciones abiertas")
-            #     # Termina las estrategias
-            #     for strategy in strategies:
-            #         strategy.is_on.value = False
-            #     # Envia una solicitud para cerrar todas las posiciones abiertas
-            #     MT5Api.send_close_all_position()
-            #     break
             
     #endregion
 
@@ -235,8 +225,8 @@ class BotController:
             
                             
             # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            # manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
-            # manage_positions_process.start()
+            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            manage_positions_process.start()
             
             # Espera a que termine el proceso
             minutes_to_restart = 30
