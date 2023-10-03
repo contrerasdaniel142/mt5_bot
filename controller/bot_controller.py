@@ -246,5 +246,6 @@ class BotController:
             for strategy in strategies:
                 strategy.is_on.value = False
             
+            hard_hedge_process.join()
 
     #endregion
