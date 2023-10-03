@@ -153,7 +153,7 @@ class HardHedgeTrading:
                     level_positions_to_close.append(position.tp)
                 
             else: # Venta
-                real_sl = position.tp - data['recovery_range']
+                real_sl = position.sl - data['recovery_range']
                 if info.ask >= real_sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     level_positions_to_close.append(position.tp)
