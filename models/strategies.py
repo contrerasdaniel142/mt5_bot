@@ -147,14 +147,14 @@ class HardHedgeTrading:
             data = self.symbol_data[position.symbol]
                                         
             if position.type == OrderType.MARKET_BUY: # Compra
-                real_tp = position.tp - data['recovery_range']
-                if info.bid > real_tp:
+                real_sl = position.sl + data['recovery_range']
+                if info.bid <= real_sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     tp_positions_to_close.append(position.tp)
                 
             else: # Venta
-                real_tp = position.tp + data['recovery_range']
-                if info.ask < real_tp:
+                real_sl = position.tp - data['recovery_range']
+                if info.ask >= real_sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
                     tp_positions_to_close.append(position.tp)
     
