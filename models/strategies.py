@@ -130,10 +130,15 @@ class HardHedgeTrading:
         # Contendra el tp de una posicion que cerro, aquellas con el mismo tp (ya sea ventas o compras) deberan cerrarse tambien
         tp_positions_to_close: List[float] = []
         # Obtiene la informacion actual para el symbolo                
-        info =  MT5Api.get_symbol_info(position.symbol)
+        info_symbol =  {} 
         # Itera sobre todas las posiciones en la lista "positions"
         for position in positions:
-                        
+            
+            if position.symbol not in info_symbol:
+                info_symbol[position.symbol] = MT5Api.get_symbol_info(position.symbol)
+                
+            info = info_symbol[position.symbol]
+            
             # Comprobamos si ya se debe cerrar esta posición
             if position.tp in tp_positions_to_close:
                 MT5Api.send_close_position(position.symbol, position.ticket)
