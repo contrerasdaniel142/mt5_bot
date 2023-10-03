@@ -295,16 +295,19 @@ class HardHedgeTrading:
                 
                 data = self.symbol_data[position.symbol]
                 
+                # Obtiene el precio actual para el symbolo                
+                info =  MT5Api.get_symbol_info(position.symbol)
+                
                 # Obtiene la informacion actual para el symbolo                
-                last_price =  MT5Api.get_last_price(position.symbol)
+                #last_price =  MT5Api.get_last_price(position.symbol)
                 
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 2)
-                    if last_price <= recovery_low:  # Corregido
+                    if info.ask <= recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
                     recovery_high = position.sl - (data["recovery_range"] * 2)
-                    if last_price >= recovery_high:  # Corregido
+                    if info.bid >= recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:

@@ -221,7 +221,7 @@ class BotController:
                 symbols= hard_hedge_symbols, 
                 is_on=manager.Value("b", True), 
                 orders_time=30,
-                volume_size= 5,
+                volume_size= 0.2,
                 max_hedge=5
             )
             hard_hedge_trading._preparing_symbols_data()
