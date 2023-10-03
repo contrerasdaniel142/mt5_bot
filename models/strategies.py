@@ -128,7 +128,7 @@ class HardHedgeTrading:
             positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
         # Contendra el tp de una posicion que cerro, aquellas con el mismo tp (ya sea ventas o compras) deberan cerrarse tambien
-        tp_positions_to_close: List[float] = []
+        level_positions_to_close: List[float] = []
         # Obtiene la informacion actual para el symbolo                
         info_symbol =  {} 
         # Itera sobre todas las posiciones en la lista "positions"
@@ -140,7 +140,7 @@ class HardHedgeTrading:
             info = info_symbol[position.symbol]
             
             # Comprobamos si ya se debe cerrar esta posición
-            if position.tp in tp_positions_to_close:
+            if position.tp in level_positions_to_close or position.sl in level_positions_to_close:
                 MT5Api.send_close_position(position.symbol, position.ticket)
                 continue
             
@@ -150,13 +150,13 @@ class HardHedgeTrading:
                 real_sl = position.sl + data['recovery_range']
                 if info.bid <= real_sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
-                    tp_positions_to_close.append(position.tp)
+                    level_positions_to_close.append(position.tp)
                 
             else: # Venta
                 real_sl = position.tp - data['recovery_range']
                 if info.ask >= real_sl:
                     MT5Api.send_close_position(position.symbol, position.ticket)
-                    tp_positions_to_close.append(position.tp)
+                    level_positions_to_close.append(position.tp)
     
     #endregion             
     
