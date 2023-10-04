@@ -277,8 +277,7 @@ class HardHedgeTrading:
                 
                 # Envía la orden a MetaTrader 5
                 MT5Api.send_order(**order)
-            
-        
+       
     def _hedge_strategy(self):
         """
         Ejecuta la estrategia a las posiciones abiertas.
@@ -286,21 +285,22 @@ class HardHedgeTrading:
         # Se obtienen las posiciones abiertas
         positions = MT5Api.get_positions(magic=self.magic)
         
-        last_position = positions[-1]
+        if positions:
+            last_position = positions[-1]
+                
+            data = self.symbol_data[last_position.symbol]
             
-        data = self.symbol_data[last_position.symbol]
-        
-        # Obtiene el precio actual para el symbolo                
-        info_symbol =  MT5Api.get_symbol_info(last_position.symbol)
-        
-        if last_position.type == OrderType.MARKET_BUY:  # Long
-            recovery_low = last_position.sl + (data["recovery_range"] * 3)
-            if info_symbol.ask < recovery_low:  
-                self._hedge_order(last_position, data, recovery_low, info_symbol)
-        else:  # Short
-            recovery_high = last_position.sl - (data["recovery_range"] * 3.5)
-            if info_symbol.bid > recovery_high:
-                self._hedge_order(last_position, data, recovery_high, info_symbol)
+            # Obtiene el precio actual para el symbolo                
+            info_symbol =  MT5Api.get_symbol_info(last_position.symbol)
+            
+            if last_position.type == OrderType.MARKET_BUY:  # Long
+                recovery_low = last_position.sl + (data["recovery_range"] * 3)
+                if info_symbol.ask < recovery_low:  
+                    self._hedge_order(last_position, data, recovery_low, info_symbol)
+            else:  # Short
+                recovery_high = last_position.sl - (data["recovery_range"] * 3.5)
+                if info_symbol.bid > recovery_high:
+                    self._hedge_order(last_position, data, recovery_high, info_symbol)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """

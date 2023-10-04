@@ -206,8 +206,6 @@ class BotController:
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
         MT5Api.shutdown()
-        
-        sleep_to_market_open = True
                         
         while True:
             print("")
@@ -215,8 +213,7 @@ class BotController:
             # Se crea una lista que contendra a los objetos de las estrategias creadas
             strategies = []
             
-            if sleep_to_market_open:
-                self._sleep_to_next_market_opening()
+            self._sleep_to_next_market_opening(False)
                 
             # Establece una variable globarl compartida que le indicara al programa cuando parar
             is_on=manager.Value("b", True)
