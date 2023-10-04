@@ -48,7 +48,7 @@ class BotController:
             None
         """
         print("Iniciando administrador de posiciones abiertas.")
-        while is_on:
+        while is_on.value:
             account_info = MT5Api.get_account_info()
             margin_free = account_info.margin_free
             profit = account_info
@@ -175,8 +175,9 @@ class BotController:
         # Calcular la cantidad de segundos que faltan hasta la apertura
         seconds_until_close = (market_close - current_time).total_seconds()
         
-        time.sleep(seconds_until_close)
-    
+        if seconds_until_close > 0:
+            time.sleep(seconds_until_close)
+        
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
         print("Hora actual utc: ", current_time)
@@ -215,7 +216,7 @@ class BotController:
         while True:
             print("")
             
-            self._sleep_to_next_market_opening(False)
+            #self._sleep_to_next_market_opening(False)
                 
             # Establece una variable globarl compartida que le indicara al programa cuando parar
             is_on=manager.Value("b", True)
@@ -252,6 +253,6 @@ class BotController:
             is_on.value = False
                 
             # Se espera a que terminen los procesos de las estrategias, se debe agregar manualmente
-            hard_hedge_process.join()    
+            manage_positions_process.join()   
 
     #endregion

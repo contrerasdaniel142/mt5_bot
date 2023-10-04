@@ -127,8 +127,13 @@ class HardHedgeTrading:
         """
         # Itera sobre todas las posiciones en la lista "positions"
         if not positions:
-            self.clean_positions_in_txt()
-            self._hedge_buyer()
+            current_time = datetime.now(pytz.utc)   # Hora actual
+            pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
+            market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+            # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
+            if pre_closing_time < market_close:
+                self.clean_positions_in_txt()
+                self._hedge_buyer()
             
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
@@ -165,12 +170,19 @@ class HardHedgeTrading:
         # Variable auxiliar
         symbol_data = {}
         
+        # Establece el periodo de tiempo para calcular el rango
+        current_time = datetime.now(pytz.utc)
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
+        
+        
         # Obtener la informacion necesaria para cada symbolo
         for symbol in self.symbols:
-            
-            number_bars = 30
-            
-            rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
+            rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
+                        
+            if rates_in_range is None or rates_in_range.size == 0:
+                number_bars = 30
+                rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
             
             info = MT5Api.get_symbol_info(symbol)
             
@@ -370,7 +382,7 @@ class HardHedgeTrading:
         print("HardHedge: Iniciando estrategia...")
         
         # Inicio del cilco
-        while self.is_on:
+        while self.is_on.value:
             # Salir del bucle si no quedan símbolos
             if not self.symbols:
                 print("HardHedge: No hay símbolos por analizar.")
