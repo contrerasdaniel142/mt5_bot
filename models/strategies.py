@@ -287,24 +287,22 @@ class HardHedgeTrading:
         """
         # Se obtienen las posiciones abiertas
         positions = MT5Api.get_positions(magic=self.magic)
-        for position in positions:
-            # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
-            if self.find_position_in_txt(position.ticket):
-                continue
+        
+        last_position = positions[-1]
             
-            data = self.symbol_data[position.symbol]
-            
-            # Obtiene el precio actual para el symbolo                
-            info_symbol =  MT5Api.get_symbol_info(position.symbol)
-            
-            if position.type == OrderType.MARKET_BUY:  # Long
-                recovery_low = position.sl + (data["recovery_range"] * 3)
-                if info_symbol.ask < recovery_low:  # Corregido
-                    self._hedge_order(position, data, recovery_low, info_symbol)
-            else:  # Short
-                recovery_high = position.sl - (data["recovery_range"] * 3.5)
-                if info_symbol.bid > recovery_high:  # Corregido
-                    self._hedge_order(position, data, recovery_high, info_symbol)
+        data = self.symbol_data[last_position.symbol]
+        
+        # Obtiene el precio actual para el symbolo                
+        info_symbol =  MT5Api.get_symbol_info(last_position.symbol)
+        
+        if last_position.type == OrderType.MARKET_BUY:  # Long
+            recovery_low = last_position.sl + (data["recovery_range"] * 3)
+            if info_symbol.ask < recovery_low:  
+                self._hedge_order(last_position, data, recovery_low, info_symbol)
+        else:  # Short
+            recovery_high = last_position.sl - (data["recovery_range"] * 3.5)
+            if info_symbol.bid > recovery_high:
+                self._hedge_order(last_position, data, recovery_high, info_symbol)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
