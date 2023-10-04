@@ -216,9 +216,6 @@ class BotController:
                         
         while True:
             print("")
-                                                
-            # Se crea una lista que contendra a los objetos de las estrategias creadas
-            strategies = []
             
             self._sleep_to_next_market_opening(False)
                 
@@ -238,7 +235,7 @@ class BotController:
                 max_hedge=5
             )
             hard_hedge_trading._preparing_symbols_data()
-            strategies.append(hard_hedge_trading)
+            
             # Se crea el proceso que administra la estrategia
             hard_hedge_process = multiprocessing.Process(target=hard_hedge_trading.start)
             hard_hedge_process.start()
@@ -247,8 +244,8 @@ class BotController:
             #endregion
             
                             
-            # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, strategies,))
+            # Inicia el proceso que administrara la estrategia
+            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, hard_hedge_trading,))
             manage_positions_process.start()
             
             self.sleep_until_market_closes()
