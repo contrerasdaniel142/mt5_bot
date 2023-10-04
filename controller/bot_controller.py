@@ -54,9 +54,7 @@ class BotController:
             profit = account_info
             balance = account_info.balance
             if margin_free < (balance/2) and profit > (balance*0.01) :
-                for position in positions:
-                    MT5Api.send_close_position(position.ticket)
-            
+                MT5Api.send_close_all_position()
             else:
                 # Obtiene las posiciones para la estrategia con su identificador magic
                 positions = MT5Api.get_positions(magic=strategy.magic)
