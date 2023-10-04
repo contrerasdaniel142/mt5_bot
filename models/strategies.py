@@ -130,6 +130,14 @@ class HardHedgeTrading:
             self.clean_positions_in_txt()
             self._hedge_buyer()
             
+        #account_info = MT5Api.get_account_info()
+        
+        # if account_info.profit > 500:
+        #     for position in positions:
+        #         MT5Api.send_close_position(position.ticket)
+        
+        # else:
+        
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
@@ -295,14 +303,14 @@ class HardHedgeTrading:
             info_symbol =  MT5Api.get_symbol_info(position.symbol)
             
             # Variables para el calculo de tp y sl
-            radius = data['recovery_range']*3
+            radius_recovery = data['recovery_range']*4
             
             if position.type == OrderType.MARKET_BUY:  # Long
-                recovery_low = position.tp - radius
+                recovery_low = position.tp - radius_recovery
                 if info_symbol.ask < recovery_low:  
                     self._hedge_order(position, data, recovery_low, info_symbol)
             else:  # Short
-                recovery_high = position.tp + radius
+                recovery_high = position.tp + radius_recovery
                 if info_symbol.bid > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
         
