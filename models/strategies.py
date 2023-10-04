@@ -17,7 +17,7 @@ from multiprocessing.managers import DictProxy, ListProxy, ValueProxy
 
 # Importacion de los clientes de las apis para hacer solicitudes
 from .mt5.enums import TimeFrame, OrderType
-from .mt5.models import TradePosition
+from .mt5.models import TradePosition, SymbolInfo
 
 # Importacion de los clientes de las apis para hacer solicitudes
 from .mt5.client import MT5Api
@@ -29,13 +29,10 @@ import pytz, time
 #endregion
 
 class HardHedgeTrading:
-    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], orders_time: int = 60, max_hedge: int = 5, volume_size: int = 5) -> None:
+    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], max_hedge: int = 5, volume_size: int = 1) -> None:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
-        
-        # Tiempo de espera en segundos que habra entre cada compra
-        self.interval_seconds_in_orders = orders_time
-        
+                
         # Diccionario que contendra la data necesaria para ejecutar la estrategia cada symbolo
         self.symbol_data = symbol_data
         
@@ -121,7 +118,7 @@ class HardHedgeTrading:
     
     #region Profit Management
                     
-    def manage_profit(self, positions: Tuple[TradePosition]):
+    def manage_positions(self, positions: Tuple[TradePosition]):
         """
         Gestiona las posiciones para maximizar las ganancias de HardHedge mediante la actualización del stop loss y el trailing stop.
 
@@ -129,8 +126,10 @@ class HardHedgeTrading:
             positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
         # Itera sobre todas las posiciones en la lista "positions"
-        if not position:
+        if not positions:
             self.clean_positions_in_txt()
+            self._hedge_buyer()
+            
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
@@ -197,6 +196,7 @@ class HardHedgeTrading:
                 else:
                     counter_hedge -=  self.volume_size * (2 ** (i))
             
+            counter_hedge = round(abs(counter_hedge), digits)
                 
             symbol_data[symbol] = {
                 'symbol': symbol,
@@ -216,7 +216,7 @@ class HardHedgeTrading:
     
     def _hedge_buyer(self):
         """
-        Prepara órdenes para ser enviadas a MetaTrader 5. Las ordenes se preparan cada self.orders_time, en función de los datos establecidos.
+        Prepara órdenes para ser enviadas a MetaTrader 5 en función de los datos establecidos.
         """
         # Verifica si el margen disponible es menor al 10% de el balance de la cuenta
         account_info = MT5Api.get_account_info()
@@ -242,30 +242,31 @@ class HardHedgeTrading:
                     "magic": self.magic
                 }
                 
-                # Obtiene el precio actual
-                last_price = MT5Api.get_last_price(symbol)
-                
                 # Obtiene la informacion actual para el symbolo                
                 info_symbol =  MT5Api.get_symbol_info(symbol)
                 
+                # Variables para el calculo de tp y sl
+                radius = data['recovery_range']*3
+                spread_point = info_symbol.spread * info_symbol.point
+                
                 # Se establece el tp y el sl
-                if last_price > data['dividing_price']:
+                if info_symbol.bid > data['dividing_price']:
                     order['price'] = info_symbol.ask    # recovery high
-                    tp = order['price']+ data['recovery_range']*3
-                    sl = order['price'] - data['recovery_range']*3.5
+                    tp = order['price'] + radius
+                    sl = order['price'] - radius - spread_point
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
                     order['price'] = info_symbol.bid    # recovery low
-                    tp = order['price'] - data['recovery_range']*3
-                    sl = order['price'] + data['recovery_range']*3.5
+                    tp = order['price'] - radius
+                    sl = order['price'] + radius + spread_point
                     order['order_type'] = OrderType.MARKET_SELL
                     
                 order['take_profit'] = round(tp, data['digits'])
                 order['stop_loss'] = round(sl, data['digits'])
                 
                 # Se establece el tp y el sl
-                if last_price > data['dividing_price']:
+                if info_symbol.bid > data['dividing_price']:
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
@@ -284,29 +285,28 @@ class HardHedgeTrading:
         """
         Ejecuta la estrategia a las posiciones abiertas.
         """
-        while self.is_on:
-            # Se obtienen las posiciones abiertas
-            positions = MT5Api.get_positions(magic=self.magic)
-            for position in positions:
-                # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
-                if self.find_position_in_txt(position.ticket):
-                    continue
-                
-                data = self.symbol_data[position.symbol]
-                
-                # Obtiene el precio actual para el symbolo                
-                info =  MT5Api.get_symbol_info(position.symbol)
-                
-                if position.type == OrderType.MARKET_BUY:  # Long
-                    recovery_low = position.sl + (data["recovery_range"] * 3)
-                    if info.ask < recovery_low:  # Corregido
-                        self._hedge_order(position, data, recovery_low)
-                else:  # Short
-                    recovery_high = position.sl - (data["recovery_range"] * 3.5)
-                    if info.bid > recovery_high:  # Corregido
-                        self._hedge_order(position, data, recovery_high)
+        # Se obtienen las posiciones abiertas
+        positions = MT5Api.get_positions(magic=self.magic)
+        for position in positions:
+            # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
+            if self.find_position_in_txt(position.ticket):
+                continue
+            
+            data = self.symbol_data[position.symbol]
+            
+            # Obtiene el precio actual para el symbolo                
+            info_symbol =  MT5Api.get_symbol_info(position.symbol)
+            
+            if position.type == OrderType.MARKET_BUY:  # Long
+                recovery_low = position.sl + (data["recovery_range"] * 3)
+                if info_symbol.ask < recovery_low:  # Corregido
+                    self._hedge_order(position, data, recovery_low, info_symbol)
+            else:  # Short
+                recovery_high = position.sl - (data["recovery_range"] * 3.5)
+                if info_symbol.bid > recovery_high:  # Corregido
+                    self._hedge_order(position, data, recovery_high, info_symbol)
         
-    def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float) -> None:
+    def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
         Prepara órdenes para ser enviadas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
 
@@ -314,6 +314,7 @@ class HardHedgeTrading:
             position (TradePosition): La posición de la orden original.
             data (Dict[str, Any]): Datos relevantes para la preparación de la orden.
             recovery_price (float): El precio de recuperación utilizado para establecer take-profit y stop-loss.
+            info_symbol (SymbolInfo): Información acerca del simbolo en mt5.
         """         
         # Se establece la orden y se envia
         next_hedge = int(position.comment)+1
@@ -327,15 +328,19 @@ class HardHedgeTrading:
                 
         if new_volume > data['volume_max']:
             new_volume = float(data['volume_max'])
-                
+            
+        # Variables para el calculo de tp y sl
+        radius = data['recovery_range']*3
+        spread_point = info_symbol.spread * info_symbol.point
+        
         if position.type == OrderType.MARKET_BUY:
             new_order_type = OrderType.MARKET_SELL
-            tp = recovery_price - data['recovery_range']*3 
-            sl = recovery_price + data['recovery_range']*3.5
+            tp = recovery_price - radius 
+            sl = recovery_price + radius + spread_point
         else:
             new_order_type = OrderType.MARKET_BUY
-            tp = recovery_price + data['recovery_range']*3
-            sl = recovery_price - data['recovery_range']*3.5
+            tp = recovery_price + radius
+            sl = recovery_price - radius - spread_point
         
         order = {
             "symbol": position.symbol, 
@@ -363,9 +368,6 @@ class HardHedgeTrading:
         """
 
         print("HardHedge: Iniciando estrategia...")
-        # Crea los hilos necesarios
-        strategy_process = multiprocessing.Process(target=self._hedge_strategy)
-        strategy_process.start()
         
         # Inicio del cilco
         while self.is_on:
@@ -374,8 +376,7 @@ class HardHedgeTrading:
                 print("HardHedge: No hay símbolos por analizar.")
                 self.is_on.value = False
                 break
-                        
-            self._hedge_buyer()
+            self._hedge_strategy()
                     
         # Fin del ciclo
         print("HardHedge: Finalizando estrategia...")

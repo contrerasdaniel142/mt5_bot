@@ -53,8 +53,10 @@ class BotController:
             for strategy in strategies:
                 # Obtiene las posiciones para la estrategia con su identificador magic
                 positions = MT5Api.get_positions(magic=strategy.magic)
-                # Llama al método 'manage_profit' de la estrategia para gestionar las posiciones
-                strategy.manage_profit(positions)
+                # Llama al método 'manage_positions' de la estrategia para gestionar las posiciones
+                strategy.manage_positions(positions)
+        
+        MT5Api.send_close_all_position()
             
     #endregion
 
@@ -153,6 +155,29 @@ class BotController:
         current_time = datetime.now(pytz.utc)
         print("Hora actual utc: ", current_time)
     
+    def sleep_until_market_closes(self,):
+        """Espera hasta el cierre del mercado.
+
+        Returns:
+            None
+        """
+    
+        # Obtener la hora actual en UTC
+        current_time = datetime.now(pytz.utc)
+                
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+
+        # Calcular la cantidad de segundos que faltan hasta la apertura
+        seconds_until_close = (market_close - current_time).total_seconds()
+        
+        time.sleep(seconds_until_close)
+    
+        # Obtener la hora actual en UTC después de esperar
+        current_time = datetime.now(pytz.utc)
+        print("Hora actual utc: ", current_time)
+        print("El Mercado esta cerrado")
+    
+    
     #endregion
     
     #region start
@@ -205,9 +230,8 @@ class BotController:
                 symbol_data= manager.dict({}), 
                 symbols= hard_hedge_symbols, 
                 is_on=is_on, 
-                orders_time=60,
-                volume_size= None,
-                max_hedge=8
+                volume_size= 1.95,
+                max_hedge=5
             )
             hard_hedge_trading._preparing_symbols_data()
             strategies.append(hard_hedge_trading)
@@ -223,15 +247,12 @@ class BotController:
             manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, strategies,))
             manage_positions_process.start()
             
-            # Espera una cantidad de minutos para reiniciar el ciclo
-            minutes_to_restart = 30
-            # Se espera el tiempo establecido para reiniciar la estrategia
-            time.sleep(minutes_to_restart * 60)
+            self.sleep_until_market_closes()
+            
             # Termina las estrategias
-            for strategy in strategies:
-                strategy.is_on.value = False
+            is_on.value = False
                 
             # Se espera a que terminen los procesos de las estrategias, se debe agregar manualmente
-            hard_hedge_process.join()
+            hard_hedge_process.join()    
 
     #endregion
