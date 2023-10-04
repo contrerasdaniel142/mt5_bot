@@ -278,8 +278,6 @@ class HardHedgeTrading:
                 # Envía la orden a MetaTrader 5
                 MT5Api.send_order(**order)
             
-        # Espera el tiempo establecido para volver a realizar las ordenes
-        time.sleep(self.interval_seconds_in_orders)
         
     def _hedge_strategy(self):
         """
@@ -353,8 +351,6 @@ class HardHedgeTrading:
         }
         # Envía la orden a MetaTrader 5
         MT5Api.send_order(**order)
-        # Guarda la posicion en un txt para evitar volver hacerle hedge
-        self.save_position_in_txt(position.ticket)
 
     
     #endregion
