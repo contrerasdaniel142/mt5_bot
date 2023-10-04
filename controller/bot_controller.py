@@ -207,7 +207,7 @@ class BotController:
         MT5Api.initialize(4)
         MT5Api.shutdown()
         
-        sleep_to_market_open = False
+        sleep_to_market_open = True
                         
         while True:
             print("")
