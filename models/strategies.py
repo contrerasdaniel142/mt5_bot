@@ -293,12 +293,15 @@ class HardHedgeTrading:
             # Obtiene el precio actual para el symbolo                
             info_symbol =  MT5Api.get_symbol_info(last_position.symbol)
             
+            # Variables para el calculo de tp y sl
+            radius = data['recovery_range']*3
+            
             if last_position.type == OrderType.MARKET_BUY:  # Long
-                recovery_low = last_position.sl + (data["recovery_range"] * 3)
+                recovery_low = last_position.tp - radius
                 if info_symbol.ask < recovery_low:  
                     self._hedge_order(last_position, data, recovery_low, info_symbol)
             else:  # Short
-                recovery_high = last_position.sl - (data["recovery_range"] * 3.5)
+                recovery_high = last_position.tp + radius
                 if info_symbol.bid > recovery_high:
                     self._hedge_order(last_position, data, recovery_high, info_symbol)
         
