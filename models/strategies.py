@@ -120,6 +120,7 @@ class HardHedgeTrading:
     #endregion   
     
     #region Profit Management
+                    
     def manage_profit(self, positions: Tuple[TradePosition]):
         """
         Gestiona las posiciones para maximizar las ganancias de HardHedge mediante la actualización del stop loss y el trailing stop.
@@ -127,36 +128,32 @@ class HardHedgeTrading:
         Args:
             positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
         """
-        # Contendra el tp de una posicion que cerro, aquellas con el mismo tp (ya sea ventas o compras) deberan cerrarse tambien
-        level_positions_to_close: List[float] = []
-        # Obtiene la informacion actual para el symbolo                
-        info_symbol =  {} 
         # Itera sobre todas las posiciones en la lista "positions"
+        if not position:
+            self.clean_positions_in_txt()
         for position in positions:
-            
-            if position.symbol not in info_symbol:
-                info_symbol[position.symbol] = MT5Api.get_symbol_info(position.symbol)
-                
-            info = info_symbol[position.symbol]
-            
-            # Comprobamos si ya se debe cerrar esta posición
-            if position.tp in level_positions_to_close or position.sl in level_positions_to_close:
-                MT5Api.send_close_position(position.symbol, position.ticket)
-                continue
-            
+            # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]
-                                        
+            submit_changes = False
+            
+            symbol_info = MT5Api.get_symbol_info(position.symbol)
+            
             if position.type == OrderType.MARKET_BUY: # Compra
-                real_sl = position.sl + data['recovery_range']
-                if info.bid <= real_sl:
-                    MT5Api.send_close_position(position.symbol, position.ticket)
-                    level_positions_to_close.append(position.tp)
-                
+                new_stop_loss = position.tp - data['recovery_range']
+                new_take_profit = position.tp + data['recovery_range']
+                if symbol_info.bid > new_stop_loss:
+                    submit_changes = True
+                    
             else: # Venta
-                real_sl = position.sl - data['recovery_range']
-                if info.ask >= real_sl:
-                    MT5Api.send_close_position(position.symbol, position.ticket)
-                    level_positions_to_close.append(position.tp)
+                new_stop_loss = position.tp + data['recovery_range']
+                new_take_profit = position.tp - data['recovery_range']
+                if symbol_info.ask < new_stop_loss:
+                    submit_changes = True
+                
+            if submit_changes is True:                 
+                # Actualiza el stop loss y el take profit con el nuevo valor calculado
+                MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
+
     
     #endregion             
     
@@ -178,21 +175,12 @@ class HardHedgeTrading:
             
             info = MT5Api.get_symbol_info(symbol)
             
-            # Obtiene la cantidad de decimales que debe teber una orden en su volumen
             digits = info.digits
-            
-            # El numero de segundos en la cantidad de barras de minutos
-            seconds_in_rates = number_bars * 60
-            
-            # Cantidad por la que hay que dividir el rango para hallar el recovery range
-            times_divisible = seconds_in_rates / self.interval_seconds_in_orders
-
             high = np.max(rates_in_range['high'])
             low = np.min(rates_in_range['low'])
             range_value = abs(high - low)
             dividing_price = round(((high + low)/2), digits)
-            # Se duplica el rango para poder administrar los profits
-            recovery_range = round((range_value/times_divisible), digits)
+            recovery_range = round((range_value/3), digits)
 
             min_range = info.trade_stops_level * info.point
             
@@ -232,7 +220,7 @@ class HardHedgeTrading:
         """
         # Verifica si el margen disponible es menor al 10% de el balance de la cuenta
         account_info = MT5Api.get_account_info()
-        minimun_margin =  0.10 *  account_info.balance
+        minimun_margin =  0.20 *  account_info.balance
         positions = MT5Api.get_positions(magic=self.magic)
         if account_info.margin_free > minimun_margin and (len(positions)*2) < account_info.limit_orders:
             # Se crea una copia de la lista de symbolos para evitar al modificarse
@@ -257,9 +245,6 @@ class HardHedgeTrading:
                 # Obtiene el precio actual
                 last_price = MT5Api.get_last_price(symbol)
                 
-                # # Se establece el tipo de orden, su tp y su sl
-                # radius = data['recovery_range']*3
-                
                 # Obtiene la informacion actual para el symbolo                
                 info_symbol =  MT5Api.get_symbol_info(symbol)
                 
@@ -267,13 +252,13 @@ class HardHedgeTrading:
                 if last_price > data['dividing_price']:
                     order['price'] = info_symbol.ask    # recovery high
                     tp = order['price']+ data['recovery_range']*3
-                    sl = order['price'] - data['recovery_range']*4
+                    sl = order['price'] - data['recovery_range']*3.5
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
                     order['price'] = info_symbol.bid    # recovery low
                     tp = order['price'] - data['recovery_range']*3
-                    sl = order['price'] + data['recovery_range']*4
+                    sl = order['price'] + data['recovery_range']*3.5
                     order['order_type'] = OrderType.MARKET_SELL
                     
                 order['take_profit'] = round(tp, data['digits'])
@@ -312,15 +297,12 @@ class HardHedgeTrading:
                 # Obtiene el precio actual para el symbolo                
                 info =  MT5Api.get_symbol_info(position.symbol)
                 
-                # Obtiene la informacion actual para el symbolo                
-                #last_price =  MT5Api.get_last_price(position.symbol)
-                
                 if position.type == OrderType.MARKET_BUY:  # Long
                     recovery_low = position.sl + (data["recovery_range"] * 3)
                     if info.ask < recovery_low:  # Corregido
                         self._hedge_order(position, data, recovery_low)
                 else:  # Short
-                    recovery_high = position.sl - (data["recovery_range"] * 4)
+                    recovery_high = position.sl - (data["recovery_range"] * 3.5)
                     if info.bid > recovery_high:  # Corregido
                         self._hedge_order(position, data, recovery_high)
         
@@ -340,8 +322,8 @@ class HardHedgeTrading:
             new_volume = self.volume_size * (2 ** (next_hedge))
             comment = str(next_hedge)
         else:
-            new_volume = data['counter_hedge']
-            comment = str(-1)
+            new_volume = data['counter_hedge'] + self.volume_size
+            comment = str(0)
                 
         if new_volume > data['volume_max']:
             new_volume = float(data['volume_max'])
@@ -349,11 +331,11 @@ class HardHedgeTrading:
         if position.type == OrderType.MARKET_BUY:
             new_order_type = OrderType.MARKET_SELL
             tp = recovery_price - data['recovery_range']*3 
-            sl = recovery_price + data['recovery_range']*4
+            sl = recovery_price + data['recovery_range']*3.5
         else:
             new_order_type = OrderType.MARKET_BUY
             tp = recovery_price + data['recovery_range']*3
-            sl = recovery_price - data['recovery_range']*4
+            sl = recovery_price - data['recovery_range']*3.5
         
         order = {
             "symbol": position.symbol, 
@@ -394,10 +376,7 @@ class HardHedgeTrading:
                 break
                         
             self._hedge_buyer()
-                
-        # Limpiamos el archivo txt para la proxima iteración
-        self.clean_positions_in_txt()
-        
+                    
         # Fin del ciclo
         print("HardHedge: Finalizando estrategia...")
           

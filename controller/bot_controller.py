@@ -18,6 +18,7 @@ from models.strategies import HardHedgeTrading
 
 # Para trabajo en paralelo
 import multiprocessing
+from multiprocessing.managers import ValueProxy
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime
@@ -34,7 +35,7 @@ class BotController:
         self._alpaca_api = AlpacaApi()
 
     #region Positions Management
-    def manage_positions(self, strategies: List[object]):
+    def manage_positions(self, is_on:ValueProxy[bool], strategies: List[object]):
         """
         Administra las posiciones abiertas según las estrategias proporcionadas.
 
@@ -47,26 +48,13 @@ class BotController:
             None
         """
         print("Iniciando administrador de posiciones abiertas.")
-        while True:
-            number_of_active_positions = 0
-            number_of_active_strategies = 0
-            
+        while is_on:            
             # Iterar a través de las estrategias proporcionadas
             for strategy in strategies:
-                # Revisa si la estrategia está activa aún
-                if strategy.is_on:
-                    number_of_active_strategies += 1
                 # Obtiene las posiciones para la estrategia con su identificador magic
                 positions = MT5Api.get_positions(magic=strategy.magic)
-                if positions:
-                    number_of_active_positions += 1
-                    # Llama al método 'manage_profit' de la estrategia para gestionar las posiciones
-                    strategy.manage_profit(positions)
-
-            # Si no hay posiciones abiertas ni estrategias activas, sal del bucle
-            if number_of_active_positions == 0 and number_of_active_strategies == 0:
-                print("Sin posiciones abiertas ni estrategias activas.")
-                break
+                # Llama al método 'manage_profit' de la estrategia para gestionar las posiciones
+                strategy.manage_profit(positions)
             
     #endregion
 
@@ -189,10 +177,12 @@ class BotController:
         
         # Crea un administrador para multiprocessing
         manager = multiprocessing.Manager()
-                
+                        
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
         MT5Api.shutdown()
+        
+        sleep_to_market_open = False
                         
         while True:
             print("")
@@ -200,6 +190,11 @@ class BotController:
             # Se crea una lista que contendra a los objetos de las estrategias creadas
             strategies = []
             
+            if sleep_to_market_open:
+                self._sleep_to_next_market_opening()
+                
+            # Establece una variable globarl compartida que le indicara al programa cuando parar
+            is_on=manager.Value("b", True)
             
             #region creación de estrategias
                         
@@ -209,10 +204,10 @@ class BotController:
             hard_hedge_trading = HardHedgeTrading(
                 symbol_data= manager.dict({}), 
                 symbols= hard_hedge_symbols, 
-                is_on=manager.Value("b", True), 
-                orders_time=30,
-                volume_size= 0.2,
-                max_hedge=5
+                is_on=is_on, 
+                orders_time=60,
+                volume_size= None,
+                max_hedge=8
             )
             hard_hedge_trading._preparing_symbols_data()
             strategies.append(hard_hedge_trading)
@@ -225,17 +220,18 @@ class BotController:
             
                             
             # Inicia el proceso que administrara todas las posiciones de todas las estrategias agregadas en tiempo real
-            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(strategies,))
+            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, strategies,))
             manage_positions_process.start()
             
-            # Espera a que termine el proceso
+            # Espera una cantidad de minutos para reiniciar el ciclo
             minutes_to_restart = 30
             # Se espera el tiempo establecido para reiniciar la estrategia
             time.sleep(minutes_to_restart * 60)
             # Termina las estrategias
             for strategy in strategies:
                 strategy.is_on.value = False
-            
+                
+            # Se espera a que terminen los procesos de las estrategias, se debe agregar manualmente
             hard_hedge_process.join()
 
     #endregion
