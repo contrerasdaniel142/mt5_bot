@@ -130,14 +130,6 @@ class HardHedgeTrading:
             self.clean_positions_in_txt()
             self._hedge_buyer()
             
-        #account_info = MT5Api.get_account_info()
-        
-        # if account_info.profit > 500:
-        #     for position in positions:
-        #         MT5Api.send_close_position(position.ticket)
-        
-        # else:
-        
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
             data = self.symbol_data[position.symbol]

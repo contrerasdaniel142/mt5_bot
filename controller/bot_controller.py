@@ -35,7 +35,7 @@ class BotController:
         self._alpaca_api = AlpacaApi()
 
     #region Positions Management
-    def manage_positions(self, is_on:ValueProxy[bool], strategies: List[object]):
+    def manage_positions(self, is_on:ValueProxy[bool], strategy: object):
         """
         Administra las posiciones abiertas según las estrategias proporcionadas.
 
@@ -48,14 +48,21 @@ class BotController:
             None
         """
         print("Iniciando administrador de posiciones abiertas.")
-        while is_on:            
-            # Iterar a través de las estrategias proporcionadas
-            for strategy in strategies:
+        while is_on:
+            account_info = MT5Api.get_account_info()
+            margin_free = account_info.margin_free
+            profit = account_info
+            balance = account_info.balance
+            if margin_free < (balance/2) and profit > (balance*0.01) :
+                for position in positions:
+                    MT5Api.send_close_position(position.ticket)
+            
+            else:
                 # Obtiene las posiciones para la estrategia con su identificador magic
                 positions = MT5Api.get_positions(magic=strategy.magic)
                 # Llama al método 'manage_positions' de la estrategia para gestionar las posiciones
                 strategy.manage_positions(positions)
-        
+            
         MT5Api.send_close_all_position()
             
     #endregion
