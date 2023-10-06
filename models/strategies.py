@@ -178,14 +178,14 @@ class HardHedgeTrading:
         # Obtener la informacion necesaria para cada symbolo
         for symbol in self.symbols:
             
-            atr = self.get_atr(symbol, 14)
-            
             info = MT5Api.get_symbol_info(symbol)
             
             digits = info.digits
             
+            atr = self.get_atr(symbol, 14)
+            
             recovery_range = round((atr*2), digits)
-
+            
             min_range = info.trade_stops_level * info.point
             
             if recovery_range < min_range:
@@ -291,12 +291,15 @@ class HardHedgeTrading:
                 # Obtiene la informacion actual para el symbolo                
                 info_symbol =  MT5Api.get_symbol_info(symbol)
                 
+                # Obtiene la ultima barra
+                last_bar = MT5Api.get_last_bar(symbol)
+                
                 # Variables para el calculo de tp y sl
                 radius = data['recovery_range']*3
                 spread_point = info_symbol.spread * info_symbol.point
                 
                 # Se establece el tp y el sl
-                if info_symbol.bid > data['dividing_price']:
+                if last_bar.open < last_bar.close:
                     order['price'] = info_symbol.ask    # recovery high
                     tp = order['price'] + (data['recovery_range'] * 3)
                     sl = order['price'] - (data['recovery_range'] * 2) - spread_point
@@ -310,13 +313,6 @@ class HardHedgeTrading:
                     
                 order['take_profit'] = round(tp, data['digits'])
                 order['stop_loss'] = round(sl, data['digits'])
-                
-                # Se establece el tp y el sl
-                if info_symbol.bid > data['dividing_price']:
-                    order['order_type'] = OrderType.MARKET_BUY
-                    
-                else:
-                    order['order_type'] = OrderType.MARKET_SELL
                 
                 # El comment representara al numero de veces que se ha apliacado el HardHedge
                 order['comment'] = str(0)
@@ -353,7 +349,7 @@ class HardHedgeTrading:
                 if info_symbol.ask > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
         
-        time.sleep(1)
+        time.sleep(10)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """

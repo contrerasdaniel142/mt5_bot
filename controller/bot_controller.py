@@ -230,8 +230,8 @@ class BotController:
                 symbol_data= manager.dict({}), 
                 symbols= hard_hedge_symbols, 
                 is_on=is_on, 
-                volume_size= 1.95,
-                max_hedge=5
+                volume_size= None,
+                max_hedge= 10
             )
             hard_hedge_trading._preparing_symbols_data()
             
