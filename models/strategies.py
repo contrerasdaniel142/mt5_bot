@@ -134,6 +134,8 @@ class HardHedgeTrading:
             if pre_closing_time < market_close:
                 self.clean_positions_in_txt()
                 self._hedge_buyer()
+            else:
+                self.is_on.value = False
             
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
