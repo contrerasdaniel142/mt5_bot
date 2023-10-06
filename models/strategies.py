@@ -299,7 +299,7 @@ class HardHedgeTrading:
                 spread_point = info_symbol.spread * info_symbol.point
                 
                 # Se establece el tp y el sl
-                if last_bar.open < last_bar.close:
+                if last_bar['open'] < last_bar['close']:
                     order['price'] = info_symbol.ask    # recovery high
                     tp = order['price'] + (data['recovery_range'] * 3)
                     sl = order['price'] - (data['recovery_range'] * 2) - spread_point
