@@ -181,10 +181,8 @@ class HardHedgeTrading:
             info = MT5Api.get_symbol_info(symbol)
             
             digits = info.digits
-            
-            atr = self.get_atr(symbol, 14)
-            
-            recovery_range = round((atr*2), digits)
+                        
+            recovery_range = round(self._calculate_recovery_range(symbol), digits)
             
             min_range = info.trade_stops_level * info.point
             
@@ -220,10 +218,14 @@ class HardHedgeTrading:
     
     def _calculate_recovery_range(self, symbol):
         atr = self.get_atr(symbol, 14)
-        data = self.symbol_data[symbol]
-        data['recovery_range'] = round((atr*2), data['digits'])
-        self.symbol_data.update({symbol:data})
-        print(data)
+        recovery_range = atr * 1
+        if symbol in self.symbol_data:
+            data = self.symbol_data[symbol]
+            data['recovery_range'] = round(recovery_range, data['digits'])
+            self.symbol_data.update({symbol:data})
+            print(data)
+        else: 
+            return recovery_range
     
     def get_atr(self, symbol: str,  number_bars:int=14)->float:
         """
@@ -349,7 +351,7 @@ class HardHedgeTrading:
                 if info_symbol.ask > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
         
-        time.sleep(10)
+        #time.sleep(2)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
