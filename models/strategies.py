@@ -134,7 +134,8 @@ class HardHedgeTrading:
             # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
             if pre_closing_time < market_close:
                 self.clean_positions_in_txt()
-                self._calculate_recovery_range()
+                for symbol in self.symbols:
+                    self._calculate_recovery_range(symbol)
                 self._hedge_buyer()
             else:
                 self.is_on.value = False
