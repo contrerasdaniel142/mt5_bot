@@ -138,27 +138,34 @@ class HardHedgeTrading:
                 self.is_on.value = False
             
         for position in positions:
-            # Obtiene los datos relacionados con el símbolo de la posición
-            data = self.symbol_data[position.symbol]
-            submit_changes = False
-            
-            symbol_info = MT5Api.get_symbol_info(position.symbol)
-            
-            if position.type == OrderType.MARKET_BUY: # Compra
-                new_stop_loss = position.tp - data['recovery_range']
-                new_take_profit = position.tp + data['recovery_range']
-                if symbol_info.bid > new_stop_loss:
-                    submit_changes = True
-                    
-            else: # Venta
-                new_stop_loss = position.tp + data['recovery_range']
-                new_take_profit = position.tp - data['recovery_range']
-                if symbol_info.ask < new_stop_loss:
-                    submit_changes = True
+            if 3 > int(position.comment):
+                account_info = MT5Api.get_account_info()
+                profit = account_info.profit
+                balance = account_info.balance
+                if profit > (balance * 0.001):
+                    MT5Api.send_close_all_position()
+            else:
+                # Obtiene los datos relacionados con el símbolo de la posición
+                data = self.symbol_data[position.symbol]
+                submit_changes = False
                 
-            if submit_changes is True:                 
-                # Actualiza el stop loss y el take profit con el nuevo valor calculado
-                MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
+                symbol_info = MT5Api.get_symbol_info(position.symbol)
+                
+                if position.type == OrderType.MARKET_BUY: # Compra
+                    new_stop_loss = position.tp - data['recovery_range']
+                    new_take_profit = position.tp + data['recovery_range']
+                    if symbol_info.bid > new_stop_loss:
+                        submit_changes = True
+                        
+                else: # Venta
+                    new_stop_loss = position.tp + data['recovery_range']
+                    new_take_profit = position.tp - data['recovery_range']
+                    if symbol_info.ask < new_stop_loss:
+                        submit_changes = True
+                    
+                if submit_changes is True:                 
+                    # Actualiza el stop loss y el take profit con el nuevo valor calculado
+                    MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
 
     
     #endregion             
@@ -302,23 +309,28 @@ class HardHedgeTrading:
             # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
             if self.find_position_in_txt(position.ticket):
                 continue
+            
+            next_hedge = int(position.comment)+1
+            
+            if next_hedge > self.max_hedge:
+                MT5Api.send_close_all_position()
+            else: 
+                data = self.symbol_data[position.symbol]
                 
-            data = self.symbol_data[position.symbol]
-            
-            # Obtiene el precio actual para el symbolo                
-            info_symbol =  MT5Api.get_symbol_info(position.symbol)
-            
-            # Variables para el calculo de tp y sl
-            radius_recovery = data['recovery_range']*4
-            
-            if position.type == OrderType.MARKET_BUY:  # Long
-                recovery_low = position.tp - radius_recovery
-                if info_symbol.ask < recovery_low:  
-                    self._hedge_order(position, data, recovery_low, info_symbol)
-            else:  # Short
-                recovery_high = position.tp + radius_recovery
-                if info_symbol.bid > recovery_high:
-                    self._hedge_order(position, data, recovery_high, info_symbol)
+                # Obtiene el precio actual para el symbolo                
+                info_symbol =  MT5Api.get_symbol_info(position.symbol)
+                
+                # Variables para el calculo de tp y sl
+                radius_recovery = data['recovery_range']*4
+                
+                if position.type == OrderType.MARKET_BUY:  # Long
+                    recovery_low = position.tp - radius_recovery
+                    if info_symbol.ask < recovery_low:  
+                        self._hedge_order(position, data, recovery_low, info_symbol)
+                else:  # Short
+                    recovery_high = position.tp + radius_recovery
+                    if info_symbol.bid > recovery_high:
+                        self._hedge_order(position, data, recovery_high, info_symbol)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
