@@ -219,7 +219,7 @@ class BotController:
             self._sleep_to_next_market_opening(False)
                 
             # Establece una variable globarl compartida que le indicara al programa cuando parar
-            is_on=manager.Value("b", True)
+            #is_on=manager.Value("b", True)
             
             #region creación de estrategias
                         
@@ -247,10 +247,10 @@ class BotController:
             manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, hard_hedge_trading,))
             manage_positions_process.start()
             
-            self.sleep_until_market_closes()
+            # self.sleep_until_market_closes()
             
-            # Termina las estrategias
-            is_on.value = False
+            # # Termina las estrategias
+            # is_on.value = False
                 
             # Se espera a que terminen los procesos de las estrategias, se debe agregar manualmente
             manage_positions_process.join()   

@@ -128,17 +128,21 @@ class HardHedgeTrading:
         """
         # Itera sobre todas las posiciones en la lista "positions"
         if not positions:
-            current_time = datetime.now(pytz.utc)   # Hora actual
-            pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
-            market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
-            # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
-            if pre_closing_time < market_close:
-                self.clean_positions_in_txt()
-                for symbol in self.symbols:
-                    self._calculate_recovery_range(symbol)
-                self._hedge_buyer()
-            else:
-                self.is_on.value = False
+            # current_time = datetime.now(pytz.utc)   # Hora actual
+            # pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
+            # market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+            # # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
+            # if pre_closing_time < market_close:
+            #     self.clean_positions_in_txt()
+            #     for symbol in self.symbols:
+            #         self._calculate_recovery_range(symbol)
+            #     self._hedge_buyer()
+            # else:
+            #     self.is_on.value = False
+            self.clean_positions_in_txt()
+            for symbol in self.symbols:
+                self._calculate_recovery_range(symbol)
+            self._hedge_buyer()
             
         for position in positions:
             # Obtiene los datos relacionados con el símbolo de la posición
