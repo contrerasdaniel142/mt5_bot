@@ -53,7 +53,7 @@ class BotController:
             margin_free = account_info.margin_free
             profit = account_info.profit
             balance = account_info.balance
-            if profit > 1:
+            if profit > 0:
                 MT5Api.send_close_all_position()
             else:
                 # Obtiene las posiciones para la estrategia con su identificador magic
