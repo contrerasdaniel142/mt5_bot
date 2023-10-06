@@ -1,4 +1,13 @@
-import numpy as np          # Para realizar operaciones numéricas eficientes
+#region Descripción
+# El archivo "technical_indicators.py" es un componente en el sistema de trading 
+# automatizado que contiene definiciones de indicadores técnicos comúnmente utilizados 
+# en análisis técnico y trading algorítmico. Su función principal es proporcionar métodos 
+# y funciones para calcular estos indicadores a partir de datos de mercado y utilizarlos en estrategias de trading.
+#endregion
+
+#region Importaciones
+# Para realizar operaciones numéricas eficientes
+import numpy as np 
 
 # Importaciones para el manejo de datos
 from mt5.enums import FieldType
@@ -10,6 +19,7 @@ from typing import Dict, List, Tuple, Any
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime, timedelta
 
+#endregion
 
 class vRenko:
     def __init__(self, brick_size):
