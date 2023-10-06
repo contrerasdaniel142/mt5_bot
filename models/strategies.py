@@ -78,6 +78,31 @@ class HardHedgeTrading:
             print("El mercado está cerrado.")
             return False
     
+    def _sleep_to_next_minute(self):
+        """
+        Espera hasta que finalice el minuto actual antes de tomar una decisión.
+
+        Este método calcula cuántos segundos faltan para que finalice el minuto actual,
+        y luego espera ese tiempo antes de continuar.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Obtener la hora actual
+        current_time = datetime.now()
+
+        # Calcular el momento en que comienza el próximo minuto (segundo 1, microsegundo 0)
+        next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
+
+        # Calcular la cantidad de segundos que faltan hasta el próximo minuto
+        seconds = (next_minute - current_time).total_seconds()
+
+        # Dormir durante la cantidad de segundos necesarios
+        time.sleep(seconds)
+    
     def save_position_in_txt(self, ticket: int):
         """
         Guarda la posición especificada en un archivo de texto.
@@ -307,14 +332,14 @@ class HardHedgeTrading:
                 # Se establece el tp y el sl
                 if last_bar['open'] < last_bar['close']:
                     order['price'] = info_symbol.ask    # recovery high
-                    tp = order['price'] + (data['recovery_range'] * 3)
-                    sl = order['price'] - (data['recovery_range'] * 2) - spread_point
+                    tp = order['price'] + radius
+                    sl = order['price'] - radius - spread_point
                     order['order_type'] = OrderType.MARKET_BUY
                     
                 else:
                     order['price'] = info_symbol.bid    # recovery low
-                    tp = order['price'] - (data['recovery_range'] * 3)
-                    sl = order['price'] + (data['recovery_range'] * 2) + spread_point
+                    tp = order['price'] - radius
+                    sl = order['price'] + radius + spread_point
                     order['order_type'] = OrderType.MARKET_SELL
                     
                 order['take_profit'] = round(tp, data['digits'])
@@ -343,7 +368,7 @@ class HardHedgeTrading:
             info_symbol =  MT5Api.get_symbol_info(position.symbol)
             
             # Variables para el calculo de tp y sl
-            recovery_radius = data['recovery_range']*3
+            recovery_radius = data['recovery_range']*4
                        
             
             if position.type == OrderType.MARKET_BUY:  # Long
@@ -355,7 +380,7 @@ class HardHedgeTrading:
                 if info_symbol.ask > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
         
-        time.sleep(15)
+        self._sleep_to_next_minute()
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
@@ -386,12 +411,12 @@ class HardHedgeTrading:
         
         if position.type == OrderType.MARKET_BUY:
             new_order_type = OrderType.MARKET_SELL
-            tp = recovery_price - (data['recovery_range'] * 3) 
-            sl = recovery_price + (data['recovery_range'] * 2) + spread_point
+            tp = recovery_price - radius 
+            sl = recovery_price + radius + spread_point
         else:
             new_order_type = OrderType.MARKET_BUY
-            tp = recovery_price + (data['recovery_range'] * 3)
-            sl = recovery_price - (data['recovery_range'] * 2) - spread_point
+            tp = recovery_price + radius
+            sl = recovery_price - radius - spread_point
         
         order = {
             "symbol": position.symbol, 
