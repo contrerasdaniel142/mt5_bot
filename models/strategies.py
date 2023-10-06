@@ -9,6 +9,7 @@
 from typing import List, Dict, Any, Tuple
 # importaciones para realizar operaciones numéricas eficientes
 import numpy as np
+import pandas as pd
 
 # Para trabajo en paralelo
 import multiprocessing
@@ -113,7 +114,7 @@ class HardHedgeTrading:
         """
         with open("hedge_positions.txt", "w") as file:
             file.truncate(0)
-    
+        
     #endregion   
     
     #region Profit Management
@@ -133,6 +134,7 @@ class HardHedgeTrading:
             # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
             if pre_closing_time < market_close:
                 self.clean_positions_in_txt()
+                self._calculate_recovery_range()
                 self._hedge_buyer()
             else:
                 self.is_on.value = False
@@ -163,7 +165,7 @@ class HardHedgeTrading:
     
     #endregion             
     
-    #region HardHedge strategy           
+    #region HardHedge strategy 
     def _preparing_symbols_data(self):
         """
         Prepara la data que se usara en la estrategia de HardHedge.
@@ -171,29 +173,17 @@ class HardHedgeTrading:
         print("HardHedge: Preparando la data...")
         # Variable auxiliar
         symbol_data = {}
-        
-        # Establece el periodo de tiempo para calcular el rango
-        current_time = datetime.now(pytz.utc)
-        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
-        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
-        
-        
+
         # Obtener la informacion necesaria para cada symbolo
         for symbol in self.symbols:
-            rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
-                        
-            if rates_in_range is None or rates_in_range.size == 0:
-                number_bars = 30
-                rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
+            
+            atr = self.get_atr(symbol, 14)
             
             info = MT5Api.get_symbol_info(symbol)
             
             digits = info.digits
-            high = np.max(rates_in_range['high'])
-            low = np.min(rates_in_range['low'])
-            range_value = abs(high - low)
-            dividing_price = round(((high + low)/2), digits)
-            recovery_range = round((range_value/3), digits)
+            
+            recovery_range = round((atr*2), digits)
 
             min_range = info.trade_stops_level * info.point
             
@@ -216,17 +206,58 @@ class HardHedgeTrading:
                 'symbol': symbol,
                 'digits': digits,
                 'recovery_range': recovery_range,
-                'dividing_price': dividing_price,
                 'volume_min': info.volume_min,
                 'volume_max': info.volume_max,
                 'counter_hedge': abs(counter_hedge)
             }
             
-            print(symbol_data)
+            print(symbol_data[symbol])
             
             
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
+    
+    def _calculate_recovery_range(self, symbol):
+        atr = self.get_atr(symbol, 14)
+        data = self.symbol_data[symbol]
+        data['recovery_range'] = round((atr*2), data['digits'])
+        self.symbol_data.update({symbol:data})
+        print(data)
+    
+    def get_atr(self, symbol: str,  number_bars:int=14)->float:
+        """
+        Calcula el Average True Range (ATR) de un symbolo especifico en mt5.
+
+        Args:
+            high_prices (list or np.array): Lista o arreglo NumPy de precios altos.
+            low_prices (list or np.array): Lista o arreglo NumPy de precios bajos.
+            close_prices (list or np.array): Lista o arreglo NumPy de precios de cierre.
+            n (int): Número de períodos para el cálculo del ATR. El valor predeterminado es 14.
+
+        Returns:
+            float: Valor del Average True Range (ATR).
+        """
+        # Obtiene las barras para el simbolo
+        rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
+        # Crear un DataFrame con los precios de alta, baja y cierre
+        data = {
+            'High': rates_in_range['high'],
+            'Low': rates_in_range['low'],
+            'Close': rates_in_range['close']
+        }
+
+        df = pd.DataFrame(data)
+
+        # Calcular el True Range (TR) utilizando Pandas y NumPy
+        df['High-Low'] = df['High'] - df['Low']
+        df['High-Close-Prev'] = abs(df['High'] - df['Close'].shift(1))
+        df['Low-Close-Prev'] = abs(df['Low'] - df['Close'].shift(1))
+        df['True-Range'] = df[['High-Low', 'High-Close-Prev', 'Low-Close-Prev']].max(axis=1)
+
+        # Calcular el ATR como un promedio exponencial ponderado (SMA)
+        atr = df['True-Range'].rolling(window=number_bars).mean().iloc[-1]
+
+        return atr
     
     def _hedge_buyer(self):
         """
@@ -314,12 +345,14 @@ class HardHedgeTrading:
             
             if position.type == OrderType.MARKET_BUY:  # Long
                 recovery_low = position.tp - recovery_radius
-                if info_symbol.ask < recovery_low:  
+                if info_symbol.bid < recovery_low:  
                     self._hedge_order(position, data, recovery_low, info_symbol)
             else:  # Short
                 recovery_high = position.tp + recovery_radius
-                if info_symbol.bid > recovery_high:
+                if info_symbol.ask > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
+        
+        time.sleep(1)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
@@ -335,7 +368,7 @@ class HardHedgeTrading:
         next_hedge = int(position.comment)+1
                         
         if next_hedge < self.max_hedge:
-            new_volume = self.volume_size * (2 ** (next_hedge))
+            new_volume = self.volume_size * (3 ** (next_hedge))
             comment = str(next_hedge)
         else:
             new_volume = data['counter_hedge'] + self.volume_size
