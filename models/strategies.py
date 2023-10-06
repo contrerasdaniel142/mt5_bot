@@ -218,7 +218,7 @@ class HardHedgeTrading:
     
     def _calculate_recovery_range(self, symbol):
         atr = self.get_atr(symbol, 14)
-        recovery_range = atr * 1
+        recovery_range = atr * 0.75
         if symbol in self.symbol_data:
             data = self.symbol_data[symbol]
             data['recovery_range'] = round(recovery_range, data['digits'])
@@ -351,7 +351,7 @@ class HardHedgeTrading:
                 if info_symbol.ask > recovery_high:
                     self._hedge_order(position, data, recovery_high, info_symbol)
         
-        #time.sleep(2)
+        time.sleep(5)
         
     def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
         """
