@@ -219,7 +219,7 @@ class BotController:
             self._sleep_to_next_market_opening(False)
                 
             # Establece una variable globarl compartida que le indicara al programa cuando parar
-            #is_on=manager.Value("b", True)
+            is_on=manager.Value("b", True)
             
             #region creación de estrategias
                         
