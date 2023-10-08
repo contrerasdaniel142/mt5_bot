@@ -30,6 +30,8 @@ import pytz, time
 
 class HardHedgeTrading:
     def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], max_hedge: int = 5, volume_size: int = 1) -> None:
+        self.trend: str = None
+        
         # Lista de symbolos para administar dentro de la estrategia
         self.symbols = symbols
                 
@@ -234,6 +236,8 @@ class HardHedgeTrading:
             
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
+    
+    def _update_trend
     
     def _hedge_buyer(self):
         """
