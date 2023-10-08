@@ -27,7 +27,24 @@ from .mt5.client import MT5Api
 from datetime import datetime, timedelta
 import pytz, time
 
+# Importaciones de indicatores técnicos
+from .technical_indicators import Atr
+
 #endregion
+
+
+class Tr3nd:
+    def __init__(self, symbol_data:DictProxy) -> None:
+        self.main_trend = 
+        pass
+
+    def _update_trends(self)
+    
+
+class StateTr3nd:
+    no_trade = 0
+    in_trade = 1
+    in_hedge = 3
 
 class HardHedgeTrading:
     def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], max_hedge: int = 5, volume_size: int = 1) -> None:
@@ -246,7 +263,9 @@ class HardHedgeTrading:
         self.symbol_data.update(symbol_data)
     
     def _calculate_recovery_range(self, symbol):
-        atr = self.get_atr(symbol, 14)
+        atr_period = 14
+        rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, atr_period)
+        atr = Atr.calculate_atr(rates_in_range, atr_period)
         recovery_range = atr * 0.75
         if symbol in self.symbol_data:
             data = self.symbol_data[symbol]
@@ -255,42 +274,7 @@ class HardHedgeTrading:
             print(data)
         else: 
             return recovery_range
-    
-    def get_atr(self, symbol: str,  number_bars:int=14)->float:
-        """
-        Calcula el Average True Range (ATR) de un symbolo especifico en mt5.
-
-        Args:
-            high_prices (list or np.array): Lista o arreglo NumPy de precios altos.
-            low_prices (list or np.array): Lista o arreglo NumPy de precios bajos.
-            close_prices (list or np.array): Lista o arreglo NumPy de precios de cierre.
-            n (int): Número de períodos para el cálculo del ATR. El valor predeterminado es 14.
-
-        Returns:
-            float: Valor del Average True Range (ATR).
-        """
-        # Obtiene las barras para el simbolo
-        rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
-        # Crear un DataFrame con los precios de alta, baja y cierre
-        data = {
-            'High': rates_in_range['high'],
-            'Low': rates_in_range['low'],
-            'Close': rates_in_range['close']
-        }
-
-        df = pd.DataFrame(data)
-
-        # Calcular el True Range (TR) utilizando Pandas y NumPy
-        df['High-Low'] = df['High'] - df['Low']
-        df['High-Close-Prev'] = abs(df['High'] - df['Close'].shift(1))
-        df['Low-Close-Prev'] = abs(df['Low'] - df['Close'].shift(1))
-        df['True-Range'] = df[['High-Low', 'High-Close-Prev', 'Low-Close-Prev']].max(axis=1)
-
-        # Calcular el ATR como un promedio exponencial ponderado (SMA)
-        atr = df['True-Range'].rolling(window=number_bars).mean().iloc[-1]
-
-        return atr
-    
+        
     def _hedge_buyer(self):
         """
         Prepara órdenes para ser enviadas a MetaTrader 5 en función de los datos establecidos.

@@ -8,6 +8,7 @@
 #region Importaciones
 # Para realizar operaciones numéricas eficientes
 import numpy as np 
+import pandas as pd
 
 # Importaciones para el manejo de datos
 from mt5.enums import FieldType
@@ -22,7 +23,7 @@ from datetime import datetime, timedelta
 #endregion
 
 class vRenko:
-    def __init__(self, brick_size):
+    def __init__(self, brick_size:float):
         """
         Inicializa una instancia de vRenko con un tamaño de ladrillo especificado.
 
@@ -30,8 +31,8 @@ class vRenko:
             brick_size (float): El tamaño de ladrillo para el gráfico Renko.
         """
         self.brick_size = brick_size
-        self.dtype_renko = [('time', 'datetime64[s]'), ('type', '<U4'), ('open', '<f8'), ('high', '<f8'), ('low', '<f8'), ('close', '<f8')]
-        self.renko_rates = np.empty(0, dtype= self.dtype_renko)
+        self.dtype_renko = [('time', 'int64'), ('type', '<U4'), ('open', '<f8'), ('high', '<f8'), ('low', '<f8'), ('close', '<f8')]
+        self.renko_data = np.empty(0, dtype= self.dtype_renko)
 
     def calculate_renko(self, rates: ndarray[FieldType.rates_dtype]):
         """
@@ -62,7 +63,7 @@ class vRenko:
             else:
                 self._add_bricks(rate, current_brick, renko_bricks)
 
-        self.renko_rates = np.array(renko_bricks, dtype=self.dtype_renko)
+        self.renko_data = np.array(renko_bricks, dtype=self.dtype_renko)
         
     def _add_bricks(self, rate:Tuple, current_brick: Dict[str, Any], renko_bricks: List[Tuple] = None):
         """
@@ -77,13 +78,13 @@ class vRenko:
         brick_count = abs(price_diff) // self.brick_size
         for i in range(int(brick_count)):
             if price_diff > 0:
-                current_brick['time'] = self._convert_time_to_mt5(datetime.fromtimestamp(rate['time']))
+                current_brick['time'] = rate['time']
                 current_brick['type'] = 'up'
                 current_brick['close'] += self.brick_size
                 current_brick['high'] = current_brick['close']
                 current_brick['low'] = rate['low'] if i == 0 else current_brick['open']
             else:
-                current_brick['time'] = self._convert_time_to_mt5(datetime.fromtimestamp(rate['time']))
+                current_brick['time'] = rate['time']
                 current_brick['type'] = 'down'
                 current_brick['close'] -= self.brick_size
                 current_brick['high'] = rate['high'] if i == 0 else current_brick['open']
@@ -92,28 +93,13 @@ class vRenko:
             brick = (current_brick['time'], current_brick['type'], current_brick['open'], current_brick['high'], current_brick['low'], current_brick['close'],)
                 
             if renko_bricks is None:
-                self.renko_rates = np.append(self.renko_rates, np.array([brick], dtype=self.dtype_renko))
+                self.renko_data = np.append(self.renko_data, np.array([brick], dtype=self.dtype_renko))
             else:
                 renko_bricks.append(brick)
                 current_brick.update({
                         'open': current_brick['close'], 'close': current_brick['close']
                     })
             
-    def _convert_time_to_mt5(self, date: datetime) -> datetime:
-        """
-        Suma 5 horas a la fecha y hora proporcionada.
-
-        Args:
-            date (datetime): Fecha y hora en formato UTC.
-
-        Returns:
-            datetime: La fecha y hora resultante después de sumar 5 horas.
-        """
-        # Suma 5 horas a la fecha y hora original
-        dt_mt5 = date + timedelta(hours=5)
-        
-        return dt_mt5
-    
     def update_renko(self, rate):
         """
         Actualiza el gráfico Renko basado en la barra proporcionada de MT5.
@@ -121,10 +107,10 @@ class vRenko:
         Args:
             rate (Tuple): Información de una barra de precios de MT5.
         """
-        if self.renko_rates.size != 0:
-            last_brick = self.renko_rates[-1].copy()
+        if self.renko_data.size != 0:
+            last_brick = self.renko_data[-1].copy()
             self._add_bricks(rate, last_brick)
-  
+        
     def get_renko_data(self):
         """
         Obtiene los datos del gráfico Renko calculados.
@@ -132,5 +118,4 @@ class vRenko:
         Returns:
             ndarray: Un array de datos del gráfico Renko.
         """
-        return self.renko_rates
-
+        return self.renko_data
