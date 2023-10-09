@@ -77,6 +77,7 @@ class Tr3nd:
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'day':1,'hour':0, 'minute':0}
         self._market_closed_time = {'hour':19, 'minute':45}
+        self.opening_balance_account = 0
         
     
     def _is_in_market_hours(self):
@@ -123,7 +124,7 @@ class Tr3nd:
         profit = account_info.profit
         for position in positions:
             profit += position.profit
-        if profit >= (account_info.balance*0.03):
+        if profit >= (self.opening_balance_account*0.03):
             self.is_on.value = False
             MT5Api.send_close_all_position()
             return True
@@ -322,6 +323,7 @@ class Tr3nd:
         print(f"Tr3nd: Iniciando estrategia para {self.symbol}...")
         # Establece el volumen para las ordenes
         account_info = MT5Api.get_account_info()
+        self.opening_balance_account = account_info.balance
         symbol_info = MT5Api.get_symbol_info(self.symbol)
         max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
         if self.volume is None:
