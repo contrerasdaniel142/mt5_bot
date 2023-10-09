@@ -517,6 +517,9 @@ class MT5Api:
             request["magic"] = magic
 
         order_request: MqlTradeResult = mt5.order_send(request)
+
+        #Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
         
         if order_request.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
@@ -525,8 +528,7 @@ class MT5Api:
         else:
             print(f"Orden completada. {symbol}: vol[{volume}] price[{price}] sl[{stop_loss}] tp [{take_profit}]")
 
-        #Cierra la conexión con MetaTrader 5
-        MT5Api.shutdown()
+        
         return order_request
     
     def send_sell_partial_order(symbol: str, volume_to_sell: float, ticket:int, comment:str = None)->bool:
@@ -753,25 +755,31 @@ class MT5Api:
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
     
-    def send_close_position(symbol:str, ticket:int):
+    def send_close_position(symbol:str, ticket:int)-> bool:
         """
         Cierra una posicion abiertas en la plataforma MetaTrader 5.
         
         Args:
             symbol (str): El símbolo del instrumento.
             ticket (int): El número de ticket de la posición a vender.
+        Returns:
+            bool: Verdadero si se ejecuto con exito, falso en caso contrario
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
-        close_result = mt5.Close(symbol=symbol, ticket=ticket)                
-        if close_result:
-            print(f"Posición {ticket} cerrada con éxito")
-        else:
-            print(f"Error al cerrar la posición ticket")
-            
+        close_result = mt5.Close(symbol=symbol, ticket=ticket)
+        
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+                   
+        if close_result:
+            print(f"Posición {ticket} cerrada con éxito")
+            return True
+        else:
+            print(f"Error al cerrar la posición ticket")
+            return False
+            
     
     
     #endregion
