@@ -23,7 +23,7 @@ import multiprocessing
 from multiprocessing.managers import ValueProxy
 
 # Importaciones necesarias para manejar fechas y tiempo
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import time
 
@@ -32,8 +32,8 @@ import time
 class BotController:
     def __init__(self) -> None:
         # Estos horarios estan en utc
-        self._market_opening_time = {'hour':13, 'minute':30}
-        self._market_closed_time = {'hour':19, 'minute':55}
+        self._market_opening_time = {'day':1,'hour':0, 'minute':0}
+        self._market_closed_time = {'hour':19, 'minute':45}
         self._alpaca_api = AlpacaApi()
 
     #region utilities
@@ -64,7 +64,7 @@ class BotController:
             business_hours['open'] = calendar_today[0].open.astimezone(pytz.utc)
             business_hours['close'] = calendar_today[0].close.astimezone(pytz.utc)
             return business_hours
-        return business_hours   
+        return business_hours  
     
     def _is_in_market_hours(self):
         """
@@ -74,7 +74,7 @@ class BotController:
             bool: True si se encuentra en horario de mercado, False si no lo está.
         """
         # Obtener la hora y minutos actuales en UTC
-        current_time = datetime.now(pytz.utc).time()
+        current_time = datetime.now(pytz.utc).time() + timedelta(days=self._market_opening_time['day'])
 
         # Crear objetos time para el horario de apertura y cierre del mercado
         market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
