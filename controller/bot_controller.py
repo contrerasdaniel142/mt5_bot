@@ -114,7 +114,7 @@ class BotController:
         for calendar in calendars:
             next_market_open = calendar.open.astimezone(pytz.utc).replace(
                 hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute']
-            )
+            )+ timedelta(days=self._market_opening_time['day'])
             if current_time < next_market_open:
                 break
             
@@ -188,7 +188,8 @@ class BotController:
             
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
-                symbol=symbol
+                symbol=symbol,
+                size_renko= 20
                 )
             tr3nd.start()
             
