@@ -184,7 +184,7 @@ class BotController:
         while True:
             print("")
             
-            #self._sleep_to_next_market_opening(False)
+            self._sleep_to_next_market_opening(False)
             
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(

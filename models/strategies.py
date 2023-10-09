@@ -290,7 +290,7 @@ class Tr3nd:
             last_bar = MT5Api.get_last_bar(symbol)
             if main_renko.update_renko(last_bar):
                 df = pd.DataFrame(main_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=self.atr_period, multiplier=self.multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
                 if last_renko['close'] > last_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
@@ -301,7 +301,7 @@ class Tr3nd:
                 
             if intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=self.atr_period, multiplier=self.multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
                 if last_renko['close'] > last_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
@@ -312,7 +312,7 @@ class Tr3nd:
                 
             if fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=self.atr_period, multiplier=self.multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
                 if last_renko['close'] > last_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
