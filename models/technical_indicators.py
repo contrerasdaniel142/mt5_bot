@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple, Any
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime
-from utilities import convert_time_to_mt5
+from .utilities import convert_time_to_mt5
 
 
 #endregion

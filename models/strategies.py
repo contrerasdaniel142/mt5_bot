@@ -63,7 +63,7 @@ class Tr3nd:
         # Volumen de las ordenes
         self.volume = volume
         # Estado el activo
-        self.state = StateSymbol.balanced
+        self.state = StateSymbol.no_trades
         # Tamaño del ladrillo del renko principal
         self.size_renko = size_renko
         # Periodo del atr usado para el supertrend
@@ -143,7 +143,6 @@ class Tr3nd:
             if self.main_trend.value != StateTr3nd.unassigned:
                 is_unbalanced, no_trade_state = self._trade_to_unbalance(no_trade_state)
                 if is_unbalanced:
-                    print("Tr3nd: Trade realizado")
                     break
                 
     def _trade_to_unbalance(self, trade_state:TradeState):
@@ -336,7 +335,7 @@ class Tr3nd:
         manager = multiprocessing.Manager()
         # Crea las variables que se administraran entre procesos
         self.is_on = manager.Value("b", True)
-        self.state = manager.Value("i", StateSymbol.balanced)
+        self.state = manager.Value("i", StateSymbol.no_trades)
         self.main_trend = manager.Value("i", StateTr3nd.unassigned)
         self.intermediate_trend = manager.Value("i", StateTr3nd.unassigned)
         self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
