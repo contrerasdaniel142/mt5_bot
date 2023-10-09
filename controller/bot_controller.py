@@ -74,7 +74,7 @@ class BotController:
             bool: True si se encuentra en horario de mercado, False si no lo está.
         """
         # Obtener la hora y minutos actuales en UTC
-        current_time = datetime.now(pytz.utc).time() + timedelta(days=self._market_opening_time['day'])
+        current_time = datetime.now(pytz.utc) + timedelta(days=self._market_opening_time['day'])
 
         # Crear objetos time para el horario de apertura y cierre del mercado
         market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
