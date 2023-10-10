@@ -129,7 +129,7 @@ class Tr3nd:
         print("tr3nd: Iniciacion administrador de posiciones")
         # Comienza el administrador de posiciones
         while self.is_on.value:
-            if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend != StateTr3nd.unassigned and self.fast_trend != StateTr3nd.unassigned:
+            if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend.value != StateTr3nd.unassigned and self.fast_trend.value != StateTr3nd.unassigned:
                 if self.state.value == StateSymbol.no_trades:
                     self._no_trade_state()
                 elif self.state.value == StateSymbol.unbalanced:
@@ -160,7 +160,7 @@ class Tr3nd:
         print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
             no_trade_state = self._trade_to_unbalance(no_trade_state)
-            if self.state == StateSymbol.unbalanced:
+            if self.state.value == StateSymbol.unbalanced:
                 break
                 
     def _trade_to_unbalance(self, trade_state:TradeState):
