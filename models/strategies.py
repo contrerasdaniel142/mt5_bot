@@ -260,6 +260,8 @@ class Tr3nd:
                     break   
     
     def _update_trends(self):
+        # Indica si es la primera vez que inicia el metodo
+        first_time = True
         # Symbolo a encontrar los trends
         symbol = self.symbol
         # Se establecen las variables para el supertrend
@@ -280,11 +282,11 @@ class Tr3nd:
         fast_renko.calculate_renko(symbol_rates)
         while self.is_on.value:
             # Se cerciora que alcance el profit diario para terminar el programa
-            if self._goal_profit():
-                break
+            # if self._goal_profit():
+            #     break
             # Agrega la ultima barra (es la barra en formación)
             last_bar = MT5Api.get_last_bar(symbol)
-            if main_renko.update_renko(last_bar):
+            if main_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(main_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
@@ -295,7 +297,7 @@ class Tr3nd:
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
                 
-            if intermediate_renko.update_renko(last_bar):
+            if intermediate_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(intermediate_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
@@ -306,7 +308,7 @@ class Tr3nd:
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
                 
-            if fast_renko.update_renko(last_bar):
+            if fast_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(fast_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_renko = df.iloc[-1]
@@ -316,6 +318,9 @@ class Tr3nd:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
+                    
+            if first_time:
+                first_time = False
                 
     
     def start(self):
