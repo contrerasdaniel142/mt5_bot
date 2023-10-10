@@ -99,6 +99,31 @@ class Tr3nd:
         else:
             print("El mercado está cerrado.")
             return False
+        
+    def _sleep_to_next_minute(self):
+        """
+        Espera hasta que finalice el minuto actual antes de tomar una decisión.
+
+        Este método calcula cuántos segundos faltan para que finalice el minuto actual,
+        y luego espera ese tiempo antes de continuar.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        # Obtener la hora actual
+        current_time = datetime.now()
+
+        # Calcular el momento en que comienza el próximo minuto 
+        next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
+
+        # Calcular la cantidad de segundos que faltan hasta el próximo minuto
+        seconds = (next_minute - current_time).total_seconds()
+
+        # Dormir durante la cantidad de segundos necesarios
+        time.sleep(seconds)
     
     def _manage_positions(self):
         print("tr3nd: Iniciacion administrador de posiciones")
@@ -266,7 +291,7 @@ class Tr3nd:
         atr_period = self.atr_period
         multiplier = self.multiplier
         # Obtiene las barras desde mt5
-        symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 7200)
+        symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 7200)
         # Establece el tamaño de los ladrillos de los renkos
         main_size = self.size_renko
         intermediate_size = main_size/2
@@ -283,50 +308,38 @@ class Tr3nd:
             # if self._goal_profit():
             #     break
             # Agrega la ultima barra (es la barra en formación)
-            last_bar = MT5Api.get_last_bar(symbol)
-            if main_renko.update_renko(last_bar) or first_time:
+            if not first_time:
+                self._sleep_to_next_minute()
+            last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+            if first_time or main_renko.update_renko(last_bar):
                 df = pd.DataFrame(main_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
                 last_bar_renko = df.iloc[-1]
-                if last_bar_renko['close'] > last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bullish
-                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bearish
-                else:
-                    self.main_trend.value = StateTr3nd.unassigned
+                self.main_trend.value = last_bar_renko['supertrend']
+                
                 print("")
                 print("Tr3nd: Update - Ultimo ladrillo main_trend:")
                 print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 print("")
                 
-            if intermediate_renko.update_renko(last_bar) or first_time:
+            if first_time or intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
                 last_bar_renko = df.iloc[-1]
-                if last_bar_renko['close'] > last_bar_renko['supertrend']:
-                    self.intermediate_trend.value = StateTr3nd.bullish
-                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
-                    self.intermediate_trend.value = StateTr3nd.bearish
-                else:
-                    self.intermediate_trend.value = StateTr3nd.unassigned
-                    
+                self.intermediate_trend.value = last_bar_renko['supertrend']
+
                 print("")
                 print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend:")
                 print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 print("")
                 
-            if fast_renko.update_renko(last_bar) or first_time:
+            if first_time or fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
                 last_bar_renko = df.iloc[-1]
-                if last_bar_renko['close'] > last_bar_renko['supertrend']:
-                    self.fast_trend.value = StateTr3nd.bullish
-                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
-                    self.fast_trend.value = StateTr3nd.bearish
-                else:
-                    self.fast_trend.value = StateTr3nd.unassigned
+                self.fast_trend.value = last_bar_renko['supertrend']
                 
                 print("")
                 print(f"Tr3nd: Update - Ultimo ladrillo fast_trend:")
