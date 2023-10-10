@@ -174,6 +174,7 @@ class Tr3nd:
                 trade_state = TradeState.start
             else:
                 trade_state = TradeState.on
+            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
             
         if trade_state == TradeState.start and self.fast_trend.value == self.main_trend.value:
             print(f"Tr3nd: Creando orden nueva")
