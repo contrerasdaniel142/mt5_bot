@@ -178,19 +178,21 @@ class Tr3nd:
             
         if trade_state == TradeState.start and self.fast_trend.value == self.main_trend.value:
             print(f"Tr3nd: Creando orden nueva")
-            if self.main_trend == StateTr3nd.bullish:
+            if self.main_trend.value == StateTr3nd.bullish:
                 result = MT5Api.send_order(
                         symbol= self.symbol, 
                         order_type= OrderType.MARKET_BUY, 
                         volume=self.volume,
-                        comment="+1"
+                        comment="+1",
+                        magic=self.magic
                         )
             else:
                 result = MT5Api.send_order(
                         symbol= self.symbol, 
                         order_type= OrderType.MARKET_SELL, 
                         volume=self.volume,
-                        comment="-1"
+                        comment="-1",
+                        magic=self.magic
                         )
             
             self.state.value = StateSymbol.unbalanced
@@ -238,14 +240,16 @@ class Tr3nd:
                             symbol= self.symbol, 
                             order_type= OrderType.MARKET_SELL, 
                             volume=self.volume,
-                            comment="-1"
+                            comment="-1",
+                            magic=self.magic
                             )
                     else:
                         result = MT5Api.send_order(
                             symbol= self.symbol, 
                             order_type= OrderType.MARKET_BUY, 
                             volume=self.volume,
-                            comment="+1"
+                            comment="+1",
+                            magic=self.magic
                             )
                     if result is not None:
                         self.state.value = StateSymbol.balanced
