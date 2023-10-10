@@ -139,6 +139,7 @@ class Tr3nd:
         print("Tr3nd: Estado sin Trade")
         no_trade_state = TradeState.on
         is_unbalanced = False
+        print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
             if self.main_trend.value != StateTr3nd.unassigned:
                 is_unbalanced, no_trade_state = self._trade_to_unbalance(no_trade_state)
@@ -148,11 +149,14 @@ class Tr3nd:
     def _trade_to_unbalance(self, trade_state:TradeState):
         if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
             trade_state = TradeState.ready
+            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
                 
         if trade_state == TradeState.ready and self.fast_trend.value != self.main_trend.value:
             trade_state = TradeState.start if self.main_trend.value == self.intermediate_trend.value else TradeState.on
+            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
         
         if trade_state == TradeState.start and self.fast_trend.value == self.main_trend.value:
+            print(f"Tr3nd: Creando orden nueva")
             if self.main_trend == StateTr3nd.bullish:
                 result = MT5Api.send_order(
                         symbol= self.symbol, 
@@ -175,6 +179,7 @@ class Tr3nd:
                 self.state.value = StateSymbol.no_trades
             else:
                 return True, trade_state
+            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
         return False, trade_state
         
     def _unbalanced_state(self):
@@ -194,6 +199,7 @@ class Tr3nd:
                         last_profit = position.profit
                         ticket = position.ticket
                 if ticket != 0:
+                    print("Tr3nd: Cerrando posicion a favor con profit")
                     result = MT5Api.send_close_position(symbol, ticket)
                     if result:
                         if (len(positions) - 1) == 0:
@@ -205,6 +211,7 @@ class Tr3nd:
             positions = MT5Api.get_positions(magic = self.magic)
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+                    print("Tr3nd: Creando orden Hedge")
                     if self.state.value == StateSymbol.bullish:
                         result = MT5Api.send_order(
                             symbol= self.symbol, 
@@ -246,6 +253,7 @@ class Tr3nd:
                         last_profit = position.profit
                         ticket = position.ticket
                 if ticket != 0:
+                    print("Tr3nd: Cerrando posicion contraria con profit")
                     result = MT5Api.send_close_position(symbol, ticket)
                     if result:
                         if (len(positions) - 1) == 0:
@@ -260,6 +268,7 @@ class Tr3nd:
                     break   
     
     def _update_trends(self):
+        print("Tr3nd: Update iniciado")
         # Indica si es la primera vez que inicia el metodo
         first_time = True
         # Symbolo a encontrar los trends
@@ -289,35 +298,43 @@ class Tr3nd:
             if main_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(main_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
-                last_renko = df.iloc[-1]
-                if last_renko['close'] > last_renko['supertrend']:
+                last_bar_renko = df.iloc[-1]
+                if last_bar_renko['close'] > last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
-                elif last_renko['close'] < last_renko['supertrend']:
+                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
+                print(f"Tr3nd: Update - Ultimo ladrillo main_trend: {last_bar_renko}")
+                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                 
             if intermediate_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(intermediate_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
-                last_renko = df.iloc[-1]
-                if last_renko['close'] > last_renko['supertrend']:
+                last_bar_renko = df.iloc[-1]
+                if last_bar_renko['close'] > last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
-                elif last_renko['close'] < last_renko['supertrend']:
+                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
+                    
+                print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend: {last_bar_renko}")
+                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                 
             if fast_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(fast_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
-                last_renko = df.iloc[-1]
-                if last_renko['close'] > last_renko['supertrend']:
+                last_bar_renko = df.iloc[-1]
+                if last_bar_renko['close'] > last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bullish
-                elif last_renko['close'] < last_renko['supertrend']:
+                elif last_bar_renko['close'] < last_bar_renko['supertrend']:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
+                
+                print(f"Tr3nd: Update - Ultimo ladrillo fast_trend: {last_bar_renko}")
+                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                     
             if first_time:
                 first_time = False
