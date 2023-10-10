@@ -305,9 +305,11 @@ class Tr3nd:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
+                print("")
                 print("Tr3nd: Update - Ultimo ladrillo main_trend:")
                 print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                print("")
                 
             if intermediate_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(intermediate_renko.renko_data)
@@ -320,9 +322,11 @@ class Tr3nd:
                 else:
                     self.intermediate_trend.value = StateTr3nd.unassigned
                     
+                print("")
                 print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend:")
                 print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                print("")
                 
             if fast_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(fast_renko.renko_data)
@@ -335,9 +339,11 @@ class Tr3nd:
                 else:
                     self.fast_trend.value = StateTr3nd.unassigned
                 
+                print("")
                 print(f"Tr3nd: Update - Ultimo ladrillo fast_trend:")
                 print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                print("")
                     
             if first_time:
                 first_time = False
