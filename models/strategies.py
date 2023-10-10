@@ -305,7 +305,8 @@ class Tr3nd:
                     self.main_trend.value = StateTr3nd.bearish
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
-                print(f"Tr3nd: Update - Ultimo ladrillo main_trend: {last_bar_renko}")
+                print("Tr3nd: Update - Ultimo ladrillo main_trend:")
+                print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                 
             if intermediate_renko.update_renko(last_bar) or first_time:
@@ -319,7 +320,8 @@ class Tr3nd:
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
                     
-                print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend: {last_bar_renko}")
+                print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend:")
+                print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                 
             if fast_renko.update_renko(last_bar) or first_time:
@@ -333,7 +335,8 @@ class Tr3nd:
                 else:
                     self.main_trend.value = StateTr3nd.unassigned
                 
-                print(f"Tr3nd: Update - Ultimo ladrillo fast_trend: {last_bar_renko}")
+                print(f"Tr3nd: Update - Ultimo ladrillo fast_trend:")
+                print(last_bar_renko)
                 print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
                     
             if first_time:
