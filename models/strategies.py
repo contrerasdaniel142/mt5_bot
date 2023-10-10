@@ -361,13 +361,13 @@ class Tr3nd:
         account_info = MT5Api.get_account_info()
         self.opening_balance_account = account_info.balance
         symbol_info = MT5Api.get_symbol_info(self.symbol)
-        max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
-        if self.volume is None:
-            self.volume = max_volume
-        else:
-            self.volume = round(self.volume, symbol_info.digits)
-            if self.volume > max_volume:
-                self.volume = max_volume
+        # max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
+        # if self.volume is None:
+        #     self.volume = max_volume
+        # else:
+        #     self.volume = round(self.volume, symbol_info.digits)
+        #     if self.volume > max_volume:
+        #         self.volume = max_volume
         # Crea un administrador para multiprocessing
         manager = multiprocessing.Manager()
         # Crea las variables que se administraran entre procesos
