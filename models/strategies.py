@@ -141,7 +141,7 @@ class Tr3nd:
         is_unbalanced = False
         print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
-            if self.main_trend.value != StateTr3nd.unassigned:
+            if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend != StateTr3nd.unassigned and self.fast_trend != StateTr3nd.unassigned:
                 is_unbalanced, no_trade_state = self._trade_to_unbalance(no_trade_state)
                 if is_unbalanced:
                     break
