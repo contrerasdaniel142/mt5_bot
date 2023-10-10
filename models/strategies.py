@@ -164,14 +164,14 @@ class Tr3nd:
                 break
                 
     def _trade_to_unbalance(self, trade_state:TradeState):
-        if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+                        
+        if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
             trade_state = TradeState.ready
             print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
-                
-        if trade_state == TradeState.ready and self.fast_trend.value != self.main_trend.value:
-            trade_state = TradeState.start if self.main_trend.value == self.intermediate_trend.value else TradeState.on
-            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
         
+        if trade_state == TradeState.ready and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+            trade_state = TradeState.start
+            
         if trade_state == TradeState.start and self.fast_trend.value == self.main_trend.value:
             print(f"Tr3nd: Creando orden nueva")
             if self.main_trend == StateTr3nd.bullish:
