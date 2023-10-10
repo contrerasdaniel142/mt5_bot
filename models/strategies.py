@@ -307,37 +307,37 @@ class Tr3nd:
                     self.main_trend.value = StateTr3nd.unassigned
                 print("Tr3nd: Update - Ultimo ladrillo main_trend:")
                 print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
+                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if intermediate_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(intermediate_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_bar_renko = df.iloc[-1]
                 if last_bar_renko['close'] > last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bullish
+                    self.intermediate_trend.value = StateTr3nd.bullish
                 elif last_bar_renko['close'] < last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bearish
+                    self.intermediate_trend.value = StateTr3nd.bearish
                 else:
-                    self.main_trend.value = StateTr3nd.unassigned
+                    self.intermediate_trend.value = StateTr3nd.unassigned
                     
                 print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend:")
                 print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
+                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if fast_renko.update_renko(last_bar) or first_time:
                 df = pd.DataFrame(fast_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERT_10_3.0']
                 last_bar_renko = df.iloc[-1]
                 if last_bar_renko['close'] > last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bullish
+                    self.fast_trend.value = StateTr3nd.bullish
                 elif last_bar_renko['close'] < last_bar_renko['supertrend']:
-                    self.main_trend.value = StateTr3nd.bearish
+                    self.fast_trend.value = StateTr3nd.bearish
                 else:
-                    self.main_trend.value = StateTr3nd.unassigned
+                    self.fast_trend.value = StateTr3nd.unassigned
                 
                 print(f"Tr3nd: Update - Ultimo ladrillo fast_trend:")
                 print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend}] [Intermediate {self.intermediate_trend}] [Fast {self.fast_trend}]")
+                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                     
             if first_time:
                 first_time = False
