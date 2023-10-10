@@ -101,6 +101,7 @@ class Tr3nd:
             return False
     
     def _manage_positions(self):
+        print("tr3nd: Iniciacion administrador de posiciones")
         # Comienza el administrador de posiciones
         while self.is_on.value:
             if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend != StateTr3nd.unassigned and self.fast_trend != StateTr3nd.unassigned:
@@ -359,8 +360,8 @@ class Tr3nd:
         self.intermediate_trend = manager.Value("i", StateTr3nd.unassigned)
         self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
         
-        positions = MT5Api.get_positions(magic = self.magic)
         # Si se vuelve a iniciar el programa y tiene posiciones abiertas les continua haciendo seguimiento
+        positions = MT5Api.get_positions(magic = self.magic)
         if positions:
             if len(positions) % 2 == 0:
                 self.state.value = StateSymbol.balanced
