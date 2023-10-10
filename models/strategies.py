@@ -41,8 +41,7 @@ class StateTr3nd:
 
 class StateSymbol:
     no_trades = 0
-    bullish = 1
-    bearish = -1
+    unbalanced = 1
     balanced = 2
 
 class TradeState:
@@ -102,21 +101,15 @@ class Tr3nd:
             return False
     
     def _manage_positions(self):
-        positions = MT5Api.get_positions(magic = self.magic)
-        # Si se vuelve a iniciar el programa y tiene posiciones abiertas les continua haciendo seguimiento
-        if positions:
-            if len(positions) % 2 == 0:
-                self._balaced_state()
-            else:
-                self._unbalanced_state()
         # Comienza el administrador de posiciones
         while self.is_on.value:
-            if self.state.value == StateSymbol.no_trades:
-                self._no_trade_state()
-            elif self.state.value == StateSymbol.bullish or self.state.value == StateSymbol.bearish:
-                self._unbalanced_state()
-            else:
-                self._balaced_state()
+            if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend != StateTr3nd.unassigned and self.fast_trend != StateTr3nd.unassigned:
+                if self.state.value == StateSymbol.no_trades:
+                    self._no_trade_state()
+                elif self.state.value == StateSymbol.unbalanced:
+                    self._unbalanced_state()
+                else:
+                    self._balaced_state()
     
     def _goal_profit(self)->bool:
         positions = MT5Api.get_positions(magic = self.magic)
@@ -138,13 +131,11 @@ class Tr3nd:
     def _no_trade_state(self):
         print("Tr3nd: Estado sin Trade")
         no_trade_state = TradeState.on
-        is_unbalanced = False
         print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
-            if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend != StateTr3nd.unassigned and self.fast_trend != StateTr3nd.unassigned:
-                is_unbalanced, no_trade_state = self._trade_to_unbalance(no_trade_state)
-                if is_unbalanced:
-                    break
+            no_trade_state = self._trade_to_unbalance(no_trade_state)
+            if self.state == StateSymbol.unbalanced:
+                break
                 
     def _trade_to_unbalance(self, trade_state:TradeState):
         if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
@@ -164,7 +155,6 @@ class Tr3nd:
                         volume=self.volume,
                         comment="+1"
                         )
-                self.state.value = StateSymbol.bullish
             else:
                 result = MT5Api.send_order(
                         symbol= self.symbol, 
@@ -172,15 +162,16 @@ class Tr3nd:
                         volume=self.volume,
                         comment="-1"
                         )
-                self.state.value = StateSymbol.bearish
+            
+            self.state.value = StateSymbol.unbalanced
                 
             if result is None:
                 trade_state = TradeState.on
                 self.state.value = StateSymbol.no_trades
             else:
-                return True, trade_state
+                return trade_state
             print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
-        return False, trade_state
+        return trade_state
         
     def _unbalanced_state(self):
         print("Tr3nd: Estado desbalanceado")
@@ -212,7 +203,7 @@ class Tr3nd:
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value:
                     print("Tr3nd: Creando orden Hedge")
-                    if self.state.value == StateSymbol.bullish:
+                    if self.main_trend.value == StateTr3nd.bullish:
                         result = MT5Api.send_order(
                             symbol= self.symbol, 
                             order_type= OrderType.MARKET_SELL, 
@@ -233,17 +224,14 @@ class Tr3nd:
     def _balaced_state(self):
         print("Tr3nd: Estado balanceado")
         unbalanced_trade_state = TradeState.on
-        is_unbalanced = False
         while self.is_on.value:
             positions = MT5Api.get_positions(magic = self.magic)
             if self.main_trend.value != self.fast_trend.value:
                 positions = MT5Api.get_positions(magic = self.magic)
                 if self.main_trend.value == StateTr3nd.bullish:
                     positions = [position for position in positions if position.type == OrderType.MARKET_SELL]
-                    state = StateSymbol.bullish
                 else:
                     positions = [position for position in positions if position.type == OrderType.MARKET_BUY]
-                    state = StateSymbol.bearish
 
                 last_profit = 0
                 ticket = 0
@@ -259,12 +247,12 @@ class Tr3nd:
                         if (len(positions) - 1) == 0:
                             self.state.value = StateSymbol.no_trades
                         else:
-                            self.state.value = state
+                            self.state.value = StateSymbol.unbalanced
                         break
                         
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
-                is_unbalanced, unbalanced_trade_state = self._trade_to_unbalance(unbalanced_trade_state)
-                if is_unbalanced:
+                unbalanced_trade_state = self._trade_to_unbalance(unbalanced_trade_state)
+                if self.state.value == StateSymbol.unbalanced:
                     break   
     
     def _update_trends(self):
@@ -370,6 +358,14 @@ class Tr3nd:
         self.main_trend = manager.Value("i", StateTr3nd.unassigned)
         self.intermediate_trend = manager.Value("i", StateTr3nd.unassigned)
         self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
+        
+        positions = MT5Api.get_positions(magic = self.magic)
+        # Si se vuelve a iniciar el programa y tiene posiciones abiertas les continua haciendo seguimiento
+        if positions:
+            if len(positions) % 2 == 0:
+                self.state.value = StateSymbol.balanced
+            else:
+                self.state.value = StateSymbol.unbalanced
         
         # Crea los procesos y los inicia
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
