@@ -50,9 +50,7 @@ class vRenko:
             if self._current_brick is None:
                 close = rate['close']
                 open = rate['open']
-                diff = abs(close - open)
-                if diff < self.brick_size:
-                    continue
+                
                 quantity_high = int(rate['open']/self.brick_size)
                 quantity_low = int(rate['close']/self.brick_size)
                 
