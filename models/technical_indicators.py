@@ -113,8 +113,13 @@ class vRenko:
             brick_count = price_diff // self.brick_size
                     
             for i in range(int(brick_count)):
+                
+                unix = rate['time']
+                time = datetime.fromtimestamp(unix)
+                convert_time = convert_time_to_mt5(time)
+                self._current_brick['time'] = convert_time
+                
                 if 'up' in type:
-                    self._current_brick['time'] = convert_time_to_mt5(datetime.fromtimestamp(rate['time']))
                     self._current_brick['type'] = 'up'
                     self._current_brick['open'] = self._current_brick['close'] if type == 'up' else self._current_brick['open']
                     self._current_brick['close'] = self._current_brick['open'] + self.brick_size
@@ -123,7 +128,6 @@ class vRenko:
                     self._current_brick['last_low'] = None
                     type = 'up'
                 elif 'down' in type:
-                    self._current_brick['time'] = convert_time_to_mt5(datetime.fromtimestamp(rate['time']))
                     self._current_brick['type'] = 'down'
                     self._current_brick['open'] = self._current_brick['close'] if type == 'down' else self._current_brick['open']
                     self._current_brick['close'] = self._current_brick['open'] - self.brick_size
