@@ -147,19 +147,22 @@ class vRenko:
         
         return False         
             
-    def update_renko(self, rate)-> bool:
+    def update_renko(self, rates)-> bool:
         """
-        Actualiza el gráfico Renko basado en la barra proporcionada de MT5.
+        Actualiza el gráfico Renko basado en la barras proporcionada de MT5.
 
         Args:
-            rate (Tuple): Información de una barra de precios de MT5.
+            rates (ndarray): Información de una o varias barra de precios de MT5.
         Returns:
             bool: retorna verdadero si se agrego uno o mas ladrillos, en caso contrario False
         """
-        result = False
+        is_update = False
         if self.renko_data.size != 0:
-            result = self._add_bricks(rate)
-        return result
+            for rate in rates:
+                result = self._add_bricks(rate)
+                if result:
+                    is_update = True
+        return is_update
         
     def get_renko_data(self):
         """
