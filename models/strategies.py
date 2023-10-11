@@ -157,13 +157,13 @@ class Tr3nd:
     def _no_trade_state(self):
         print("Tr3nd: Estado sin Trade")
         no_trade_state = TradeState.on
-        print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
+        #print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
-            no_trade_state = self._trade_to_unbalance(no_trade_state)
+            self._trade_to_unbalance()
             if self.state.value == StateSymbol.unbalanced:
                 break
                 
-    def _trade_to_unbalance(self, trade_state:TradeState):
+    def _trade_to_unbalance_2(self, trade_state:TradeState):
                         
         if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
             trade_state = TradeState.ready
@@ -211,7 +211,32 @@ class Tr3nd:
                 return trade_state
             print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
         return trade_state
-        
+     
+    def _trade_to_unbalance(self):               
+        if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+            print(f"Tr3nd: Creando orden nueva")
+            if self.main_trend.value == StateTr3nd.bullish:
+                result = MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= OrderType.MARKET_BUY, 
+                        volume=self.volume,
+                        comment="+1",
+                        magic=self.magic
+                        )
+            else:
+                result = MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= OrderType.MARKET_SELL, 
+                        volume=self.volume,
+                        comment="-1",
+                        magic=self.magic
+                        )
+            
+            self.state.value = StateSymbol.unbalanced
+                
+            if result is None:
+                self.state.value = StateSymbol.no_trades
+          
     def _unbalanced_state(self):
         print("Tr3nd: Estado desbalanceado")
         while self.is_on.value:
