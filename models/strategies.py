@@ -87,7 +87,7 @@ class Tr3nd:
             bool: True si se encuentra en horario de mercado, False si no lo está.
         """
         # Obtener la hora y minutos actuales en UTC
-        current_time = datetime.now(pytz.utc) + timedelta(days=self._market_opening_time['day'])
+        current_time = datetime.now(pytz.utc) #+ timedelta(days=self._market_opening_time['day'])
 
         # Crear objetos time para el horario de apertura y cierre del mercado
         market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
@@ -306,7 +306,7 @@ class Tr3nd:
         atr_period = self.atr_period
         multiplier = self.multiplier
         # Obtiene las barras desde mt5
-        symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 7200)
+        symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
         # Establece el tamaño de los ladrillos de los renkos
         main_size = self.size_renko
         intermediate_size = main_size/2
