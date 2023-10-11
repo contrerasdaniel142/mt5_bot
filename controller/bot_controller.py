@@ -189,7 +189,8 @@ class BotController:
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
                 symbol=symbol,
-                size_renko= 20
+                size_renko= 20,
+                volume=5
                 )
             tr3nd.start()
             

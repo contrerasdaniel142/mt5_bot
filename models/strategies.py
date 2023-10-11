@@ -60,7 +60,7 @@ class Tr3nd:
         # Maximo intentos de desbalance permitidos en la estregia
         self.max_unbalanced = 3
         # Volumen de las ordenes
-        self.volume = volume
+        self.volume = float(volume)
         # Estado el activo
         self.state = StateSymbol.no_trades
         # Tamaño del ladrillo del renko principal
