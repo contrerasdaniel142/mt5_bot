@@ -44,17 +44,21 @@ class StateSymbol:
     unbalanced = 1
     balanced = 2
 
-class TradeState:
-    on = 0
-    ready = 1
-    start = 3
+class TrendSignal:
+    anticipating = 0
+    rady_main = 1
+    ready_intermediate = 2
+    ready_fast = 3
+    buy = 4
+    
+    
 
 class Tr3nd:
     def __init__(self, symbol: str, volume: float = None, size_renko:float = 40, atr_period:int = 10, multiplier:int = 3) -> None:
         # Numero identificador de la estretegia
         self.magic = 40
         # Indica si la estrategia esta activa
-        self.is_on = None
+        self.is_on = True
         # Activo a tradear
         self.symbol = symbol
         # Maximo intentos de desbalance permitidos en la estregia
@@ -78,7 +82,6 @@ class Tr3nd:
         self._market_closed_time = {'hour':19, 'minute':45}
         self.opening_balance_account = 0
         
-    
     def _is_in_market_hours(self):
         """
         Comprueba si el momento actual se encuentra en horario de mercado.
@@ -156,34 +159,32 @@ class Tr3nd:
             
     def _no_trade_state(self):
         print("Tr3nd: Estado sin Trade")
-        no_trade_state = TradeState.on
+        trend_signal = TrendSignal.anticipating
         #print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
-            self._trade_to_unbalance()
+            trend_signal = self._trade_to_unbalance(trend_signal)
             if self.state.value == StateSymbol.unbalanced:
                 break
                 
-    def _trade_to_unbalance_2(self, trade_state:TradeState):
-                        
-        if trade_state == TradeState.on and self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
-            trade_state = TradeState.ready
-            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
+    def _trade_to_unbalance(self, trend_signal:TrendSignal):
+               
+        if trend_signal == TrendSignal.anticipating:
+            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
+                 trend_signal = TrendSignal.ready_fast
+            elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                trend_signal = TrendSignal.ready_intermediate
         
-        if trade_state == TradeState.ready and self.fast_trend.value != self.main_trend.value:
-            if self.main_trend.value == self.intermediate_trend.value:
-                trade_state = TradeState.start 
-            else:
-                trade_state = TradeState.on
-            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
+        if trend_signal == TrendSignal.ready_fast:
+            if self.intermediate_trend.value != self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+                trend_signal = TrendSignal.anticipating
+            elif self.fast_trend.value == self.main_trend.value:
+                trend_signal = TrendSignal.buy
         
-        if trade_state == TradeState.start and self.main_trend.value == self.fast_trend.value:
-            if self.main_trend.value == self.intermediate_trend.value:
-                trade_state = TradeState.start
-            else:
-                trade_state = TradeState.on
-            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
-            
-        if trade_state == TradeState.start and self.fast_trend.value == self.main_trend.value:
+        elif trend_signal == TrendSignal.ready_intermediate:
+            if self.intermediate_trend.value == self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+                trend_signal = TrendSignal.buy
+                            
+        if trend_signal == TrendSignal.buy:
             print(f"Tr3nd: Creando orden nueva")
             if self.main_trend.value == StateTr3nd.bullish:
                 result = MT5Api.send_order(
@@ -195,7 +196,7 @@ class Tr3nd:
                         )
             else:
                 result = MT5Api.send_order(
-                        symbol= self.symbol, 
+                        symbol= self.symbol,
                         order_type= OrderType.MARKET_SELL, 
                         volume=self.volume,
                         comment="-1",
@@ -205,38 +206,14 @@ class Tr3nd:
             self.state.value = StateSymbol.unbalanced
                 
             if result is None:
-                trade_state = TradeState.on
+                trend_signal = TrendSignal.anticipating
                 self.state.value = StateSymbol.no_trades
             else:
-                return trade_state
-            print(f"Tr3nd: [Estado para nueva orden {trade_state}]")
-        return trade_state
-     
-    def _trade_to_unbalance(self):               
-        if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
-            print(f"Tr3nd: Creando orden nueva")
-            if self.main_trend.value == StateTr3nd.bullish:
-                result = MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= OrderType.MARKET_BUY, 
-                        volume=self.volume,
-                        comment="+1",
-                        magic=self.magic
-                        )
-            else:
-                result = MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= OrderType.MARKET_SELL, 
-                        volume=self.volume,
-                        comment="-1",
-                        magic=self.magic
-                        )
-            
-            self.state.value = StateSymbol.unbalanced
-                
-            if result is None:
-                self.state.value = StateSymbol.no_trades
-          
+                return trend_signal
+            print(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
+        
+        return trend_signal
+               
     def _unbalanced_state(self):
         print("Tr3nd: Estado desbalanceado")
         while self.is_on.value:
@@ -265,7 +242,7 @@ class Tr3nd:
                 
             positions = MT5Api.get_positions(magic = self.magic)
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
-                if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+                if self.main_trend.value != self.intermediate_trend.value:
                     print("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
                         result = MT5Api.send_order(
@@ -289,10 +266,12 @@ class Tr3nd:
                     
     def _balaced_state(self):
         print("Tr3nd: Estado balanceado")
-        unbalanced_trade_state = TradeState.on
+        trend_signal = TrendSignal.anticipating
+        hedge_state
+        #print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
             positions = MT5Api.get_positions(magic = self.magic)
-            if self.main_trend.value != self.fast_trend.value:
+            if self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
                 positions = MT5Api.get_positions(magic = self.magic)
                 if self.main_trend.value == StateTr3nd.bullish:
                     positions = [position for position in positions if position.type == OrderType.MARKET_SELL]
@@ -317,9 +296,9 @@ class Tr3nd:
                         break
                         
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
-                self._trade_to_unbalance()
+                trend_signal = self._trade_to_unbalance(trend_signal)
                 if self.state.value == StateSymbol.unbalanced:
-                    break   
+                    break 
     
     def _update_trends(self):
         print("Tr3nd: Update iniciado")
@@ -355,37 +334,28 @@ class Tr3nd:
                 df = pd.DataFrame(main_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
-                self.main_trend.value = last_bar_renko['supertrend']
-                
-                print("")
-                print("Tr3nd: Update - Ultimo ladrillo main_trend:")
-                print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                print("")
+                if self.main_trend.value != last_bar_renko['supertrend']:
+                    self.main_trend.value = last_bar_renko['supertrend']
+                    print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    print("")
                 
             if first_time or intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
-                self.intermediate_trend.value = last_bar_renko['supertrend']
-
-                print("")
-                print(f"Tr3nd: Update - Ultimo ladrillo intermediate_trend:")
-                print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                print("")
+                if self.intermediate_trend.value != last_bar_renko['supertrend']:
+                    self.intermediate_trend.value = last_bar_renko['supertrend']
+                    print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    print("")
                 
             if first_time or fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
-                self.fast_trend.value = last_bar_renko['supertrend']
-                
-                print("")
-                print(f"Tr3nd: Update - Ultimo ladrillo fast_trend:")
-                print(last_bar_renko)
-                print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                print("")
+                if self.fast_trend.value != last_bar_renko['supertrend']:
+                    self.fast_trend.value = last_bar_renko['supertrend']
+                    print(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    print("")
                     
             if first_time:
                 first_time = False
