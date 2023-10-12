@@ -339,7 +339,6 @@ class Tr3nd:
                 if self.main_trend.value != last_bar_renko['supertrend']:
                     self.main_trend.value = last_bar_renko['supertrend']
                     self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                    self._telegram_api.send_message("")
                 
             if first_time or intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
@@ -348,7 +347,6 @@ class Tr3nd:
                 if self.intermediate_trend.value != last_bar_renko['supertrend']:
                     self.intermediate_trend.value = last_bar_renko['supertrend']
                     self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                    self._telegram_api.send_message("")
                 
             if first_time or fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
@@ -357,7 +355,6 @@ class Tr3nd:
                 if self.fast_trend.value != last_bar_renko['supertrend']:
                     self.fast_trend.value = last_bar_renko['supertrend']
                     self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
-                    self._telegram_api.send_message("")
                     
             if first_time:
                 first_time = False

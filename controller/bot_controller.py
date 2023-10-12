@@ -182,9 +182,7 @@ class BotController:
         MT5Api.initialize(4)
         MT5Api.shutdown()
                         
-        while True:
-            self._telegram_api.send_message("")
-            
+        while True:            
             #self._sleep_to_next_market_opening(False)
             
             # Se crea el objeto de la estrategia Tr3nd y se inicia
