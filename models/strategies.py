@@ -267,7 +267,6 @@ class Tr3nd:
     def _balaced_state(self):
         print("Tr3nd: Estado balanceado")
         trend_signal = TrendSignal.anticipating
-        hedge_state
         #print(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
             positions = MT5Api.get_positions(magic = self.magic)
