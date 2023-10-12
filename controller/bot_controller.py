@@ -36,7 +36,6 @@ class BotController:
         self._market_opening_time = {'day':1,'hour':0, 'minute':0}
         self._market_closed_time = {'hour':19, 'minute':45}
         self._alpaca_api = AlpacaApi()
-        self._telegram_api = TelegramApi()
 
     #region utilities
     def _get_business_hours_today(self):
@@ -53,10 +52,10 @@ class BotController:
             horas_mercado = mi_instancia.get_business_hours_today()
             
             if horas_mercado:
-                self._telegram_api.send_message(f"Hora de apertura del mercado: {horas_mercado['open']}")
-                self._telegram_api.send_message(f"Hora de cierre del mercado: {horas_mercado['close']}")
+                TelegramApi.send_message(f"Hora de apertura del mercado: {horas_mercado['open']}")
+                TelegramApi.send_message(f"Hora de cierre del mercado: {horas_mercado['close']}")
             else:
-                self._telegram_api.send_message("Hoy no hubo mercado.")
+                TelegramApi.send_message("Hoy no hubo mercado.")
         """
         # Obtiene la hora de apertura y cierre del mercado para el dia de hoy en el horario de estados unidos
         calendar_today = self._alpaca_api.get_next_days_of_market(0)
@@ -86,7 +85,7 @@ class BotController:
         if market_open <= current_time <= market_close and self._get_business_hours_today():
             return True
         else:
-            self._telegram_api.send_text("El mercado está cerrado.")
+            TelegramApi.send_text("El mercado está cerrado.")
             return False
 
     def _sleep_to_next_market_opening(self, sleep_in_market:bool = True):
@@ -100,10 +99,10 @@ class BotController:
         """
         
         if sleep_in_market == False and self._is_in_market_hours():
-            self._telegram_api.send_text("El mercado está abierto")
+            TelegramApi.send_text("El mercado está abierto")
             return
         
-        self._telegram_api.send_text("Obteniendo proxima apertura de mercado...")
+        TelegramApi.send_text("Obteniendo proxima apertura de mercado...")
     
         # Obtener la hora actual en UTC
         current_time = datetime.now(pytz.utc)
@@ -120,18 +119,18 @@ class BotController:
             if current_time < next_market_open:
                 break
             
-        self._telegram_api.send_text("Hora actual utc: ", current_time)
-        self._telegram_api.send_text("Apertura del mercado utc: ", next_market_open)
+        TelegramApi.send_text("Hora actual utc: ", current_time)
+        TelegramApi.send_text("Apertura del mercado utc: ", next_market_open)
         
         # Calcular la cantidad de segundos que faltan hasta la apertura
         seconds_until_open = (next_market_open - current_time).total_seconds()
         
-        self._telegram_api.send_text(f"Esperando {seconds_until_open} segundos hasta la apertura...")
+        TelegramApi.send_text(f"Esperando {seconds_until_open} segundos hasta la apertura...")
         time.sleep(seconds_until_open)
     
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        self._telegram_api.send_text("Hora actual utc: ", current_time)
+        TelegramApi.send_text("Hora actual utc: ", current_time)
     
     def sleep_until_market_closes(self,):
         """Espera hasta el cierre del mercado.
@@ -153,8 +152,8 @@ class BotController:
         
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        self._telegram_api.send_text("Hora actual utc: ", current_time)
-        self._telegram_api.send_text("El Mercado esta cerrado")
+        TelegramApi.send_text("Hora actual utc: ", current_time)
+        TelegramApi.send_text("El Mercado esta cerrado")
     
     
     #endregion
@@ -173,7 +172,7 @@ class BotController:
         Returns:
             None
         """
-        self._telegram_api.send_text("Iniciando bot..")
+        TelegramApi.send_text("Iniciando bot..")
                 
         # Establece los symbolos
         symbol= "US30.cash"
@@ -187,7 +186,6 @@ class BotController:
             
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
-                telegram_api= self._telegram_api,
                 symbol=symbol,
                 size_renko= 20,
                 volume=5,

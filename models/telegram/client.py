@@ -11,15 +11,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class TelegramApi:
-    def __init__(self) -> None:
-        self._group_id = int(os.getenv("GROUP_ID"))
-
-    def _get_bot(self):
-        return telegram.Bot(token=os.getenv("TELEGRAM_TOKEN"))
-
-    def send_text(self, text):
+    def send_text(text):
         print(text)
-        bot = self._get_bot()
-        asyncio.run(bot.send_message(chat_id=self._group_id, text=text))
+        bot = telegram.Bot(token=os.getenv("TELEGRAM_TOKEN"))
+        asyncio.run(bot.send_message(chat_id=int(os.getenv("GROUP_ID")), text=text))
 
 
