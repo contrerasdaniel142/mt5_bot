@@ -174,8 +174,10 @@ class Tr3nd:
                  trend_signal = TrendSignal.ready_fast
             elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                 trend_signal = TrendSignal.ready_intermediate
-            # elif self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
-            #     trend_signal = TrendSignal.buy
+            positions = MT5Api.get_positions(magic = self.magic)
+            if positions is not None and not positions:
+                if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+                    trend_signal = TrendSignal.buy
         
         if trend_signal == TrendSignal.ready_fast:
             if self.intermediate_trend.value != self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
