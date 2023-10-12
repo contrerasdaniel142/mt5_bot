@@ -17,5 +17,6 @@ class TelegramApi:
 
     def send_message(self, text):
         print(text)
-        asyncio.run(self._bot.send_message(chat_id=self._group_id, text=text))
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.run(self._bot.send_message(chat_id=self._group_id, text=text)))
 
