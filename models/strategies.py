@@ -101,7 +101,7 @@ class Tr3nd:
         if market_open <= current_time <= market_close:
             return True
         else:
-            self._telegram_api.send_message("El mercado está cerrado.")
+            self._telegram_api.send_text("El mercado está cerrado.")
             return False
         
     def _sleep_to_next_minute(self):
@@ -130,7 +130,7 @@ class Tr3nd:
         time.sleep(seconds)
     
     def _manage_positions(self):
-        self._telegram_api.send_message("tr3nd: Iniciacion administrador de posiciones")
+        self._telegram_api.send_text("tr3nd: Iniciacion administrador de posiciones")
         # Comienza el administrador de posiciones
         while self.is_on.value:
             if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend.value != StateTr3nd.unassigned and self.fast_trend.value != StateTr3nd.unassigned:
@@ -159,7 +159,7 @@ class Tr3nd:
         return False
             
     def _no_trade_state(self):
-        self._telegram_api.send_message("Tr3nd: Estado sin Trade")
+        self._telegram_api.send_text("Tr3nd: Estado sin Trade")
         trend_signal = TrendSignal.anticipating
         #self._telegram_api.send_message(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
@@ -188,7 +188,7 @@ class Tr3nd:
                 trend_signal = TrendSignal.buy
                             
         if trend_signal == TrendSignal.buy:
-            self._telegram_api.send_message(f"Tr3nd: Creando orden nueva")
+            self._telegram_api.send_text(f"Tr3nd: Creando orden nueva")
             if self.main_trend.value == StateTr3nd.bullish:
                 result = MT5Api.send_order(
                         symbol= self.symbol, 
@@ -213,12 +213,12 @@ class Tr3nd:
                 self.state.value = StateSymbol.no_trades
             else:
                 return trend_signal
-            self._telegram_api.send_message(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
+            self._telegram_api.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
         return trend_signal
                
     def _unbalanced_state(self):
-        self._telegram_api.send_message("Tr3nd: Estado desbalanceado")
+        self._telegram_api.send_text("Tr3nd: Estado desbalanceado")
         while self.is_on.value:
             if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
                 positions = MT5Api.get_positions(magic = self.magic)
@@ -234,7 +234,7 @@ class Tr3nd:
                         last_profit = position.profit
                         ticket = position.ticket
                 if ticket != 0:
-                    self._telegram_api.send_message("Tr3nd: Cerrando posicion a favor con profit")
+                    self._telegram_api.send_text("Tr3nd: Cerrando posicion a favor con profit")
                     result = MT5Api.send_close_position(symbol, ticket)
                     if result:
                         if (len(positions) - 1) == 0:
@@ -246,7 +246,7 @@ class Tr3nd:
             positions = MT5Api.get_positions(magic = self.magic)
             if positions is not None and len(positions) < self.max_positions:
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
-                    self._telegram_api.send_message("Tr3nd: Creando orden Hedge")
+                    self._telegram_api.send_text("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
                         result = MT5Api.send_order(
                             symbol= self.symbol, 
@@ -268,7 +268,7 @@ class Tr3nd:
                         break
                     
     def _balaced_state(self):
-        self._telegram_api.send_message("Tr3nd: Estado balanceado")
+        self._telegram_api.send_text("Tr3nd: Estado balanceado")
         trend_signal = TrendSignal.anticipating
         #self._telegram_api.send_message(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
@@ -288,7 +288,7 @@ class Tr3nd:
                         last_profit = position.profit
                         ticket = position.ticket
                 if ticket != 0:
-                    self._telegram_api.send_message("Tr3nd: Cerrando posicion contraria con profit")
+                    self._telegram_api.send_text("Tr3nd: Cerrando posicion contraria con profit")
                     result = MT5Api.send_close_position(symbol, ticket)
                     if result:
                         if (len(positions) - 1) == 0:
@@ -303,7 +303,7 @@ class Tr3nd:
                     break 
     
     def _update_trends(self):
-        self._telegram_api.send_message("Tr3nd: Update iniciado")
+        self._telegram_api.send_text("Tr3nd: Update iniciado")
         # Indica si es la primera vez que inicia el metodo
         first_time = True
         # Symbolo a encontrar los trends
@@ -338,7 +338,7 @@ class Tr3nd:
                 last_bar_renko = df.iloc[-1]
                 if self.main_trend.value != last_bar_renko['supertrend']:
                     self.main_trend.value = last_bar_renko['supertrend']
-                    self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    self._telegram_api.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if first_time or intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
@@ -346,7 +346,7 @@ class Tr3nd:
                 last_bar_renko = df.iloc[-1]
                 if self.intermediate_trend.value != last_bar_renko['supertrend']:
                     self.intermediate_trend.value = last_bar_renko['supertrend']
-                    self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    self._telegram_api.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if first_time or fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
@@ -354,14 +354,14 @@ class Tr3nd:
                 last_bar_renko = df.iloc[-1]
                 if self.fast_trend.value != last_bar_renko['supertrend']:
                     self.fast_trend.value = last_bar_renko['supertrend']
-                    self._telegram_api.send_message(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
+                    self._telegram_api.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                     
             if first_time:
                 first_time = False
                 
     
     def start(self):
-        self._telegram_api.send_message(f"Tr3nd: Iniciando estrategia para {self.symbol}...")
+        self._telegram_api.send_text(f"Tr3nd: Iniciando estrategia para {self.symbol}...")
         # Establece el volumen para las ordenes
         account_info = MT5Api.get_account_info()
         self.opening_balance_account = account_info.balance
@@ -400,6 +400,6 @@ class Tr3nd:
         update_trends_process.join()
         
         # Fin del ciclo
-        self._telegram_api.send_message("HardHedge: Finalizando estrategia...")
+        self._telegram_api.send_text("HardHedge: Finalizando estrategia...")
         
 

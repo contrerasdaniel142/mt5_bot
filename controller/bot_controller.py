@@ -86,7 +86,7 @@ class BotController:
         if market_open <= current_time <= market_close and self._get_business_hours_today():
             return True
         else:
-            self._telegram_api.send_message("El mercado está cerrado.")
+            self._telegram_api.send_text("El mercado está cerrado.")
             return False
 
     def _sleep_to_next_market_opening(self, sleep_in_market:bool = True):
@@ -100,10 +100,10 @@ class BotController:
         """
         
         if sleep_in_market == False and self._is_in_market_hours():
-            self._telegram_api.send_message("El mercado está abierto")
+            self._telegram_api.send_text("El mercado está abierto")
             return
         
-        self._telegram_api.send_message("Obteniendo proxima apertura de mercado...")
+        self._telegram_api.send_text("Obteniendo proxima apertura de mercado...")
     
         # Obtener la hora actual en UTC
         current_time = datetime.now(pytz.utc)
@@ -120,18 +120,18 @@ class BotController:
             if current_time < next_market_open:
                 break
             
-        self._telegram_api.send_message("Hora actual utc: ", current_time)
-        self._telegram_api.send_message("Apertura del mercado utc: ", next_market_open)
+        self._telegram_api.send_text("Hora actual utc: ", current_time)
+        self._telegram_api.send_text("Apertura del mercado utc: ", next_market_open)
         
         # Calcular la cantidad de segundos que faltan hasta la apertura
         seconds_until_open = (next_market_open - current_time).total_seconds()
         
-        self._telegram_api.send_message(f"Esperando {seconds_until_open} segundos hasta la apertura...")
+        self._telegram_api.send_text(f"Esperando {seconds_until_open} segundos hasta la apertura...")
         time.sleep(seconds_until_open)
     
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        self._telegram_api.send_message("Hora actual utc: ", current_time)
+        self._telegram_api.send_text("Hora actual utc: ", current_time)
     
     def sleep_until_market_closes(self,):
         """Espera hasta el cierre del mercado.
@@ -153,8 +153,8 @@ class BotController:
         
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        self._telegram_api.send_message("Hora actual utc: ", current_time)
-        self._telegram_api.send_message("El Mercado esta cerrado")
+        self._telegram_api.send_text("Hora actual utc: ", current_time)
+        self._telegram_api.send_text("El Mercado esta cerrado")
     
     
     #endregion
@@ -173,7 +173,7 @@ class BotController:
         Returns:
             None
         """
-        self._telegram_api.send_message("Iniciando bot..")
+        self._telegram_api.send_text("Iniciando bot..")
                 
         # Establece los symbolos
         symbol= "US30.cash"
