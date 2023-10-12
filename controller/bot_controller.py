@@ -190,7 +190,9 @@ class BotController:
             tr3nd = Tr3nd(
                 symbol=symbol,
                 size_renko= 20,
-                volume=5
+                volume=5,
+                atr_period=7,
+                multiplier=2.0
                 )
             tr3nd.start()
             

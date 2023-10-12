@@ -317,7 +317,7 @@ class Tr3nd:
                         break
                         
             if positions is not None and (len(positions)/2) < self.max_unbalanced:
-                unbalanced_trade_state = self._trade_to_unbalance(unbalanced_trade_state)
+                self._trade_to_unbalance()
                 if self.state.value == StateSymbol.unbalanced:
                     break   
     
@@ -353,7 +353,7 @@ class Tr3nd:
             last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
             if first_time or main_renko.update_renko(last_bar):
                 df = pd.DataFrame(main_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 self.main_trend.value = last_bar_renko['supertrend']
                 
@@ -365,7 +365,7 @@ class Tr3nd:
                 
             if first_time or intermediate_renko.update_renko(last_bar):
                 df = pd.DataFrame(intermediate_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 self.intermediate_trend.value = last_bar_renko['supertrend']
 
@@ -377,7 +377,7 @@ class Tr3nd:
                 
             if first_time or fast_renko.update_renko(last_bar):
                 df = pd.DataFrame(fast_renko.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier)['SUPERTd_10_3.0']
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 self.fast_trend.value = last_bar_renko['supertrend']
                 
