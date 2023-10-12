@@ -1,6 +1,9 @@
 # Importaciones necesarias para manejar telegram
 import telegram
-from telegram.ext import Updater
+from telegram import Update
+
+import asyncio
+
 # Importación de módulos externos
 import os
 from dotenv import load_dotenv
@@ -10,14 +13,9 @@ load_dotenv()
 class TelegramApi:
     def __init__(self) -> None:
         self._bot = telegram.Bot(token=os.getenv("TELEGRAM_TOKEN"))
-        
-        
+        self._group_id = int(os.getenv("GROUP_ID"))
 
+    def send_message(self, text):
+        print(text)
+        asyncio.run(self._bot.send_message(chat_id=self._group_id, text=text))
 
-      
-# Initialize the bot
-bot = telegram.Bot(token=os.getenv("TELEGRAM_TOKEN"))
-bot.initialize()
-
-# Now you can access the properties or methods of the bot
-print(bot.can_join_groups)
