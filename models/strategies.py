@@ -62,7 +62,7 @@ class Tr3nd:
         # Activo a tradear
         self.symbol = symbol
         # Maximo intentos de desbalance permitidos en la estregia
-        self.max_unbalanced = 3
+        self.max_positions = 6
         # Volumen de las ordenes
         self.volume = float(volume)
         # Estado el activo
@@ -243,8 +243,8 @@ class Tr3nd:
                         break
                 
             positions = MT5Api.get_positions(magic = self.magic)
-            if positions is not None and (len(positions)/2) < self.max_unbalanced:
-                if self.main_trend.value != self.intermediate_trend.value:
+            if positions is not None and len(positions) < self.max_positions:
+                if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
                     print("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
                         result = MT5Api.send_order(
@@ -296,7 +296,7 @@ class Tr3nd:
                             self.state.value = StateSymbol.unbalanced
                         break
                         
-            if positions is not None and (len(positions)/2) < self.max_unbalanced:
+            if positions is not None and len(positions) < self.max_positions:
                 trend_signal = self._trade_to_unbalance(trend_signal)
                 if self.state.value == StateSymbol.unbalanced:
                     break 
