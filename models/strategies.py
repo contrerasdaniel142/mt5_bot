@@ -53,7 +53,7 @@ class TrendSignal:
     
 
 class Tr3nd:
-    def __init__(self, telegram_api: TelegramApi, symbol: str, volume: float = None, size_renko:float = 40, atr_period:int = 10, multiplier:int = 3) -> None:
+    def __init__(self, telegram_api: TelegramApi, symbol: str, volume: float = None, size_renko:float = 40, atr_period:int = 10, multiplier:float = 3.0) -> None:
         # Api de telegram para enviar mensajes
         self._telegram_api = telegram_api
         # Numero identificador de la estretegia
