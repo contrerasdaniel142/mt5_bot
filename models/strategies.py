@@ -219,8 +219,14 @@ class Tr3nd:
                
     def _unbalanced_state(self):
         TelegramApi.send_text("Tr3nd: Estado desbalanceado")
+        take_profit = False
         while self.is_on.value:
             if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
+                take_profit = True
+            elif self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+                take_profit = True
+                            
+            if take_profit:
                 positions = MT5Api.get_positions(magic = self.magic)
                 if self.main_trend.value == StateTr3nd.bullish:
                     positions = [position for position in positions if position.type == OrderType.MARKET_BUY]
@@ -306,17 +312,22 @@ class Tr3nd:
         TelegramApi.send_text("Tr3nd: Update iniciado")
         # Indica si es la primera vez que inicia el metodo
         first_time = True
+        
         # Symbolo a encontrar los trends
         symbol = self.symbol
+
         # Se establecen las variables para el supertrend
         atr_period = self.atr_period
         multiplier = self.multiplier
+        
         # Obtiene las barras desde mt5
         symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
+        
         # Establece el tamaño de los ladrillos de los renkos
         main_size = self.size_renko
         intermediate_size = main_size/2
         fast_size = intermediate_size/2
+        
         # Establece y calcula los renkos
         main_renko = vRenko(main_size)
         main_renko.calculate_renko(symbol_rates)
@@ -324,6 +335,7 @@ class Tr3nd:
         intermediate_renko.calculate_renko(symbol_rates)
         fast_renko = vRenko(fast_size)
         fast_renko.calculate_renko(symbol_rates)
+        
         while self.is_on.value:
             
             # Se cerciora que alcance el profit diario para terminar el programa
@@ -335,6 +347,7 @@ class Tr3nd:
             if not first_time:
                 self._sleep_to_next_minute()
             last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+            
             if first_time or main_renko.update_renko(last_bar):
                 df = pd.DataFrame(main_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
