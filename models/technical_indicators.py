@@ -7,7 +7,8 @@
 
 #region Importaciones
 # Para realizar operaciones numéricas eficientes
-import numpy as np 
+import numpy as np
+import pandas_ta as ta 
 
 # Importaciones para el manejo de datos
 from .mt5.enums import FieldType
@@ -55,18 +56,16 @@ class vRenko:
                 quantity_low = int(rate['close']/self.brick_size)
                 
                 if open > close:
-                    open = (quantity_high * self.brick_size)
+                    close = (quantity_high * self.brick_size)
                     type = 'down'
                 else:
-                    open = (quantity_low + 1) * self.brick_size
+                    close = (quantity_low + 1) * self.brick_size
                     type = 'up'
                     
                 self._current_brick = {
                     'type': type,
-                    'open': open,
-                    'close': open,
-                    'last_high': rate['high'],
-                    'last_low': rate['low']
+                    'open': close,
+                    'close': close
                 }
                 self._add_bricks(rate, renko_bricks)
                 
@@ -101,14 +100,7 @@ class vRenko:
             elif self._current_brick['close'] > rate['close']:
                 price_diff = self._current_brick['close'] - rate['close']
                 type = 'down'
-        
-        
-        if self._current_brick['last_high'] is None or self._current_brick['last_high'] < rate['high']:
-            self._current_brick['last_high'] = rate['high']
-            
-        if self._current_brick['last_low'] is None or self._current_brick['last_low'] > rate['low']:
-            self._current_brick['last_low'] = rate['low']
-                
+                        
         if price_diff is not None:
             brick_count = price_diff // self.brick_size
                     
@@ -124,14 +116,14 @@ class vRenko:
                     self._current_brick['open'] = self._current_brick['close'] if type == 'up' else self._current_brick['open']
                     self._current_brick['close'] = self._current_brick['open'] + self.brick_size
                     self._current_brick['high'] = self._current_brick['close']
-                    self._current_brick['low'] = self._current_brick['open'] if self._current_brick['last_low'] is None else self._current_brick['last_low']
+                    self._current_brick['low'] = self._current_brick['open']
                     self._current_brick['last_low'] = None
                     type = 'up'
                 elif 'down' in type:
                     self._current_brick['type'] = 'down'
                     self._current_brick['open'] = self._current_brick['close'] if type == 'down' else self._current_brick['open']
                     self._current_brick['close'] = self._current_brick['open'] - self.brick_size
-                    self._current_brick['high'] = self._current_brick['open'] if self._current_brick['last_high'] is None else self._current_brick['last_high']
+                    self._current_brick['high'] = self._current_brick['open']
                     self._current_brick['low'] = self._current_brick['close']
                     self._current_brick['last_high'] = None
                     type = 'down'

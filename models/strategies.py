@@ -325,9 +325,12 @@ class Tr3nd:
         fast_renko = vRenko(fast_size)
         fast_renko.calculate_renko(symbol_rates)
         while self.is_on.value:
+            
             # Se cerciora que alcance el profit diario para terminar el programa
             # if self._goal_profit():
             #     break
+            
+            
             # Agrega la ultima barra (es la barra en formación)
             if not first_time:
                 self._sleep_to_next_minute()
@@ -366,6 +369,7 @@ class Tr3nd:
         account_info = MT5Api.get_account_info()
         self.opening_balance_account = account_info.balance
         symbol_info = MT5Api.get_symbol_info(self.symbol)
+        
         # max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
         # if self.volume is None:
         #     self.volume = max_volume
@@ -374,6 +378,7 @@ class Tr3nd:
         #     if self.volume > max_volume:
         #         self.volume = max_volume
         # Crea un administrador para multiprocessing
+        
         manager = multiprocessing.Manager()
         # Crea las variables que se administraran entre procesos
         self.is_on = manager.Value("b", True)
