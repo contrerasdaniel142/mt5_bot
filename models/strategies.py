@@ -219,21 +219,21 @@ class Tr3nd:
         TelegramApi.send_text("Tr3nd: Estado desbalanceado")
         take_profit = False
         while self.is_on.value:
+            
+            positions = MT5Api.get_positions(magic = self.magic)
+            
             if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
-                take_profit = True
-            elif self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
                 take_profit = True
                             
             if take_profit:
-                positions = MT5Api.get_positions(magic = self.magic)
                 if self.main_trend.value == StateTr3nd.bullish:
-                    positions = [position for position in positions if position.type == OrderType.MARKET_BUY]
+                    positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_BUY]
                 else:
-                    positions = [position for position in positions if position.type == OrderType.MARKET_SELL]
+                    positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_SELL]
                 last_profit = 0
                 ticket = 0
                 symbol = self.symbol
-                for position in positions:
+                for position in positions_in_favor:
                     if position.profit > last_profit:
                         last_profit = position.profit
                         ticket = position.ticket
@@ -247,7 +247,6 @@ class Tr3nd:
                             self.state.value = StateSymbol.balanced
                         break
                 
-            positions = MT5Api.get_positions(magic = self.magic)
             if positions is not None and len(positions) < self.max_positions:
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
                     TelegramApi.send_text("Tr3nd: Creando orden Hedge")
