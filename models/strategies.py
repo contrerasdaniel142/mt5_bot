@@ -144,10 +144,13 @@ class Tr3nd:
         for position in positions:
             profit_positions += position.profit
         if profit_positions > (self.opening_balance_account*0.005):
+            TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado{profit_positions}")
             self.state.value = StateSymbol.no_trades
             MT5Api.send_close_all_position()
-            
-        if (profit_positions+profit_account) >= (self.opening_balance_account*0.03):
+        
+        total_profit = profit_positions+profit_account
+        if total_profit >= (self.opening_balance_account*0.03):
+            TelegramApi.send_text(f"Tr3nd: Meta de profit total alcanzado {total_profit}")
             self.is_on.value = False
             MT5Api.send_close_all_position()
             
@@ -411,6 +414,7 @@ class Tr3nd:
         # Establece el volumen para las ordenes
         account_info = MT5Api.get_account_info()
         self.opening_balance_account = account_info.balance
+        TelegramApi.send_text(f"Tr3nd: Balance de apertura {self.opening_balance_account}")
         symbol_info = MT5Api.get_symbol_info(self.symbol)
         
         # max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
