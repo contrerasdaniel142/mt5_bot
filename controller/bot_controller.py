@@ -88,6 +88,36 @@ class BotController:
             TelegramApi.send_text("El mercado está cerrado.")
             return False
 
+
+    def _sleep_to_next_market_opening_synthetic(self):
+        """Espera hasta la próxima apertura del mercado.
+
+        Args:
+            sleep_in_market (bool): Indica si el método debe ejecutarse durante el mercado abierto (False) o no (True).
+
+        Returns:
+            None
+        """        
+        TelegramApi.send_text("Obteniendo proxima apertura de mercado...")
+    
+        # Obtener la hora actual en UTC
+        current_time = datetime.now(pytz.utc)
+        
+        next_market_open = current_time.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            
+        TelegramApi.send_text(f"Hora actual utc: {current_time}")
+        TelegramApi.send_text(f"Apertura del mercado utc: {next_market_open}")
+        
+        # Calcular la cantidad de segundos que faltan hasta la apertura
+        seconds_until_open = (next_market_open - current_time).total_seconds()
+        
+        TelegramApi.send_text(f"Esperando {seconds_until_open} segundos hasta la apertura...")
+        time.sleep(seconds_until_open)
+    
+        # Obtener la hora actual en UTC después de esperar
+        current_time = datetime.now(pytz.utc)
+        TelegramApi.send_text(f"Hora actual utc: {current_time}")
+    
     def _sleep_to_next_market_opening(self, sleep_in_market:bool = True):
         """Espera hasta la próxima apertura del mercado.
 
@@ -181,9 +211,7 @@ class BotController:
         MT5Api.initialize(4)
         MT5Api.shutdown()
                         
-        while True:            
-            #self._sleep_to_next_market_opening(False)
-            
+        while True:                     
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
                 symbol=symbol,
@@ -192,5 +220,6 @@ class BotController:
                 multiplier=2.0
                 )
             tr3nd.start()
+            self._sleep_to_next_market_opening_synthetic()   
             
     #endregion

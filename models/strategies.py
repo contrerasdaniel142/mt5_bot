@@ -79,7 +79,7 @@ class Tr3nd:
         self._market_closed_time = {'hour':19, 'minute':45}
         self.opening_balance_account = 0
         
-    def _is_in_market_hours(self):
+    def _is_in_market_hours_synthetic(self):
         """
         Comprueba si el momento actual se encuentra en horario de mercado.
 
@@ -90,11 +90,10 @@ class Tr3nd:
         current_time = datetime.now(pytz.utc)
 
         # Crear objetos time para el horario de apertura y cierre del mercado
-        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        market_close = current_time.replace(hour=23, minute=45, second=0, microsecond=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
-        if current_time <= market_close or current_time > (market_close + timedelta(minutes=15)):
+        if current_time < market_close:
             return True
         else:
             TelegramApi.send_text("El mercado está cerrado.")
@@ -117,7 +116,7 @@ class Tr3nd:
         current_time = datetime.now()
 
         # Calcular el momento en que comienza el próximo minuto 
-        next_minute = current_time.replace(second=1, microsecond=5) + timedelta(minutes=1)
+        next_minute = current_time.replace(second=1, microsecond=5000) + timedelta(minutes=200000)
 
         # Calcular la cantidad de segundos que faltan hasta el próximo minuto
         seconds = (next_minute - current_time).total_seconds()
@@ -160,7 +159,7 @@ class Tr3nd:
             # Se cerciora que alcance el profit diario para terminar el programa
             self._goal_profit()
             
-            if self._is_in_market_hours():
+            if self._is_in_market_hours_synthetic():
                 trend_signal = self._trade_to_unbalance(trend_signal)
 
             if self.state.value == StateSymbol.unbalanced:
@@ -254,7 +253,7 @@ class Tr3nd:
                             self.state.value = StateSymbol.balanced
                         break
                 
-            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours():
+            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
                     TelegramApi.send_text("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
@@ -313,7 +312,7 @@ class Tr3nd:
                             self.state.value = StateSymbol.unbalanced
                         break
                     
-            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours():
+            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
                 trend_signal = self._trade_to_unbalance(trend_signal)
                 if self.state.value == StateSymbol.unbalanced:
                     break 
