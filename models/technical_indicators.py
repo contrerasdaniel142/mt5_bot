@@ -11,7 +11,7 @@ import numpy as np
 import pandas_ta as ta 
 
 # Importaciones para el manejo de datos
-from .mt5.enums import FieldType
+from mt5.enums import FieldType
 from numpy import ndarray
 
 # Importaciones necesarias para definir tipos de datos
@@ -19,13 +19,13 @@ from typing import Dict, List, Tuple, Any
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime
-from .utilities import convert_time_to_mt5
+from utilities import convert_time_to_mt5
 
 
 #endregion
 
 class vRenko:
-    def __init__(self, brick_size:float):
+    def __init__(self, rates: ndarray[FieldType.rates_dtype], brick_size:float):
         """
         Inicializa una instancia de vRenko con un tamaño de ladrillo especificado.
 
@@ -36,8 +36,9 @@ class vRenko:
         self.dtype_renko = [('time', datetime), ('type', 'U4'), ('open', float), ('high', float), ('low', float), ('close', float)]
         self.renko_data = np.empty(0, dtype= self.dtype_renko)
         self._current_brick: Dict[str, Any]= None
+        self._calculate_renko(rates)
     
-    def calculate_renko(self, rates: ndarray[FieldType.rates_dtype]):
+    def _calculate_renko(self, rates: ndarray[FieldType.rates_dtype]):
         """
         Calcula y genera datos de gráfico Renko basados en las tasas de precios proporcionadas.
 
@@ -164,3 +165,27 @@ class vRenko:
             ndarray: Un array de datos del gráfico Renko.
         """
         return self.renko_data
+
+
+
+from mt5.client import MT5Api
+from mt5.enums import TimeFrame
+import pandas as pd
+
+def _get_optimal_brick_size(self, rates: np.ndarray, atr_timeperiod=14):
+    brick_size = 0.0
+    df = pd.DataFrame(rates)
+    # Si tenemos suficientes datos
+    if len(rates) > atr_timeperiod:
+        atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
+        brick_size = np.median(atr[atr_timeperiod:])
+    return brick_size
+
+# Obtiene las barras desde mt5
+symbol_rates = MT5Api.get_rates_from_pos("BTCUSD", TimeFrame.MINUTE_1, 1,  10080)
+main_renko = vRenko(symbol_rates, 20)
+df = pd.DataFrame(main_renko.renko_data)
+
+df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=7, multiplier=2).iloc[:, 1]
+
+print(df.tail(50))

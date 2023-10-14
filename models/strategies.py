@@ -89,14 +89,14 @@ class Tr3nd:
             bool: True si se encuentra en horario de mercado, False si no lo está.
         """
         # Obtener la hora y minutos actuales en UTC
-        current_time = datetime.now(pytz.utc) #+ timedelta(days=self._market_opening_time['day'])
+        current_time = datetime.now(pytz.utc)
 
         # Crear objetos time para el horario de apertura y cierre del mercado
         market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
         market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
-        if market_open <= current_time <= market_close:
+        if current_time <= market_close or current_time > (market_close + timedelta(minutes=15)):
             return True
         else:
             TelegramApi.send_text("El mercado está cerrado.")
@@ -119,7 +119,7 @@ class Tr3nd:
         current_time = datetime.now()
 
         # Calcular el momento en que comienza el próximo minuto 
-        next_minute = current_time.replace(second=1, microsecond=0) + timedelta(minutes=1)
+        next_minute = current_time.replace(second=1, microsecond=5) + timedelta(minutes=1)
 
         # Calcular la cantidad de segundos que faltan hasta el próximo minuto
         seconds = (next_minute - current_time).total_seconds()
@@ -142,38 +142,42 @@ class Tr3nd:
     def _goal_profit(self)->bool:
         positions = MT5Api.get_positions(magic = self.magic)
         account_info = MT5Api.get_account_info()
-        profit = account_info.profit
+        profit_account = account_info.profit
+        profit_positions = 0
         for position in positions:
-            profit += position.profit
-        if profit >= (self.opening_balance_account*0.03):
+            profit_positions += position.profit
+        if profit_positions > (self.opening_balance_account*0.005):
+            self.state.value = StateSymbol.no_trades
+            MT5Api.send_close_all_position()
+            
+        if (profit_positions+profit_account) >= (self.opening_balance_account*0.03):
             self.is_on.value = False
             MT5Api.send_close_all_position()
-            return True
-        
-        # Revisa si esta en horario de mercado para salir del bot
-        if not self._is_in_market_hours():
-            self.is_on.value = False
-            return True
-        return False
             
     def _no_trade_state(self):
         TelegramApi.send_text("Tr3nd: Estado sin Trade")
         trend_signal = TrendSignal.anticipating
         #TelegramApi.send_message(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
-            trend_signal = self._trade_to_unbalance(trend_signal)
+            # Se cerciora que alcance el profit diario para terminar el programa
+            self._goal_profit()
+            
+            if self._is_in_market_hours():
+                trend_signal = self._trade_to_unbalance(trend_signal)
+
             if self.state.value == StateSymbol.unbalanced:
                 break
                 
     def _trade_to_unbalance(self, trend_signal:TrendSignal):
-               
+        
         if trend_signal == TrendSignal.anticipating:
-            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
+            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value and self.state == StateSymbol.no_trades:
                  trend_signal = TrendSignal.ready_fast
             elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                 trend_signal = TrendSignal.ready_intermediate
-            elif self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
-                trend_signal = TrendSignal.buy
+        
+        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value and self.state != StateSymbol.no_trades:
+            trend_signal = TrendSignal.buy
         
         if trend_signal == TrendSignal.ready_fast:
             if self.intermediate_trend.value != self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
@@ -219,6 +223,11 @@ class Tr3nd:
         TelegramApi.send_text("Tr3nd: Estado desbalanceado")
         take_profit = False
         while self.is_on.value:
+            # Se cerciora que alcance el profit diario para terminar el programa
+            self._goal_profit()
+            
+            if self.state.value != StateSymbol.unbalanced:
+                break
             
             positions = MT5Api.get_positions(magic = self.magic)
             
@@ -247,7 +256,7 @@ class Tr3nd:
                             self.state.value = StateSymbol.balanced
                         break
                 
-            if positions is not None and len(positions) < self.max_positions:
+            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours():
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
                     TelegramApi.send_text("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
@@ -275,6 +284,12 @@ class Tr3nd:
         trend_signal = TrendSignal.anticipating
         #TelegramApi.send_message(f"Tr3nd: [Estado para nueva orden {no_trade_state}]")
         while self.is_on.value:
+            # Se cerciora que alcance el profit diario para terminar el programa
+            self._goal_profit()
+            
+            if self.state.value != StateSymbol.balanced:
+                break
+            
             positions = MT5Api.get_positions(magic = self.magic)
             if self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
                 positions = MT5Api.get_positions(magic = self.magic)
@@ -299,11 +314,20 @@ class Tr3nd:
                         else:
                             self.state.value = StateSymbol.unbalanced
                         break
-                        
-            if positions is not None and len(positions) < self.max_positions:
+                    
+            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours():
                 trend_signal = self._trade_to_unbalance(trend_signal)
                 if self.state.value == StateSymbol.unbalanced:
                     break 
+                
+    def _get_optimal_brick_size(self, rates: np.ndarray, atr_timeperiod=14):
+        brick_size = 0.0
+        df = pd.DataFrame(rates)
+        # Si tenemos suficientes datos
+        if len(rates) > atr_timeperiod:
+            atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
+            brick_size = np.median(atr[atr_timeperiod:])
+        return brick_size
     
     def _update_trends(self):
         TelegramApi.send_text("Tr3nd: Update iniciado")
@@ -319,33 +343,31 @@ class Tr3nd:
         
         # Obtiene las barras desde mt5
         symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-        
-        # Establece el tamaño de los ladrillos de los renkos
-        main_size = self.size_renko
-        intermediate_size = main_size/2
-        fast_size = intermediate_size/2
-        
-        # Establece y calcula los renkos
-        main_renko = vRenko(main_size)
-        main_renko.calculate_renko(symbol_rates)
-        intermediate_renko = vRenko(intermediate_size)
-        intermediate_renko.calculate_renko(symbol_rates)
-        fast_renko = vRenko(fast_size)
-        fast_renko.calculate_renko(symbol_rates)
-        
+        hour_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
+        last_bar_hour = None
+                        
         while self.is_on.value:
-            
-            # Se cerciora que alcance el profit diario para terminar el programa
-            # if self._goal_profit():
-            #     break
-            
-            
+                                               
             # Agrega la ultima barra (es la barra en formación)
             if not first_time:
                 self._sleep_to_next_minute()
-            last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+                last_bar_hour = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
+                last_bar_minute = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
             
-            if first_time or main_renko.update_renko(last_bar):
+            # Establece y calcula los renkos
+            if first_time or self.state == StateSymbol.no_trades and last_bar_hour['time'] > hour_rates[-1]['time']:
+                # Establece el tamaño de los ladrillos de los renkos
+                if last_bar_hour is not None:
+                    hour_rates = np.append(hour_rates, last_bar_hour)
+                brick_size = self._get_optimal_brick_size(hour_rates)
+                main_size = brick_size
+                intermediate_size = main_size/2
+                fast_size = intermediate_size/2
+                main_renko = vRenko(symbol_rates, main_size)
+                intermediate_renko = vRenko(intermediate_size)
+                fast_renko = vRenko(fast_size)
+            
+            if first_time or main_renko.update_renko(last_bar_minute):
                 df = pd.DataFrame(main_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -353,7 +375,7 @@ class Tr3nd:
                     self.main_trend.value = last_bar_renko['supertrend']
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
-            if first_time or intermediate_renko.update_renko(last_bar):
+            if first_time or intermediate_renko.update_renko(last_bar_minute):
                 df = pd.DataFrame(intermediate_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -361,7 +383,7 @@ class Tr3nd:
                     self.intermediate_trend.value = last_bar_renko['supertrend']
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
-            if first_time or fast_renko.update_renko(last_bar):
+            if first_time or fast_renko.update_renko(last_bar_minute):
                 df = pd.DataFrame(fast_renko.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
