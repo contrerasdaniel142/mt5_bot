@@ -340,7 +340,7 @@ class Tr3nd:
         multiplier = self.multiplier
         
         # Obtiene las barras desde mt5
-        symbol_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
+        minute_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
         hour_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
         last_bar_hour = None
                         
@@ -351,8 +351,9 @@ class Tr3nd:
                 self._sleep_to_next_minute()
                 last_bar_hour = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
                 last_bar_minute = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+                minute_rates = np.append(minute_rates, last_bar_minute)
             
-            # Establece y calcula los renkos
+            
             if first_time or self.state == StateSymbol.no_trades and last_bar_hour['time'] > hour_rates[-1]['time']:
                 # Establece el tamaño de los ladrillos de los renkos
                 if last_bar_hour is not None:
@@ -361,9 +362,11 @@ class Tr3nd:
                 main_size = brick_size
                 intermediate_size = main_size/2
                 fast_size = intermediate_size/2
-                main_renko = vRenko(symbol_rates, main_size)
-                intermediate_renko = vRenko(intermediate_size)
-                fast_renko = vRenko(fast_size)
+                
+                # Establece y calcula los renkos
+                main_renko = vRenko(minute_rates, main_size)
+                intermediate_renko = vRenko(minute_rates, intermediate_size)
+                fast_renko = vRenko(minute_rates, fast_size)
             
             if first_time or main_renko.update_renko(last_bar_minute):
                 df = pd.DataFrame(main_renko.renko_data)
