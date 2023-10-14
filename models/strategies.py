@@ -116,7 +116,7 @@ class Tr3nd:
         current_time = datetime.now()
 
         # Calcular el momento en que comienza el próximo minuto 
-        next_minute = current_time.replace(second=1, microsecond=5000) + timedelta(minutes=200000)
+        next_minute = current_time.replace(second=1, microsecond=200000) + timedelta(minutes=1)
 
         # Calcular la cantidad de segundos que faltan hasta el próximo minuto
         seconds = (next_minute - current_time).total_seconds()
@@ -125,7 +125,7 @@ class Tr3nd:
         time.sleep(seconds)
     
     def _manage_positions(self):
-        TelegramApi.send_text("tr3nd: Iniciacion administrador de posiciones")
+        TelegramApi.send_text("tr3nd: Iniciando administrador de posiciones")
         # Comienza el administrador de posiciones
         while self.is_on.value:
             if self.main_trend.value != StateTr3nd.unassigned and self.intermediate_trend.value != StateTr3nd.unassigned and self.fast_trend.value != StateTr3nd.unassigned:
