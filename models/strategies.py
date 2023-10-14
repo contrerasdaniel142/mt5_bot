@@ -168,14 +168,14 @@ class Tr3nd:
     def _trade_to_unbalance(self, trend_signal:TrendSignal):
         
         if trend_signal == TrendSignal.anticipating:
-            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value and self.state == StateSymbol.no_trades:
+            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value and self.state.value == StateSymbol.no_trades:
                 trend_signal = TrendSignal.ready_fast
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
             elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                 trend_signal = TrendSignal.ready_intermediate
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
-        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value and self.state != StateSymbol.no_trades:
+        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value and self.state.value != StateSymbol.no_trades:
             trend_signal = TrendSignal.buy
             TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
@@ -330,7 +330,7 @@ class Tr3nd:
         if len(rates) > atr_timeperiod:
             atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
             brick_size = np.median(atr[atr_timeperiod:])
-        return brick_size
+        return round(brick_size)
     
     def _update_trends(self):
         TelegramApi.send_text("Tr3nd: Update iniciado")
@@ -359,7 +359,7 @@ class Tr3nd:
                 minute_rates = np.append(minute_rates, last_bar_minute)
             
             
-            if first_time or self.state == StateSymbol.no_trades and last_bar_hour['time'] > hour_rates[-1]['time']:
+            if first_time or self.state.value == StateSymbol.no_trades and last_bar_hour['time'] > hour_rates[-1]['time']:
                 # Establece el tamaño de los ladrillos de los renkos
                 if last_bar_hour is not None:
                     hour_rates = np.append(hour_rates, last_bar_hour)
