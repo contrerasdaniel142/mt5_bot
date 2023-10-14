@@ -359,8 +359,11 @@ class Tr3nd:
                     hour_rates = np.append(hour_rates, last_bar_hour)
                 brick_size = self._get_optimal_brick_size(hour_rates)
                 main_size = brick_size
+                TelegramApi.send_text(f"Tr3nd: Main brick size: {main_size}")
                 intermediate_size = main_size/2
+                TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
                 fast_size = intermediate_size/2
+                TelegramApi.send_text(f"Tr3nd: Fast brick size: {fast_size}")
                 
                 # Establece y calcula los renkos
                 main_renko = vRenko(minute_rates, main_size)
@@ -397,6 +400,8 @@ class Tr3nd:
     
     def start(self):
         TelegramApi.send_text(f"Tr3nd: Iniciando estrategia para {self.symbol}...")
+        TelegramApi.send_text(f"Tr3nd: Periodo atr: {self.atr_period}")
+        TelegramApi.send_text(f"Tr3nd: Multiplicador: {self.multiplier}")
         # Establece el volumen para las ordenes
         account_info = MT5Api.get_account_info()
         self.opening_balance_account = account_info.balance

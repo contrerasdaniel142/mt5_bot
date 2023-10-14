@@ -527,7 +527,7 @@ class MT5Api:
             TelegramApi.send_text(f"Comentario: {order_request.comment}")
             return None
         else:
-            TelegramApi.send_text(f"Orden completada. {symbol}: vol[{volume}] price[{price}] sl[{stop_loss}] tp [{take_profit}]")
+            TelegramApi.send_text(f"Orden completada: {request}")
 
         
         return order_request
