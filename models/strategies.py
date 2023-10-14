@@ -355,7 +355,7 @@ class Tr3nd:
         while self.is_on.value:
                                                
             # Agrega la ultima barra (es la barra en formación)
-            if not first_time:
+            if first_time:
                 self._sleep_to_next_minute()
                 last_bar_hour = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
                 last_bar_minute = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
