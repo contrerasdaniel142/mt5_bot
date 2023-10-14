@@ -53,7 +53,7 @@ class TrendSignal:
     
 
 class Tr3nd:
-    def __init__(self, symbol: str, volume: float = None, size_renko:float = 40, atr_period:int = 10, multiplier:float = 3.0) -> None:
+    def __init__(self, symbol: str, volume: float = None, atr_period:int = 10, multiplier:float = 3.0) -> None:
         # Numero identificador de la estretegia
         self.magic = 40
         # Indica si la estrategia esta activa
@@ -66,8 +66,6 @@ class Tr3nd:
         self.volume = float(volume)
         # Estado el activo
         self.state = StateSymbol.no_trades
-        # Tamaño del ladrillo del renko principal
-        self.size_renko = size_renko
         # Periodo del atr usado para el supertrend
         self.atr_period = atr_period
         # Multiplicador usado en el supertrend
