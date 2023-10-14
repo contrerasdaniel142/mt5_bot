@@ -97,6 +97,7 @@ class Tr3nd:
             return True
         else:
             TelegramApi.send_text("El mercado está cerrado.")
+            self.is_on.value = False
             return False
         
     def _sleep_to_next_minute(self):
