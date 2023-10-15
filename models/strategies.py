@@ -192,11 +192,11 @@ class Tr3nd:
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
         elif trend_signal == TrendSignal.ready_intermediate:
-            if self.intermediate_trend.value == self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
-                trend_signal = TrendSignal.buy
-                TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
-            elif self.intermediate_trend.value != self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+            if self.intermediate_trend.value != self.main_trend.value and self.main_trend.value != self.fast_trend.value:
                 trend_signal = TrendSignal.anticipating
+                TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
+            elif self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                trend_signal = TrendSignal.buy
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
                             
         if trend_signal == TrendSignal.buy:
