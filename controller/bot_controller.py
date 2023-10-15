@@ -217,7 +217,7 @@ class BotController:
                 symbol=symbol,
                 volume=5,
                 atr_period=7,
-                multiplier=2.0
+                multiplier=1.5
                 )
             tr3nd.start()
             self._sleep_to_next_market_opening_synthetic()   

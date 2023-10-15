@@ -143,10 +143,11 @@ class Tr3nd:
             profit_positions = 0
             for position in positions:
                 profit_positions += position.profit
-            if profit_positions > (self.opening_balance_account*0.005):
-                TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
-                self.state.value = StateSymbol.no_trades
-                MT5Api.send_close_all_position()
+                
+            # if profit_positions > (self.opening_balance_account*0.005):
+            #     TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
+            #     self.state.value = StateSymbol.no_trades
+            #     MT5Api.send_close_all_position()
             
             total_profit = profit_positions+profit_account
             if total_profit >= (self.opening_balance_account*0.03):
@@ -178,7 +179,7 @@ class Tr3nd:
                 trend_signal = TrendSignal.ready_intermediate
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
-        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value: #and self.state.value != StateSymbol.no_trades:
+        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value and self.state.value != StateSymbol.no_trades:
             trend_signal = TrendSignal.buy
             TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
