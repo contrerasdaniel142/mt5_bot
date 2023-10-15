@@ -96,8 +96,6 @@ class Tr3nd:
         if current_time < market_close:
             return True
         else:
-            TelegramApi.send_text("El mercado está cerrado.")
-            self.is_on.value = False
             return False
         
     def _sleep_to_next_minute(self):
@@ -145,7 +143,7 @@ class Tr3nd:
         for position in positions:
             profit_positions += position.profit
         if profit_positions > (self.opening_balance_account*0.005):
-            TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado{profit_positions}")
+            TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
             self.state.value = StateSymbol.no_trades
             MT5Api.send_close_all_position()
         
@@ -179,7 +177,7 @@ class Tr3nd:
                 trend_signal = TrendSignal.ready_intermediate
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
-        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value and self.state.value != StateSymbol.no_trades:
+        if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value: #and self.state.value != StateSymbol.no_trades:
             trend_signal = TrendSignal.buy
             TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
