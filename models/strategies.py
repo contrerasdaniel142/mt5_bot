@@ -27,7 +27,7 @@ import pytz, time
 
 # Importaciones de indicatores técnicos
 import pandas_ta as ta
-from .technical_indicators import vRenko
+from .technical_indicators import HeikenAshi
 
 
 #endregion
@@ -355,59 +355,62 @@ class Tr3nd:
         
         # Obtiene las barras desde mt5
         while True:
-            minute_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-            hour_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
-            if minute_rates is not None and hour_rates is not None:
+            minute_15_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  10080)
+            hour_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
+            hour_4_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1,  10080)
+            if minute_15_rates is not None and hour_1_rates is not None and hour_4_rates is not None:
                 break
-        last_bar_hour = None
-                        
+        
+        ha_main = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1,  10080))
+        ha_intermediate = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080))
+        ha_fast = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080))
+                                    
         while self.is_on.value:           
+            fast_bar = None
+            intermediate_bar = None
+            main_bar = None
                                                
-            # Agrega la ultima barra (es la barra en formación)
             if not first_time:
                 self._sleep_to_next_minute()
-                last_bar_hour = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
-                last_bar_minute = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
-                if last_bar_hour is None or last_bar_minute is None:
-                    continue
-                minute_rates = np.append(minute_rates, last_bar_minute)
-            
-            
-            if first_time or self.state.value == StateSymbol.no_trades and last_bar_hour['time'] > hour_rates[-1]['time']:
-                # Establece el tamaño de los ladrillos de los renkos
-                if last_bar_hour is not None:
-                    hour_rates = np.append(hour_rates, last_bar_hour)
-                brick_size = self._get_optimal_brick_size(hour_rates)
-                main_size = brick_size
-                TelegramApi.send_text(f"Tr3nd: Main brick size: {main_size}")
-                intermediate_size = main_size/2
-                TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
-                fast_size = intermediate_size/2
-                TelegramApi.send_text(f"Tr3nd: Fast brick size: {fast_size}")
                 
-                # Establece y calcula los renkos
-                main_renko = vRenko(minute_rates, main_size)
-                intermediate_renko = vRenko(minute_rates, intermediate_size)
-                fast_renko = vRenko(minute_rates, fast_size)
+                while True:
+                    fast_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1, 1)
+                    intermediate_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
+                    main_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1, 1)
+                    if fast_bar is not None and intermediate_bar is not None and main_bar is not None:
+                        break
+                    
+                if ha_main.rates[-1]['time'] < main_bar['time']:
+                    ha_main.update_HeikenAshi(main_bar)
+                    
+                if ha_intermediate.rates[-1]['time'] < intermediate_bar['time']:
+                    ha_intermediate.update_HeikenAshi(intermediate_bar)
+                
+                if ha_fast.rates[-1]['time'] < fast_bar['time']:
+                    ha_fast.update_HeikenAshi(fast_bar)
             
-            if first_time or main_renko.update_renko(last_bar_minute):
-                df = pd.DataFrame(main_renko.renko_data)
+            
+            if first_time or ha_main.rates[-1]['time'] < main_bar['time']:
+                ha_main.update_HeikenAshi(main_bar)
+                df = pd.DataFrame(ha_main.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 if self.main_trend.value != last_bar_renko['supertrend']:
                     self.main_trend.value = last_bar_renko['supertrend']
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
-            if first_time or intermediate_renko.update_renko(last_bar_minute):
-                df = pd.DataFrame(intermediate_renko.renko_data)
+            if first_time or ha_intermediate.rates[-1]['time'] < intermediate_bar['time']:
+                ha_intermediate.update_HeikenAshi(intermediate_bar)
+                df = pd.DataFrame(ha_intermediate.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 if self.intermediate_trend.value != last_bar_renko['supertrend']:
                     self.intermediate_trend.value = last_bar_renko['supertrend']
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
-            if first_time or fast_renko.update_renko(last_bar_minute):
-                df = pd.DataFrame(fast_renko.renko_data)
+            if first_time or ha_fast.rates[-1]['time'] < fast_bar['time']:
+                ha_fast.update_HeikenAshi(fast_bar)
+                df = pd.DataFrame(ha_fast.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
                 if self.fast_trend.value != last_bar_renko['supertrend']:
