@@ -361,15 +361,12 @@ class Tr3nd:
             if minute_15_rates is not None and hour_1_rates is not None and hour_4_rates is not None:
                 break
         
-        ha_main = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1,  10080))
-        ha_intermediate = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080))
-        ha_fast = HeikenAshi(MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080))
+        ha_main = HeikenAshi(hour_4_rates)
+        ha_intermediate = HeikenAshi(hour_1_rates)
+        ha_fast = HeikenAshi(minute_15_rates)
                                     
         while self.is_on.value:           
-            fast_bar = None
-            intermediate_bar = None
-            main_bar = None
-                                               
+             
             if not first_time:
                 self._sleep_to_next_minute()
                 
@@ -378,20 +375,11 @@ class Tr3nd:
                     intermediate_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
                     main_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1, 1)
                     if fast_bar is not None and intermediate_bar is not None and main_bar is not None:
-                        break
-                    
-                if ha_main.rates[-1]['time'] < main_bar['time']:
-                    ha_main.update_HeikenAshi(main_bar)
-                    
-                if ha_intermediate.rates[-1]['time'] < intermediate_bar['time']:
-                    ha_intermediate.update_HeikenAshi(intermediate_bar)
-                
-                if ha_fast.rates[-1]['time'] < fast_bar['time']:
-                    ha_fast.update_HeikenAshi(fast_bar)
-            
+                        break           
             
             if first_time or ha_main.rates[-1]['time'] < main_bar['time']:
-                ha_main.update_HeikenAshi(main_bar)
+                if not first_time:
+                    ha_main.update_HeikenAshi(main_bar)
                 df = pd.DataFrame(ha_main.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -400,7 +388,8 @@ class Tr3nd:
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if first_time or ha_intermediate.rates[-1]['time'] < intermediate_bar['time']:
-                ha_intermediate.update_HeikenAshi(intermediate_bar)
+                if not first_time:
+                    ha_intermediate.update_HeikenAshi(intermediate_bar)
                 df = pd.DataFrame(ha_intermediate.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -409,7 +398,8 @@ class Tr3nd:
                     TelegramApi.send_text(f"Tr3nd: [Main {self.main_trend.value}] [Intermediate {self.intermediate_trend.value}] [Fast {self.fast_trend.value}]")
                 
             if first_time or ha_fast.rates[-1]['time'] < fast_bar['time']:
-                ha_fast.update_HeikenAshi(fast_bar)
+                if not first_time:
+                    ha_fast.update_HeikenAshi(fast_bar)
                 df = pd.DataFrame(ha_fast.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
