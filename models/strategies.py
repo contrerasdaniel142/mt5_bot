@@ -138,20 +138,21 @@ class Tr3nd:
     def _goal_profit(self)->bool:
         positions = MT5Api.get_positions(magic = self.magic)
         account_info = MT5Api.get_account_info()
-        profit_account = account_info.profit
-        profit_positions = 0
-        for position in positions:
-            profit_positions += position.profit
-        if profit_positions > (self.opening_balance_account*0.005):
-            TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
-            self.state.value = StateSymbol.no_trades
-            MT5Api.send_close_all_position()
-        
-        total_profit = profit_positions+profit_account
-        if total_profit >= (self.opening_balance_account*0.03):
-            TelegramApi.send_text(f"Tr3nd: Meta de profit total alcanzado {total_profit}")
-            self.is_on.value = False
-            MT5Api.send_close_all_position()
+        if positions is not None and account_info is not None:
+            profit_account = account_info.profit
+            profit_positions = 0
+            for position in positions:
+                profit_positions += position.profit
+            if profit_positions > (self.opening_balance_account*0.005):
+                TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
+                self.state.value = StateSymbol.no_trades
+                MT5Api.send_close_all_position()
+            
+            total_profit = profit_positions+profit_account
+            if total_profit >= (self.opening_balance_account*0.03):
+                TelegramApi.send_text(f"Tr3nd: Meta de profit total alcanzado {total_profit}")
+                self.is_on.value = False
+                MT5Api.send_close_all_position()
             
     def _no_trade_state(self):
         TelegramApi.send_text("Tr3nd: Estado sin Trade")
@@ -236,32 +237,33 @@ class Tr3nd:
             
             positions = MT5Api.get_positions(magic = self.magic)
             
-            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
-                take_profit = True
-                            
-            if take_profit:
-                if self.main_trend.value == StateTr3nd.bullish:
-                    positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_BUY]
-                else:
-                    positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_SELL]
-                last_profit = 0
-                ticket = 0
-                symbol = self.symbol
-                for position in positions_in_favor:
-                    if position.profit > last_profit:
-                        last_profit = position.profit
-                        ticket = position.ticket
-                if ticket != 0:
-                    TelegramApi.send_text("Tr3nd: Cerrando posicion a favor con profit")
-                    result = MT5Api.send_close_position(symbol, ticket)
-                    if result:
-                        if (len(positions) - 1) == 0:
-                            self.state.value = StateSymbol.no_trades
-                        else:
-                            self.state.value = StateSymbol.balanced
-                        break
+            if positions is not None:
+                if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
+                    take_profit = True
+                                
+                if take_profit:
+                    if self.main_trend.value == StateTr3nd.bullish:
+                        positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_BUY]
+                    else:
+                        positions_in_favor = [position for position in positions if position.type == OrderType.MARKET_SELL]
+                    last_profit = 0
+                    ticket = 0
+                    symbol = self.symbol
+                    for position in positions_in_favor:
+                        if position.profit > last_profit:
+                            last_profit = position.profit
+                            ticket = position.ticket
+                    if ticket != 0:
+                        TelegramApi.send_text("Tr3nd: Cerrando posicion a favor con profit")
+                        result = MT5Api.send_close_position(symbol, ticket)
+                        if result:
+                            if (len(positions) - 1) == 0:
+                                self.state.value = StateSymbol.no_trades
+                            else:
+                                self.state.value = StateSymbol.balanced
+                            break
                 
-            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
+            if len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
                 if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
                     TelegramApi.send_text("Tr3nd: Creando orden Hedge")
                     if self.main_trend.value == StateTr3nd.bullish:
@@ -296,34 +298,35 @@ class Tr3nd:
                 break
             
             positions = MT5Api.get_positions(magic = self.magic)
-            if self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
-                positions = MT5Api.get_positions(magic = self.magic)
-                if self.main_trend.value == StateTr3nd.bullish:
-                    hedge_positions = [position for position in positions if position.type == OrderType.MARKET_SELL]
-                else:
-                    hedge_positions = [position for position in positions if position.type == OrderType.MARKET_BUY]
+            if positions is not None:
+                if self.main_trend.value != self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value:
+                    positions = MT5Api.get_positions(magic = self.magic)
+                    if self.main_trend.value == StateTr3nd.bullish:
+                        hedge_positions = [position for position in positions if position.type == OrderType.MARKET_SELL]
+                    else:
+                        hedge_positions = [position for position in positions if position.type == OrderType.MARKET_BUY]
 
-                last_profit = 0
-                ticket = 0
-                symbol = self.symbol
-                for position in hedge_positions:
-                    if position.profit > last_profit:
-                        last_profit = position.profit
-                        ticket = position.ticket
-                if ticket != 0:
-                    TelegramApi.send_text("Tr3nd: Cerrando posicion contraria con profit")
-                    result = MT5Api.send_close_position(symbol, ticket)
-                    if result:
-                        if (len(positions) - 1) == 0:
-                            self.state.value = StateSymbol.no_trades
-                        else:
-                            self.state.value = StateSymbol.unbalanced
-                        break
-                    
-            if positions is not None and len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
-                trend_signal = self._trade_to_unbalance(trend_signal)
-                if self.state.value == StateSymbol.unbalanced:
-                    break 
+                    last_profit = 0
+                    ticket = 0
+                    symbol = self.symbol
+                    for position in hedge_positions:
+                        if position.profit > last_profit:
+                            last_profit = position.profit
+                            ticket = position.ticket
+                    if ticket != 0:
+                        TelegramApi.send_text("Tr3nd: Cerrando posicion contraria con profit")
+                        result = MT5Api.send_close_position(symbol, ticket)
+                        if result:
+                            if (len(positions) - 1) == 0:
+                                self.state.value = StateSymbol.no_trades
+                            else:
+                                self.state.value = StateSymbol.unbalanced
+                            break
+                        
+                if len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
+                    trend_signal = self._trade_to_unbalance(trend_signal)
+                    if self.state.value == StateSymbol.unbalanced:
+                        break 
                 
     def _get_optimal_brick_size(self, rates: np.ndarray, atr_timeperiod=14):
         brick_size = 0.0
@@ -347,17 +350,22 @@ class Tr3nd:
         multiplier = self.multiplier
         
         # Obtiene las barras desde mt5
-        minute_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-        hour_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
+        while True:
+            minute_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
+            hour_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
+            if minute_rates is not None and hour_rates is not None:
+                break
         last_bar_hour = None
                         
-        while self.is_on.value:
+        while self.is_on.value:           
                                                
             # Agrega la ultima barra (es la barra en formación)
             if not first_time:
                 self._sleep_to_next_minute()
                 last_bar_hour = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1, 1)
                 last_bar_minute = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+                if last_bar_hour is None or last_bar_minute is None:
+                    continue
                 minute_rates = np.append(minute_rates, last_bar_minute)
             
             
@@ -411,11 +419,15 @@ class Tr3nd:
         TelegramApi.send_text(f"Tr3nd: Periodo atr: {self.atr_period}")
         TelegramApi.send_text(f"Tr3nd: Multiplicador: {self.multiplier}")
         # Establece el volumen para las ordenes
-        account_info = MT5Api.get_account_info()
+        while True:
+            account_info = MT5Api.get_account_info()
+            if account_info is not None:
+                break
+            
         self.opening_balance_account = account_info.balance
         TelegramApi.send_text(f"Tr3nd: Balance de apertura {self.opening_balance_account}")
-        symbol_info = MT5Api.get_symbol_info(self.symbol)
         
+        #symbol_info = MT5Api.get_symbol_info(self.symbol)
         # max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
         # if self.volume is None:
         #     self.volume = max_volume
@@ -434,7 +446,11 @@ class Tr3nd:
         self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
         
         # Si se vuelve a iniciar el programa y tiene posiciones abiertas les continua haciendo seguimiento
-        positions = MT5Api.get_positions(magic = self.magic)
+        while True:
+            positions = MT5Api.get_positions(magic = self.magic)
+            if positions is not None:
+                break
+        
         if positions:
             if len(positions) % 2 == 0:
                 self.state.value = StateSymbol.balanced
