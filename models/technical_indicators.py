@@ -11,7 +11,7 @@ import numpy as np
 import pandas_ta as ta 
 
 # Importaciones para el manejo de datos
-from mt5.enums import FieldType
+from .mt5.enums import FieldType
 from numpy import ndarray
 
 # Importaciones necesarias para definir tipos de datos
@@ -19,7 +19,7 @@ from typing import Dict, List, Tuple, Any
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime
-from utilities import convert_time_to_mt5
+from .utilities import convert_time_to_mt5
 
 
 #endregion
