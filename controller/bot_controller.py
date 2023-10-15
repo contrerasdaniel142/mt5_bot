@@ -215,9 +215,9 @@ class BotController:
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
                 symbol=symbol,
-                volume=5,
-                atr_period=7,
-                multiplier=1.5
+                volume=10,
+                atr_period=5,
+                multiplier=1
                 )
             tr3nd.start()
             self._sleep_to_next_market_opening_synthetic()   
