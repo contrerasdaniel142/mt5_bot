@@ -262,29 +262,29 @@ class Tr3nd:
                             else:
                                 self.state.value = StateSymbol.balanced
                             break
-                
-            if len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
-                if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
-                    TelegramApi.send_text("Tr3nd: Creando orden Hedge")
-                    if self.main_trend.value == StateTr3nd.bullish:
-                        result = MT5Api.send_order(
-                            symbol= self.symbol, 
-                            order_type= OrderType.MARKET_SELL, 
-                            volume=self.volume,
-                            comment="-1",
-                            magic=self.magic
-                            )
-                    else:
-                        result = MT5Api.send_order(
-                            symbol= self.symbol, 
-                            order_type= OrderType.MARKET_BUY, 
-                            volume=self.volume,
-                            comment="+1",
-                            magic=self.magic
-                            )
-                    if result is not None:
-                        self.state.value = StateSymbol.balanced
-                        break
+                    
+                if len(positions) < self.max_positions and self._is_in_market_hours_synthetic():
+                    if self.main_trend.value != self.intermediate_trend.value and self.intermediate_trend.value == self.fast_trend.value :
+                        TelegramApi.send_text("Tr3nd: Creando orden Hedge")
+                        if self.main_trend.value == StateTr3nd.bullish:
+                            result = MT5Api.send_order(
+                                symbol= self.symbol, 
+                                order_type= OrderType.MARKET_SELL, 
+                                volume=self.volume,
+                                comment="-1",
+                                magic=self.magic
+                                )
+                        else:
+                            result = MT5Api.send_order(
+                                symbol= self.symbol, 
+                                order_type= OrderType.MARKET_BUY, 
+                                volume=self.volume,
+                                comment="+1",
+                                magic=self.magic
+                                )
+                        if result is not None:
+                            self.state.value = StateSymbol.balanced
+                            break
                     
     def _balaced_state(self):
         TelegramApi.send_text("Tr3nd: Estado balanceado")
