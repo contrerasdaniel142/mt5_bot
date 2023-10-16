@@ -25,7 +25,7 @@ from .utilities import convert_time_to_mt5
 #endregion
 
 class vRenko:
-    def __init__(self, rates: ndarray[FieldType.rates_dtype], brick_size:float):
+    def __init__(self, rates: ndarray[FieldType.rates_dtype], brick_size:float, wicks:bool = True):
         """
         Inicializa una instancia de vRenko con un tamaño de ladrillo especificado.
 
@@ -33,6 +33,7 @@ class vRenko:
             brick_size (float): El tamaño de ladrillo para el gráfico Renko.
         """
         self.brick_size = brick_size
+        self.wicks = wicks
         self.dtype_renko = [('time', datetime), ('type', 'U4'), ('open', float), ('high', float), ('low', float), ('close', float)]
         self.renko_data = np.empty(0, dtype= self.dtype_renko)
         self._current_brick: Dict[str, Any]= None
@@ -66,7 +67,9 @@ class vRenko:
                 self._current_brick = {
                     'type': type,
                     'open': close,
-                    'close': close
+                    'close': close,
+                    'last_high': None,
+                    'last_low': None
                 }
                 self._add_bricks(rate, renko_bricks)
                 
@@ -85,60 +88,75 @@ class vRenko:
         Returns:
             bool: retorna verdadero si se agrego uno o mas ladrillos, en caso contrario False
         """
-        price_diff = None
-        type = None
-        if self._current_brick['type'] == 'up':
-            if self._current_brick['close'] < rate['close']:
-                price_diff = rate['close'] - self._current_brick['close']
-                type = 'up'
-            elif self._current_brick['open'] > rate['close']:
-                price_diff = self._current_brick['open'] - rate['close']
-                type = 'down2'
-        else:
-            if self._current_brick['open'] < rate['close']:
-                price_diff = rate['close'] - self._current_brick['open']
-                type = 'up2'
-            elif self._current_brick['close'] > rate['close']:
-                price_diff = self._current_brick['close'] - rate['close']
-                type = 'down'
-                        
-        if price_diff is not None:
-            brick_count = price_diff // self.brick_size
-                    
-            for i in range(int(brick_count)):
-                
-                unix = rate['time']
-                time = datetime.fromtimestamp(unix)
-                convert_time = convert_time_to_mt5(time)
-                self._current_brick['time'] = convert_time
-                
-                if 'up' in type:
-                    self._current_brick['type'] = 'up'
-                    self._current_brick['open'] = self._current_brick['close'] if type == 'up' else self._current_brick['open']
-                    self._current_brick['close'] = self._current_brick['open'] + self.brick_size
-                    self._current_brick['high'] = self._current_brick['close']
-                    self._current_brick['low'] = self._current_brick['open']
-                    self._current_brick['last_low'] = None
-                    type = 'up'
-                elif 'down' in type:
-                    self._current_brick['type'] = 'down'
-                    self._current_brick['open'] = self._current_brick['close'] if type == 'down' else self._current_brick['open']
-                    self._current_brick['close'] = self._current_brick['open'] - self.brick_size
-                    self._current_brick['high'] = self._current_brick['open']
-                    self._current_brick['low'] = self._current_brick['close']
-                    self._current_brick['last_high'] = None
-                    type = 'down'
+        current_type = self._current_brick['type']
+        current_open = self._current_brick['open']
+        current_close = self._current_brick['close']
+        new_type = None
 
-                    
-                brick = (self._current_brick['time'], self._current_brick['type'], self._current_brick['open'], self._current_brick['high'], self._current_brick['low'], self._current_brick['close'],)
-                    
-                if renko_bricks is None:
-                    self.renko_data = np.append(self.renko_data, np.array([brick], dtype=self.dtype_renko))
-                else:
-                    renko_bricks.append(brick)
-                return True
+        if current_type == 'up' and current_close < rate['close']:
+            price_diff = rate['close'] - current_close
+            new_type = 'up'
+        elif current_type == 'up' and current_open > rate['close']:
+            price_diff = current_open - rate['close']
+            new_type = 'down2'
+        elif current_type == 'down' and current_open < rate['close']:
+            price_diff = rate['close'] - current_open
+            new_type = 'up2'
+        elif current_type == 'down' and current_close > rate['close']:
+            price_diff = current_close - rate['close']
+            new_type = 'down'
         
-        return False         
+        if self.wicks:
+            if self._current_brick['last_high'] is None or self._current_brick['last_high'] < rate['high']:
+                self._current_brick['last_high'] = rate['high']
+            if self._current_brick['last_low'] is None or self._current_brick['last_low'] > rate['low']:
+                self._current_brick['last_high'] = rate['low']
+        
+        if new_type is None:
+            return False
+
+        brick_count = int(price_diff // self.brick_size)
+                    
+        for i in range(int(brick_count)):
+            
+            unix = rate['time']
+            time = datetime.fromtimestamp(unix)
+            convert_time = convert_time_to_mt5(time)
+            self._current_brick['time'] = convert_time
+            
+            if 'up' in new_type:
+                self._current_brick['type'] = 'up'
+                self._current_brick['open'] = self._current_brick['close'] if new_type == 'up' else self._current_brick['open']
+                self._current_brick['close'] = self._current_brick['open'] + self.brick_size
+                self._current_brick['high'] = self._current_brick['close']
+                self._current_brick['low'] = self._current_brick['open'] if self._current_brick['last_low'] is None else self._current_brick['last_low']
+                self._current_brick['last_low'] = None
+                new_type = 'up'
+            elif 'down' in new_type:
+                self._current_brick['type'] = 'down'
+                self._current_brick['open'] = self._current_brick['close'] if new_type == 'down' else self._current_brick['open']
+                self._current_brick['close'] = self._current_brick['open'] - self.brick_size
+                self._current_brick['high'] = self._current_brick['open'] if self._current_brick['last_high'] is None else self._current_brick['last_high']
+                self._current_brick['low'] = self._current_brick['close']
+                self._current_brick['last_high'] = None
+                new_type = 'down'
+
+                
+            brick = (
+                self._current_brick['time'],
+                self._current_brick['type'],
+                self._current_brick['open'],
+                self._current_brick['high'],
+                self._current_brick['low'],
+                self._current_brick['close'],
+            )
+
+            if renko_bricks is None:
+                self.renko_data = np.append(self.renko_data, np.array([brick], dtype=self.dtype_renko))
+            else:
+                renko_bricks.append(brick)
+        
+        return True         
             
     def update_renko(self, rates)-> bool:
         """
@@ -169,7 +187,7 @@ class vRenko:
 class HeikenAshi:
     def __init__(self, rates):
         self.rates = rates
-        self.dtype_ha = [('time', int), ('open', float), ('high', float), ('low', float), ('close', float)]
+        self.dtype_ha = [('time', datetime), ('open', float), ('high', float), ('low', float), ('close', float)]
         self.heiken_ashi = np.empty(0, dtype=self.dtype_ha)
         self._calculate_heiken_ashi()
         
