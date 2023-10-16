@@ -53,7 +53,7 @@ class TrendSignal:
     
 
 class Tr3nd:
-    def __init__(self, symbol: str, volume: float = None, atr_period:int = 10, multiplier:float = 3.0) -> None:
+    def __init__(self, symbol: str, volume: float, atr_period:int, multiplier:float) -> None:
         # Numero identificador de la estretegia
         self.magic = 40
         # Indica si la estrategia esta activa
