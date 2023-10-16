@@ -192,7 +192,10 @@ class Tr3nd:
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
         elif trend_signal == TrendSignal.ready_intermediate:
-            if self.intermediate_trend.value != self.main_trend.value and self.main_trend.value != self.fast_trend.value:
+            if self.intermediate_trend.value != self.main_trend.value and self.intermediate_trend.value == self.fast_trend.value:
+                trend_signal = TrendSignal.anticipating
+                TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
+            elif self.intermediate_trend.value == self.main_trend.value and self.main_trend.value != self.fast_trend.value:
                 trend_signal = TrendSignal.anticipating
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
             elif self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
@@ -368,9 +371,9 @@ class Tr3nd:
         TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
         TelegramApi.send_text(f"Tr3nd: Fast brick size: {fast_size}")
         
-        renko_main = vRenko(minute_1_rates, main_size)
-        renko_intermediate = vRenko(minute_1_rates, intermediate_size)
-        renko_fast = vRenko(minute_1_rates, fast_size)
+        renko_main = vRenko(minute_1_rates, main_size, False)
+        renko_intermediate = vRenko(minute_1_rates, intermediate_size, False)
+        renko_fast = vRenko(minute_1_rates, fast_size, False)
                                     
         while self.is_on.value:           
              
