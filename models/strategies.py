@@ -358,7 +358,7 @@ class Tr3nd:
         
         # Obtiene las barras desde mt5
         while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  10080)
+            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
             hour_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
             if minute_1_rates is not None and hour_1_rates is not None:
                 break
