@@ -25,7 +25,7 @@ from .utilities import convert_time_to_mt5
 #endregion
 
 class vRenko:
-    def __init__(self, rates: ndarray[FieldType.rates_dtype], brick_size:float, wicks:bool = True):
+    def __init__(self, rates: ndarray[FieldType.rates_dtype], brick_size:float, wicks:bool = False):
         """
         Inicializa una instancia de vRenko con un tamaño de ladrillo especificado.
 
@@ -93,16 +93,16 @@ class vRenko:
         current_close = self._current_brick['close']
         new_type = None
 
-        if current_type == 'up' and current_close < rate['close']:
+        if current_close < rate['close']:
             price_diff = rate['close'] - current_close
             new_type = 'up'
-        elif current_type == 'up' and current_open > rate['close']:
-            price_diff = current_open - rate['close']
-            new_type = 'down2'
-        elif current_type == 'down' and current_open < rate['close']:
-            price_diff = rate['close'] - current_open
-            new_type = 'up2'
-        elif current_type == 'down' and current_close > rate['close']:
+        # elif current_type == 'up' and current_open > rate['close']:
+        #     price_diff = current_open - rate['close']
+        #     new_type = 'down2'
+        # elif current_type == 'down' and current_open < rate['close']:
+        #     price_diff = rate['close'] - current_open
+        #     new_type = 'up2'
+        elif current_close > rate['close']:
             price_diff = current_close - rate['close']
             new_type = 'down'
         
@@ -116,7 +116,10 @@ class vRenko:
             return False
 
         brick_count = int(price_diff // self.brick_size)
-                    
+        
+        if brick_count == 0:
+            return False
+        
         for i in range(int(brick_count)):
             
             unix = rate['time']
@@ -156,7 +159,7 @@ class vRenko:
             else:
                 renko_bricks.append(brick)
         
-        return True         
+        return True
             
     def update_renko(self, rates)-> bool:
         """
