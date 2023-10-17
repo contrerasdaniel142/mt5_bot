@@ -338,6 +338,9 @@ class Tr3nd:
         # Indica si es la primera vez que inicia el metodo
         first_time = True
         
+        atr_period = 3
+        multiplier = 1
+        
         # Symbolo a encontrar los trends
         symbol = self.symbol
         
@@ -369,7 +372,7 @@ class Tr3nd:
                 if not first_time:
                     ha_main.update_HeikenAshi(hour_1_bar)
                 df = pd.DataFrame(ha_main.heiken_ashi)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 state_trend = int(df.iloc[-1]['supertrend'])
                 if self.main_trend.value != state_trend:
                     self.main_trend.value = state_trend
@@ -379,7 +382,7 @@ class Tr3nd:
                 if not first_time:
                     ha_intermediate.update_HeikenAshi(minute_15_bar)
                 df = pd.DataFrame(ha_intermediate.heiken_ashi)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 state_trend = int(df.iloc[-1]['supertrend'])
                 if self.intermediate_trend.value != state_trend:
                     self.intermediate_trend.value = state_trend
@@ -388,7 +391,7 @@ class Tr3nd:
             if not first_time:
                 ha_fast.update_HeikenAshi(minute_1_bar)
             df = pd.DataFrame(ha_fast.heiken_ashi)
-            df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
+            df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
             state_trend = int(df.iloc[-1]['supertrend'])
             if self.fast_trend.value != state_trend:
                 self.fast_trend.value = state_trend
