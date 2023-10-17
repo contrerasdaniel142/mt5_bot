@@ -34,36 +34,6 @@ class BotController:
         self._market_closed_time = {'hour':19, 'minute':55}
         self._alpaca_api = AlpacaApi()
 
-    #region Positions Management
-    def manage_positions(self, is_on:ValueProxy[bool], strategy: object):
-        """
-        Administra las posiciones abiertas según las estrategias proporcionadas.
-
-        Este método revisa las estrategias proporcionadas y gestiona las posiciones abiertas de acuerdo con ellas.
-        
-        Args:
-            strategies (List[object]): Una lista de objetos que representan las estrategias a seguir.
-
-        Returns:
-            None
-        """
-        print("Iniciando administrador de posiciones abiertas.")
-        while is_on.value:
-            account_info = MT5Api.get_account_info()
-            margin_free = account_info.margin_free
-            profit = account_info.profit
-            balance = account_info.balance
-            if profit > 0:
-                MT5Api.send_close_all_position()
-            else:
-                # Obtiene las posiciones para la estrategia con su identificador magic
-                positions = MT5Api.get_positions(magic=strategy.magic)
-                # Llama al método 'manage_positions' de la estrategia para gestionar las posiciones
-                strategy.manage_positions(positions)
-            
-        MT5Api.send_close_all_position()
-            
-    #endregion
 
     #region utilities
     def _get_business_hours_today(self):
@@ -204,11 +174,8 @@ class BotController:
         print("Iniciando bot..")
                 
         # Establece los symbolos
-        symbols= ["US30.cash"] 
-        
-        # Crea un administrador para multiprocessing
-        manager = multiprocessing.Manager()
-                        
+        symbol= "US30.cash"
+                                
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
         MT5Api.shutdown()
@@ -217,42 +184,11 @@ class BotController:
             print("")
             
             self._sleep_to_next_market_opening(False)
-                
-            # Establece una variable globarl compartida que le indicara al programa cuando parar
-            is_on=manager.Value("b", True)
             
-            #region creación de estrategias
-                        
-            #region HardHedge
             # Se crea el objeto de la estrategia HardHedge 
-            hard_hedge_symbols = manager.list(symbols)
             hard_hedge_trading = HardHedgeTrading(
-                symbol_data= manager.dict({}), 
-                symbols= hard_hedge_symbols, 
-                is_on=is_on, 
-                volume_size= None,
-                max_hedge= 10
+                symbol= symbol,
+                volume_size= None
             )
-            hard_hedge_trading._preparing_symbols_data()
-            
-            # Se crea el proceso que administra la estrategia
-            hard_hedge_process = multiprocessing.Process(target=hard_hedge_trading.start)
-            hard_hedge_process.start()
-            #endregion
-            
-            #endregion
-            
-                            
-            # Inicia el proceso que administrara la estrategia
-            manage_positions_process = multiprocessing.Process(target=self.manage_positions, args=(is_on, hard_hedge_trading,))
-            manage_positions_process.start()
-            
-            # self.sleep_until_market_closes()
-            
-            # # Termina las estrategias
-            # is_on.value = False
-                
-            # Se espera a que terminen los procesos de las estrategias, se debe agregar manualmente
-            manage_positions_process.join()   
 
     #endregion

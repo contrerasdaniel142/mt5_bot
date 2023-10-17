@@ -13,38 +13,52 @@ import pandas as pd
 
 # Para trabajo en paralelo
 import multiprocessing
-from multiprocessing import Queue
-from multiprocessing.managers import DictProxy, ListProxy, ValueProxy
 
 # Importacion de los clientes de las apis para hacer solicitudes
 from .mt5.enums import TimeFrame, OrderType
 from .mt5.models import TradePosition, SymbolInfo
 
 # Importacion de los clientes de las apis para hacer solicitudes
+from .mt5.enums import TimeFrame, OrderType
 from .mt5.client import MT5Api
+from .telegram.client import TelegramApi
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime, timedelta
 import pytz, time
 
+# Importaciones de indicatores técnicos
+import pandas_ta as ta
+from .technical_indicators import HeikenAshi, vRenko
+
 #endregion
 
+class PositionState:
+    waiting = 0
+    rupture = 1
+    false_rupture = 2
+
+class SymbolState:
+    in_range = 0
+    long = 1
+    short = -1
+
+class TrendState:
+    unassigned = 0
+    bullish = 1
+    bearish = -1
+
+
 class HardHedgeTrading:
-    def __init__(self, symbol_data:DictProxy, symbols: ListProxy, is_on:ValueProxy[bool], max_hedge: int = 5, volume_size: int = 1) -> None:
+    def __init__(self, symbol: str, volume_size: int = 1) -> None:
+        # Indica si el programa debe seguir activo
+        self.is_on = None
+        
         # Lista de symbolos para administar dentro de la estrategia
-        self.symbols = symbols
-                
-        # Diccionario que contendra la data necesaria para ejecutar la estrategia cada symbolo
-        self.symbol_data = symbol_data
+        self.symbol = symbol
         
         # El numero que identificara las ordenes de esta estrategia
         self.magic = 33
-        
-        # True para que la estrategia siga ejecutandose y False para detenerse
-        self.is_on = is_on
-        
-        # El maximo hedge permitido
-        self.max_hedge = max_hedge
         
         # El tamaño del lote
         if volume_size is None:
@@ -55,8 +69,7 @@ class HardHedgeTrading:
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
-      
-    #region Utilities
+    
     def _is_in_market_hours(self):
         """
         Comprueba si el momento actual se encuentra en horario de mercado.
@@ -140,60 +153,12 @@ class HardHedgeTrading:
         with open("hedge_positions.txt", "w") as file:
             file.truncate(0)
         
-    #endregion   
-    
-    #region Profit Management
-                    
-    def manage_positions(self, positions: Tuple[TradePosition]):
-        """
-        Gestiona las posiciones para maximizar las ganancias de HardHedge mediante la actualización del stop loss y el trailing stop.
-
-        Args:
-            positions (Tuple[TradePosition]): Tupla de posiciones de operaciones.
-        """
-        # Itera sobre todas las posiciones en la lista "positions"
-        if not positions:
-            # current_time = datetime.now(pytz.utc)   # Hora actual
-            # pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
-            # market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
-            # # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
-            # if pre_closing_time < market_close:
-            #     self.clean_positions_in_txt()
-            #     for symbol in self.symbols:
-            #         self._calculate_recovery_range(symbol)
-            #     self._hedge_buyer()
-            # else:
-            #     self.is_on.value = False
-            self.clean_positions_in_txt()
-            for symbol in self.symbols:
-                self._calculate_recovery_range(symbol)
-            self._hedge_buyer()
-            
-        for position in positions:
-            # Obtiene los datos relacionados con el símbolo de la posición
-            data = self.symbol_data[position.symbol]
-            submit_changes = False
-            
-            symbol_info = MT5Api.get_symbol_info(position.symbol)
-            
-            if position.type == OrderType.MARKET_BUY: # Compra
-                new_stop_loss = position.tp - data['recovery_range']
-                new_take_profit = position.tp + data['recovery_range']
-                if symbol_info.bid > new_stop_loss:
-                    submit_changes = True
-                    
-            else: # Venta
-                new_stop_loss = position.tp + data['recovery_range']
-                new_take_profit = position.tp - data['recovery_range']
-                if symbol_info.ask < new_stop_loss:
-                    submit_changes = True
+    def manage_positions(self):
+        TelegramApi.send_text("tr3nd: Iniciando administrador de posiciones")
+        # Comienza el administrador de posiciones
+        while self.is_on.value:
+            if self.
                 
-            if submit_changes is True:                 
-                # Actualiza el stop loss y el take profit con el nuevo valor calculado
-                MT5Api.send_change_stop_loss_and_take_profit(position.symbol, new_stop_loss, new_take_profit, position.ticket)
-
-    
-    #endregion             
     
     #region HardHedge strategy 
     def _preparing_symbols_data(self):
@@ -203,59 +168,49 @@ class HardHedgeTrading:
         print("HardHedge: Preparando la data...")
         # Variable auxiliar
         symbol_data = {}
-
-        # Obtener la informacion necesaria para cada symbolo
-        for symbol in self.symbols:
-            
-            info = MT5Api.get_symbol_info(symbol)
-            
-            digits = info.digits
-                        
-            recovery_range = round(self._calculate_recovery_range(symbol), digits)
-            
-            min_range = info.trade_stops_level * info.point
-            
-            if recovery_range < min_range:
-                recovery_range = min_range
-            
-            if self.volume_size is None:
-                self.volume_size = info.volume_min
-            
-            counter_hedge = self.volume_size
-            for i in range(1, self.max_hedge):
-                if i % 2 == 0: 
-                    counter_hedge += self.volume_size * (2 ** (i))
-                else:
-                    counter_hedge -=  self.volume_size * (2 ** (i))
-            
-            counter_hedge = round(abs(counter_hedge), digits)
+        
+        # Establece el periodo de tiempo para calcular el rango
+        current_time = datetime.now(pytz.utc)
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
+        
                 
-            symbol_data[symbol] = {
-                'symbol': symbol,
-                'digits': digits,
-                'recovery_range': recovery_range,
-                'volume_min': info.volume_min,
-                'volume_max': info.volume_max,
-                'counter_hedge': abs(counter_hedge)
-            }
+        while True:
+            info = MT5Api.get_symbol_info(self.symbol)
+            rates_in_range = MT5Api.get_rates_range(self.symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
-            print(symbol_data[symbol])
+            # Para testear fuera de horarios de mercado 
+            if rates_in_range is None or rates_in_range.size == 0:
+                number_bars = 30
+                rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
+
+            if info is not None and rates_in_range is not None:
+                break
+        
+        
+        digits = info.digits
+        high = np.max(rates_in_range['high'])
+        low = np.min(rates_in_range['low'])
+        range_value = abs(high - low)
+        recovery_range = range_value
+                
+        if self.volume_size is None:
+            self.volume_size = info.volume_min
+  
+        symbol_data= {
+            'symbol': self.symbol,
+            'digits': digits,
+            'recovery_range': recovery_range,
+            'volume_min': info.volume_min,
+            'volume_max': info.volume_max,
+        }
+        
+        print(symbol_data)
             
             
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
-    
-    def _calculate_recovery_range(self, symbol):
-        atr = self.get_atr(symbol, 14)
-        recovery_range = atr * 0.75
-        if symbol in self.symbol_data:
-            data = self.symbol_data[symbol]
-            data['recovery_range'] = round(recovery_range, data['digits'])
-            self.symbol_data.update({symbol:data})
-            print(data)
-        else: 
-            return recovery_range
-    
+        
     def get_atr(self, symbol: str,  number_bars:int=14)->float:
         """
         Calcula el Average True Range (ATR) de un symbolo especifico en mt5.
@@ -445,14 +400,22 @@ class HardHedgeTrading:
 
         print("HardHedge: Iniciando estrategia...")
         
-        # Inicio del cilco
-        while self.is_on.value:
-            # Salir del bucle si no quedan símbolos
-            if not self.symbols:
-                print("HardHedge: No hay símbolos por analizar.")
-                self.is_on.value = False
+        while True:
+            positions = MT5Api.get_positions(magic=self.magic)
+            if positions is not None:
                 break
-            self._hedge_strategy()
+        
+        # Se crea las variables compartidas
+        manager = multiprocessing.Manager()
+        self.symbol_data = manager.dict()
+        self.is_on = manager.Value("b", True)
+        self.trend_state = manager.Value("i", TrendState.unassigned)
+        self.symbol_state = manager.Value("i", SymbolState.in_range)
+                
+        self._preparing_symbols_data()
+        
+        # crea los procesos y los inicia
+        self._hedge_strategy()
                     
         # Fin del ciclo
         print("HardHedge: Finalizando estrategia...")

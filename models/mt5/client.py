@@ -2,6 +2,7 @@ import MetaTrader5 as mt5   # Para conectarse y realizar solicitudes a una termi
 import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
+from .telegram.client import TelegramApi
 from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
 from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition, AccountInfo
 from numpy import ndarray
@@ -493,7 +494,7 @@ class MT5Api:
             # Si no se especifica el precio, obtener el precio actual del mercado
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
-                print(f"No se pudo obtener el precio actual para {symbol}.")
+                TelegramApi.send_text(f"No se pudo obtener el precio actual para {symbol}.")
             if order_type == OrderType.MARKET_BUY:
                 request['price'] = tick.ask  # Precio ask (venta) como precio de compra
             elif order_type == OrderType.MARKET_SELL:
@@ -517,16 +518,18 @@ class MT5Api:
             request["magic"] = magic
 
         order_request: MqlTradeResult = mt5.order_send(request)
-        
-        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
-            print(f"Comentario: {order_request.comment}")
-            return None
-        else:
-            print(f"Orden completada. {symbol}: vol[{volume}] price[{price}] sl[{stop_loss}] tp [{take_profit}]")
 
         #Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+        
+        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            TelegramApi.send_text(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
+            TelegramApi.send_text(f"Comentario: {order_request.comment}")
+            return None
+        else:
+            TelegramApi.send_text(f"Orden completada: {request}")
+
+        
         return order_request
     
     def send_sell_partial_order(symbol: str, volume_to_sell: float, ticket:int, comment:str = None)->bool:
@@ -577,17 +580,17 @@ class MT5Api:
             MT5Api.shutdown()
 
             if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
-                print(f"Comentario: {order_request.comment}")
+                TelegramApi.send_text(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+                TelegramApi.send_text(f"Comentario: {order_request.comment}")
                 return False
             else:
-                print("Venta parcial completada.")
+                TelegramApi.send_text("Venta parcial completada.")
                 return True
                 
         else:
             #Cierra la conexión con MetaTrader 5
             MT5Api.shutdown()
-            print("Ticket no encontrado.")
+            TelegramApi.send_text("Ticket no encontrado.")
             return False
     
     def send_change_stop_loss_and_take_profit(symbol:str, new_stop_loss: float,  new_take_profit: float, ticket:int)->bool:
@@ -620,11 +623,11 @@ class MT5Api:
         MT5Api.shutdown()
 
         if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del sl y tp ejecutada. {symbol}: sl {new_stop_loss} tp {new_take_profit}")
+            TelegramApi.send_text(f"Modificación del sl y tp ejecutada. {symbol}: sl {new_stop_loss} tp {new_take_profit}")
             return True
         else:
-            print(f"Error al ejecutar la modificación del sl y tp: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
+            TelegramApi.send_text(f"Error al ejecutar la modificación del sl y tp: {modify_result.retcode}")
+            TelegramApi.send_text(f"Comentario: {modify_result.comment}")
             return False  
     
     def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int)->bool:
@@ -655,11 +658,11 @@ class MT5Api:
         MT5Api.shutdown()
 
         if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del stop loss ejecutada. {symbol}: {new_stop_loss}")
+            TelegramApi.send_text(f"Modificación del stop loss ejecutada. {symbol}: {new_stop_loss}")
             return True
         else:
-            print(f"Error al ejecutar la modificación del stop loss: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
+            TelegramApi.send_text(f"Error al ejecutar la modificación del stop loss: {modify_result.retcode}")
+            TelegramApi.send_text(f"Comentario: {modify_result.comment}")
             return False  
         
     def send_change_take_profit(symbol:str, new_take_profit: float, ticket:int):
@@ -684,10 +687,10 @@ class MT5Api:
         modify_result = mt5.order_send(modify_request)
 
         if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Modificación del take profit ejecutada. {symbol}: {new_take_profit}")
+            TelegramApi.send_text(f"Modificación del take profit ejecutada. {symbol}: {new_take_profit}")
         else:
-            print(f"Error al ejecutar la modificación del take profit: {modify_result.retcode}")
-            print(f"Comentario: {modify_result.comment}")
+            TelegramApi.send_text(f"Error al ejecutar la modificación del take profit: {modify_result.retcode}")
+            TelegramApi.send_text(f"Comentario: {modify_result.comment}")
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -711,11 +714,11 @@ class MT5Api:
                 close_result = mt5.Close(position.symbol,ticket=position.ticket)
                 
                 if close_result:
-                    print(f"Posición en {position.symbol} cerrada con éxito")
+                    TelegramApi.send_text(f"Posición en {position.symbol} cerrada con éxito")
                 else:
-                    print(f"Error al cerrar la posición en {position.symbol}")
+                    TelegramApi.send_text(f"Error al cerrar la posición en {position.symbol}")
         else:
-            print("No hay posiciones abiertas para cerrar")
+            TelegramApi.send_text("No hay posiciones abiertas para cerrar")
             
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -731,7 +734,7 @@ class MT5Api:
         MT5Api.initialize()
         # Verificamos si la conexión con MetaTrader 5 está establecida
         if not mt5.initialize():
-            print("Error: No se pudo establecer la conexión con MetaTrader 5.")
+            TelegramApi.send_text("Error: No se pudo establecer la conexión con MetaTrader 5.")
             return False
         
         # Configuramos los parámetros para eliminar el stop loss y el take profit
@@ -745,33 +748,39 @@ class MT5Api:
         result = mt5.order_send(request)
         
         if result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"Take profit y stop loss eliminados.")
+            TelegramApi.send_text(f"Take profit y stop loss eliminados.")
         else:
-            print(f"Error al ejecutar la eliminación de Take profit y stop loss: {result.retcode}")
-            print(f"Comentario: {result.comment}")
+            TelegramApi.send_text(f"Error al ejecutar la eliminación de Take profit y stop loss: {result.retcode}")
+            TelegramApi.send_text(f"Comentario: {result.comment}")
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
     
-    def send_close_position(symbol:str, ticket:int):
+    def send_close_position(symbol:str, ticket:int)-> bool:
         """
         Cierra una posicion abiertas en la plataforma MetaTrader 5.
         
         Args:
             symbol (str): El símbolo del instrumento.
             ticket (int): El número de ticket de la posición a vender.
+        Returns:
+            bool: Verdadero si se ejecuto con exito, falso en caso contrario
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
-        close_result = mt5.Close(symbol=symbol, ticket=ticket)                
-        if close_result:
-            print(f"Posición {ticket} cerrada con éxito")
-        else:
-            print(f"Error al cerrar la posición ticket")
-            
+        close_result = mt5.Close(symbol=symbol, ticket=ticket)
+        
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+                   
+        if close_result:
+            TelegramApi.send_text(f"Posición {ticket} cerrada con éxito")
+            return True
+        else:
+            TelegramApi.send_text(f"Error al cerrar la posición ticket")
+            return False
+            
     
     
     #endregion
