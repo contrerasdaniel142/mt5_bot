@@ -400,7 +400,7 @@ class Tr3nd:
             if not first_time:
                 minute_1_rates = np.append(minute_1_rates, minute_1_bar)
             df = pd.DataFrame(minute_1_rates)
-            df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1)
+            df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
             state_trend = int(df[-1]['supertrend'])
             if self.fast_trend.value != state_trend:
                 self.fast_trend.value = state_trend
