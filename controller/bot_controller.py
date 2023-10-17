@@ -205,7 +205,7 @@ class BotController:
         TelegramApi.send_text("Iniciando bot..")
                 
         # Establece los symbolos
-        symbol= "US30.cash"
+        symbol= "Volatility 10 Index"
         
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
