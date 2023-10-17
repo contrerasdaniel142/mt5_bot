@@ -355,13 +355,15 @@ class Tr3nd:
         brick_size = self._get_optimal_brick_size(hour_1_rates)
         main_size = round(brick_size, self.digits)
         intermediate_size = round((main_size/4),self.digits)
+        fast_size = round((intermediate_size/4),self.digits)
         
         TelegramApi.send_text(f"Tr3nd: Main brick size: {main_size}")
         TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
+        TelegramApi.send_text(f"Tr3nd: fast brick size: {fast_size}")
             
         renko_main = vRenko(minute_1_rates, main_size)
         renko_intermediate = vRenko(minute_1_rates, intermediate_size)
-        ha_fast = HeikenAshi(minute_1_rates)
+        renko_fast = vRenko(minute_1_rates, fast_size)
                                                 
         while self.is_on.value:           
              
@@ -393,15 +395,16 @@ class Tr3nd:
                     self.intermediate_trend.value = state_trend
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
             
-            if not first_time:
-                ha_fast.update_HeikenAshi(minute_1_bar)
-            df = pd.DataFrame(ha_fast.heiken_ashi)
-            df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-            state_trend = int(df.iloc[-1]['supertrend'])
-            if self.fast_trend.value != state_trend:
-                self.fast_trend.value = state_trend
-                TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")            
-               
+            if first_time or renko_fast.update_renko(minute_1_bar):
+                last_type = renko_fast.renko_data[-1]['type']
+                if last_type == 'up':
+                    state_trend = StateTr3nd.bullish
+                else:
+                    state_trend = StateTr3nd.bearish
+                if self.fast_trend.value != state_trend:
+                    self.fast_trend.value = state_trend
+                    TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+            
             if first_time:
                 first_time = False
                 
