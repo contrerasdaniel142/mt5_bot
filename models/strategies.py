@@ -45,7 +45,7 @@ class StateSymbol:
 
 class TrendSignal:
     anticipating = 0
-    rady_main = 1
+    ready_main = 1
     ready_intermediate = 2
     ready_fast = 3
     buy = 4
@@ -164,8 +164,8 @@ class Tr3nd:
     def _trade_to_unbalance(self, trend_signal:TrendSignal):
         
         if trend_signal == TrendSignal.anticipating:
-            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value and self.state.value == StateSymbol.no_trades:
-                trend_signal = TrendSignal.ready_fast
+            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value == self.fast_trend.value and self.state.value == StateSymbol.no_trades:
+                trend_signal = TrendSignal.ready_main
                 TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
             elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                 trend_signal = TrendSignal.ready_intermediate
@@ -175,6 +175,11 @@ class Tr3nd:
             trend_signal = TrendSignal.buy
             TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
+        if trend_signal == TrendSignal.ready_main:
+            if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value and self.state.value == StateSymbol.no_trades:
+                trend_signal = TrendSignal.ready_fast
+                TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
+                
         if trend_signal == TrendSignal.ready_fast:
             if self.intermediate_trend.value != self.main_trend.value:
                 trend_signal = TrendSignal.anticipating
@@ -220,7 +225,7 @@ class Tr3nd:
             TelegramApi.send_text(f"Tr3nd: [Estado para nueva orden {trend_signal}]")
         
         return trend_signal
-               
+            
     def _unbalanced_state(self):
         TelegramApi.send_text("Tr3nd: Estado desbalanceado")
         take_profit = False
@@ -344,11 +349,11 @@ class Tr3nd:
         # Obtiene las barras desde mt5
         while True:
             minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-            hour_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
-            if minute_1_rates is not None and hour_1_rates is not None:
+            hour_4_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_4, 1,  10080)
+            if minute_1_rates is not None and hour_4_rates is not None:
                 break
             
-        optimal_brick = self._get_optimal_brick_size(hour_1_rates)
+        optimal_brick = self._get_optimal_brick_size(hour_4_rates)
         main_size = round(optimal_brick, self.digits)
         intermediate_size = round((main_size/4), self.digits)
         fast_size = round((intermediate_size/4), self.digits)
