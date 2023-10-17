@@ -33,8 +33,6 @@ import time
 class BotController:
     def __init__(self) -> None:
         # Estos horarios estan en utc
-        self._market_opening_time = {'day':1,'hour':0, 'minute':0}
-        self._market_closed_time = {'hour':19, 'minute':45}
         self._alpaca_api = AlpacaApi()
 
     #region utilities
@@ -67,19 +65,22 @@ class BotController:
             return business_hours
         return business_hours  
     
-    def _is_in_market_hours(self):
+    def _is_in_market_hours_synthetic(self):
         """
-        Comprueba si el momento actual se encuentra en horario de mercado.
+        Comprueba si el momento actual se encuentra en horario de mercado sintetico.
 
         Returns:
             bool: True si se encuentra en horario de mercado, False si no lo está.
         """
         # Obtener la hora y minutos actuales en UTC
         current_time = datetime.now(pytz.utc)
+        
+        market_opening_time = {'day':1,'hour':0, 'minute':0}
+        market_closed_time = {'hour':19, 'minute':45}
 
         # Crear objetos time para el horario de apertura y cierre del mercado
-        market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        market_open = current_time.replace(hour=market_opening_time['hour'], minute=market_opening_time['minute'], second=0)
+        market_close = current_time.replace(hour=market_closed_time['hour'], minute=market_closed_time['minute'], second=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close and self._get_business_hours_today():
@@ -88,9 +89,32 @@ class BotController:
             TelegramApi.send_text("El mercado está cerrado.")
             return False
 
+    def _is_in_market_hours_ny(self):
+        """
+        Comprueba si el momento actual se encuentra en horario de mercado de nueva york.
+
+        Returns:
+            bool: True si se encuentra en horario de mercado, False si no lo está.
+        """
+        # Obtener la hora y minutos actuales en UTC
+        current_time = datetime.now(pytz.utc).time()
+        
+        market_opening_time = {'hour':13, 'minute':30}
+        market_closed_time = {'hour':19, 'minute':55}
+
+        # Crear objetos time para el horario de apertura y cierre del mercado
+        market_open = current_time.replace(hour=market_opening_time['hour'], minute=market_opening_time['minute'], second=0)
+        market_close = current_time.replace(hour=market_closed_time['hour'], minute=market_closed_time['minute'], second=0)
+
+        # Verificar si la hora actual está dentro del horario de mercado
+        if market_open <= current_time <= market_close and self._get_business_hours_today():
+            return True
+        else:
+            print("El mercado está cerrado.")
+            return False
 
     def _sleep_to_next_market_opening_synthetic(self):
-        """Espera hasta la próxima apertura del mercado.
+        """Espera hasta la próxima apertura del mercado sintetico.
 
         Args:
             sleep_in_market (bool): Indica si el método debe ejecutarse durante el mercado abierto (False) o no (True).
@@ -118,8 +142,8 @@ class BotController:
         current_time = datetime.now(pytz.utc)
         TelegramApi.send_text(f"Hora actual utc: {current_time}")
     
-    def _sleep_to_next_market_opening(self, sleep_in_market:bool = True):
-        """Espera hasta la próxima apertura del mercado.
+    def _sleep_to_next_market_opening_ny(self, sleep_in_market:bool = True):
+        """Espera hasta la próxima apertura del mercado de nueva york.
 
         Args:
             sleep_in_market (bool): Indica si el método debe ejecutarse durante el mercado abierto (False) o no (True).
@@ -128,14 +152,16 @@ class BotController:
             None
         """
         
-        if sleep_in_market == False and self._is_in_market_hours():
-            TelegramApi.send_text("El mercado está abierto")
+        if sleep_in_market == False and self._is_in_market_hours_ny():
+            print("El mercado está abierto")
             return
         
-        TelegramApi.send_text("Obteniendo proxima apertura de mercado...")
+        print("Obteniendo proxima apertura de mercado...")
     
         # Obtener la hora actual en UTC
         current_time = datetime.now(pytz.utc)
+        
+        market_opening_time = {'hour':13, 'minute':30}
         
         # Obtiene los calendarios de mercado desde el día actual hasta 10 días después.
         calendars = self._alpaca_api.get_next_days_of_market(10)
@@ -144,23 +170,23 @@ class BotController:
         
         for calendar in calendars:
             next_market_open = calendar.open.astimezone(pytz.utc).replace(
-                hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute']
-            )+ timedelta(days=self._market_opening_time['day'])
+                hour=market_opening_time['hour'], minute=market_opening_time['minute']
+            )
             if current_time < next_market_open:
                 break
             
-        TelegramApi.send_text("Hora actual utc: ", current_time)
-        TelegramApi.send_text("Apertura del mercado utc: ", next_market_open)
+        print("Hora actual utc: ", current_time)
+        print("Apertura del mercado utc: ", next_market_open)
         
         # Calcular la cantidad de segundos que faltan hasta la apertura
         seconds_until_open = (next_market_open - current_time).total_seconds()
         
-        TelegramApi.send_text(f"Esperando {seconds_until_open} segundos hasta la apertura...")
+        print(f"Esperando {seconds_until_open} segundos hasta la apertura...")
         time.sleep(seconds_until_open)
     
         # Obtener la hora actual en UTC después de esperar
         current_time = datetime.now(pytz.utc)
-        TelegramApi.send_text("Hora actual utc: ", current_time)
+        print("Hora actual utc: ", current_time)
     
     def sleep_until_market_closes(self,):
         """Espera hasta el cierre del mercado.
@@ -211,13 +237,13 @@ class BotController:
         MT5Api.initialize(4)
         MT5Api.shutdown()
                         
-        while True:                     
+        while True:
+            self._sleep_to_next_market_opening_ny(False)
             # Se crea el objeto de la estrategia Tr3nd y se inicia
             tr3nd = Tr3nd(
                 symbol=symbol,
                 volume=10
                 )
-            tr3nd.start()
-            self._sleep_to_next_market_opening_synthetic()   
+            tr3nd.start() 
             
     #endregion
