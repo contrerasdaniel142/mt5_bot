@@ -344,11 +344,11 @@ class Tr3nd:
         # Obtiene las barras desde mt5
         while True:
             minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-            minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_30, 1,  10080)
-            if minute_1_rates is not None and minute_30_rates is not None:
+            hour_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.HOUR_1, 1,  10080)
+            if minute_1_rates is not None and hour_1_rates is not None:
                 break
             
-        optimal_brick = self._get_optimal_brick_size(minute_30_rates)
+        optimal_brick = self._get_optimal_brick_size(hour_1_rates)
         main_size = round(optimal_brick, self.digits)
         intermediate_size = round((main_size/4), self.digits)
         fast_size = round((intermediate_size/4), self.digits)
