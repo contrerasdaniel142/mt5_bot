@@ -53,7 +53,7 @@ class TrendSignal:
     
 
 class Tr3nd:
-    def __init__(self, symbol: str, volume: float, atr_period:int, multiplier:float) -> None:
+    def __init__(self, symbol: str, volume: float) -> None:
         # Numero identificador de la estretegia
         self.magic = 40
         # Indica si la estrategia esta activa
@@ -66,10 +66,6 @@ class Tr3nd:
         self.volume = float(volume)
         # Estado el activo
         self.state = StateSymbol.no_trades
-        # Periodo del atr usado para el supertrend
-        self.atr_period = atr_period
-        # Multiplicador usado en el supertrend
-        self.multiplier = multiplier
         # Inicializa las variables que tendran la tendencia
         self.main_trend = StateTr3nd.unassigned
         self.intermediate_trend = StateTr3nd.unassigned
@@ -78,6 +74,7 @@ class Tr3nd:
         self._market_opening_time = {'day':1,'hour':0, 'minute':0}
         self._market_closed_time = {'hour':19, 'minute':45}
         self.opening_balance_account = 0
+        self.digits = 0
         
     def _is_in_market_hours_synthetic(self):
         """
@@ -143,12 +140,7 @@ class Tr3nd:
             profit_positions = 0
             for position in positions:
                 profit_positions += position.profit
-                
-            # if profit_positions > (self.opening_balance_account*0.005):
-            #     TelegramApi.send_text(f"Tr3nd: Meta de profit en las posiciones abiertas alcanzado {profit_positions}")
-            #     self.state.value = StateSymbol.no_trades
-            #     MT5Api.send_close_all_position()
-            
+                            
             total_profit = profit_positions+profit_account
             if total_profit >= (self.opening_balance_account*0.03):
                 TelegramApi.send_text(f"Tr3nd: Meta de profit total alcanzado {total_profit}")
@@ -339,7 +331,7 @@ class Tr3nd:
         if len(rates) > atr_timeperiod:
             atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
             brick_size = np.median(atr[atr_timeperiod:])
-        return round(brick_size)
+        return brick_size
     
     def _update_trends(self):
         TelegramApi.send_text("Tr3nd: Update iniciado")
@@ -348,10 +340,6 @@ class Tr3nd:
         
         # Symbolo a encontrar los trends
         symbol = self.symbol
-
-        # Se establecen las variables para el supertrend
-        atr_period = self.atr_period
-        multiplier = self.multiplier
         
         # Obtiene las barras desde mt5
         while True:
@@ -359,10 +347,11 @@ class Tr3nd:
             minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_30, 1,  10080)
             if minute_1_rates is not None and minute_30_rates is not None:
                 break
-        
-        main_size = self._get_optimal_brick_size(minute_30_rates)
-        intermediate_size = main_size/2
-        fast_size = intermediate_size/2
+            
+        optimal_brick = self._get_optimal_brick_size(minute_30_rates)
+        main_size = round(optimal_brick, self.digits)
+        intermediate_size = round((main_size/2), self.digits)
+        fast_size = round((intermediate_size/2), self.digits)
         
         TelegramApi.send_text(f"Tr3nd: Main brick size: {main_size}")
         TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
@@ -418,27 +407,17 @@ class Tr3nd:
     
     def start(self):
         TelegramApi.send_text(f"Tr3nd: Iniciando estrategia para {self.symbol}...")
-        TelegramApi.send_text(f"Tr3nd: Periodo atr: {self.atr_period}")
-        TelegramApi.send_text(f"Tr3nd: Multiplicador: {self.multiplier}")
         # Establece el volumen para las ordenes
         while True:
             account_info = MT5Api.get_account_info()
-            if account_info is not None:
+            symbol_info = MT5Api.get_symbol_info(self.symbol)
+            if account_info is not None and symbol_info is not None:
                 break
             
         self.opening_balance_account = account_info.balance
+        self.digits = symbol_info.digits
         TelegramApi.send_text(f"Tr3nd: Balance de apertura {self.opening_balance_account}")
-        
-        #symbol_info = MT5Api.get_symbol_info(self.symbol)
-        # max_volume = round((account_info.balance * 0.01 * symbol_info.point), symbol_info.digits)
-        # if self.volume is None:
-        #     self.volume = max_volume
-        # else:
-        #     self.volume = round(self.volume, symbol_info.digits)
-        #     if self.volume > max_volume:
-        #         self.volume = max_volume
-        # Crea un administrador para multiprocessing
-        
+         
         manager = multiprocessing.Manager()
         # Crea las variables que se administraran entre procesos
         self.is_on = manager.Value("b", True)
