@@ -383,27 +383,33 @@ class Tr3nd:
                         break           
             
             if first_time or renko_main.update_renko(minute_1_bar):
-                df = pd.DataFrame(renko_main.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.main_trend.value != last_bar_renko['supertrend']:
-                    self.main_trend.value = int(last_bar_renko['supertrend'])
+                last_type = renko_main.renko_data[-1]['type']
+                if last_type == 'up':
+                    state_trend = StateTr3nd.bullish
+                else:
+                    state_trend = StateTr3nd.bearish
+                if self.main_trend.value != state_trend:
+                    self.main_trend.value = state_trend
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                 
             if first_time or renko_intermediate.update_renko(minute_1_bar):
-                df = pd.DataFrame(renko_intermediate.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.intermediate_trend.value != last_bar_renko['supertrend']:
-                    self.intermediate_trend.value = int(last_bar_renko['supertrend'])
+                last_type = renko_intermediate.renko_data[-1]['type']
+                if last_type == 'up':
+                    state_trend = StateTr3nd.bullish
+                else:
+                    state_trend = StateTr3nd.bearish
+                if self.intermediate_trend.value != state_trend:
+                    self.intermediate_trend.value = state_trend
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                 
             if first_time or renko_fast.update_renko(minute_1_bar):
-                df = pd.DataFrame(renko_fast.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.fast_trend.value != last_bar_renko['supertrend']:
-                    self.fast_trend.value = int(last_bar_renko['supertrend'])
+                last_type = renko_fast.renko_data[-1]['type']
+                if last_type == 'up':
+                    state_trend = StateTr3nd.bullish
+                else:
+                    state_trend = StateTr3nd.bearish
+                if self.fast_trend.value != state_trend:
+                    self.fast_trend.value = state_trend
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     
             if first_time:
