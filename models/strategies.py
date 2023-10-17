@@ -370,20 +370,20 @@ class Tr3nd:
                     if minute_1_bar is not None:
                         break           
             
-            if first_time or hour_1_bar['time'] > hour_1_rates[-1]['time']:
+            if first_time or hour_1_bar['time'] > ha_main.rates[-1]['time'] :
                 if not first_time:
-                    hour_1_rates = np.append(hour_1_rates, hour_1_bar)
-                df = pd.DataFrame(hour_1_rates)
+                    ha_main.update_HeikenAshi(hour_1_bar)
+                df = pd.DataFrame(ha_main.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
                 state_trend = int(df.iloc[-1]['supertrend'])
                 if self.main_trend.value != state_trend:
                     self.main_trend.value = state_trend
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")            
             
-            if first_time or minute_15_bar['time'] > minute_15_rates[-1]['time']:
+            if first_time or minute_15_bar['time'] > ha_intermediate.rates[-1]['time'] :
                 if not first_time:
-                    minute_15_rates = np.append(minute_15_rates, minute_15_bar)
-                df = pd.DataFrame(minute_15_rates)
+                    ha_intermediate.update_HeikenAshi(minute_15_bar)
+                df = pd.DataFrame(ha_intermediate.heiken_ashi)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
                 state_trend = int(df.iloc[-1]['supertrend'])
                 if self.intermediate_trend.value != state_trend:
@@ -391,8 +391,8 @@ class Tr3nd:
                     TelegramApi.send_text(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")            
             
             if not first_time:
-                minute_1_rates = np.append(minute_1_rates, minute_1_bar)
-            df = pd.DataFrame(minute_1_rates)
+                ha_fast.update_HeikenAshi(minute_1_bar)
+            df = pd.DataFrame(ha_fast.heiken_ashi)
             df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=5, multiplier=1).iloc[:, 1]
             state_trend = int(df.iloc[-1]['supertrend'])
             if self.fast_trend.value != state_trend:
