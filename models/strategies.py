@@ -338,9 +338,6 @@ class Tr3nd:
         # Indica si es la primera vez que inicia el metodo
         first_time = True
         
-        atr_period = 3
-        multiplier = 1
-        
         # Symbolo a encontrar los trends
         symbol = self.symbol
         
