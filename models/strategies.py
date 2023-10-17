@@ -350,8 +350,8 @@ class Tr3nd:
             
         optimal_brick = self._get_optimal_brick_size(minute_30_rates)
         main_size = round(optimal_brick, self.digits)
-        intermediate_size = round((main_size/2), self.digits)
-        fast_size = round((intermediate_size/2), self.digits)
+        intermediate_size = round((main_size/4), self.digits)
+        fast_size = round((intermediate_size/4), self.digits)
         
         TelegramApi.send_text(f"Tr3nd: Main brick size: {main_size}")
         TelegramApi.send_text(f"Tr3nd: Intermediate brick size: {intermediate_size}")
