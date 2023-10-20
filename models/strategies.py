@@ -33,23 +33,7 @@ from .technical_indicators import HeikenAshi, vRenko
 
 #endregion
 
-class PositionState:
-    waiting = 0
-    rupture = 1
-    false_rupture = 2
-
-class SymbolState:
-    in_range = 0
-    long = 1
-    short = -1
-
-class TrendState:
-    unassigned = 0
-    bullish = 1
-    bearish = -1
-
-
-class HardHedgeTrading:
+class HedgeTrailing:
     def __init__(self, symbol: str, volume_size: int = 1) -> None:
         # Indica si el programa debe seguir activo
         self.is_on = None
@@ -57,8 +41,14 @@ class HardHedgeTrading:
         # Lista de symbolos para administar dentro de la estrategia
         self.symbol = symbol
         
+        # Variable para indicar el estado del supertrend
+        self.trend_state = None
+        
+        # Variable que contiene informaciond el symbolo para la estrategia
+        self.symbol_data = {}
+        
         # El numero que identificara las ordenes de esta estrategia
-        self.magic = 33
+        self.magic = 63
         
         # El tamaño del lote
         if volume_size is None:
@@ -70,6 +60,7 @@ class HardHedgeTrading:
         self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
     
+    #region Utilities
     def _is_in_market_hours(self):
         """
         Comprueba si el momento actual se encuentra en horario de mercado.
@@ -116,56 +107,156 @@ class HardHedgeTrading:
         # Dormir durante la cantidad de segundos necesarios
         time.sleep(seconds)
     
-    def save_position_in_txt(self, ticket: int):
-        """
-        Guarda la posición especificada en un archivo de texto.
-        No se aplicará hedge a las posiciones guardadas en este archivo.
-
-        Args:
-            ticket (int): El número de ticket de la posición a guardar.
-        """
-        with open("hedge_positions.txt", "a") as file:
-            file.write(f"Ticket: {ticket} ")
-
-    def find_position_in_txt(self, ticket: int) -> bool:
-        """
-        Busca si un ticket de posición está presente en el archivo de texto.
-
-        Args:
-            ticket (int): El número de ticket de la posición a buscar.
-
-        Returns:
-            bool: True si se encuentra el ticket en el archivo, False en caso contrario.
-        """
-        try:
-            with open("hedge_positions.txt", "r") as file:
-                content = file.read()  # Cambia readlines() a read()
-                if f"Ticket: {ticket}" in content:  # Verifica si la cadena está en el contenido
-                    return True
-                return False
-        except FileNotFoundError:
-            return False
-
-    def clean_positions_in_txt(self):
-        """
-        Limpia el archivo de texto que almacena las posiciones guardadas.            
-        """
-        with open("hedge_positions.txt", "w") as file:
-            file.truncate(0)
-        
-    def manage_positions(self):
-        TelegramApi.send_text("tr3nd: Iniciando administrador de posiciones")
-        # Comienza el administrador de posiciones
-        while self.is_on.value:
-            if self.
-                
+    #endregion
     
-    #region HardHedge strategy 
+    #region Manage Profit
+    
+    def _manage_positions(self):
+        """
+        Esta función administra las posiciones en el contexto de trading.
+        """
+        
+        # Envía un mensaje de inicio al canal de Telegram
+        print("HedgeTrailing: Iniciando administrador de posiciones")
+        
+        # Comienza el administrador de posiciones
+        # Variables del rango
+        high = self.symbol_data['high']
+        low = self.symbol_data['low']
+        range = self.symbol_data['range']
+        number_trailing = 1
+        in_hedge = False
+        trailing_stop = False
+        
+        while self.is_on.value:
+            # Se obtienen las posiciones y la información del símbolo de MetaTrader 5
+            while True:
+                positions = MT5Api.get_positions(magic=self.magic)
+                info = MT5Api.get_symbol_info(self.symbol)
+                if positions is not None and info is not None:
+                    break
+            
+            # Reinicia las variables en caso de que ya no haya posiciones abiertas
+            if not positions:
+                current_time = datetime.now(pytz.utc)   # Hora actual
+                pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
+                market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+                # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
+                if False:
+                    self.is_on.value = False
+                    continue
+
+                number_trailing = 1
+                in_hedge = False
+                trailing_stop = False
+                continue
+            
+            current_price = info.bid
+            
+            if not trailing_stop and positions:
+                # Determina el número de lotes y el tipo de última posición
+                number_batchs = int(positions[-1].comment)
+                type = positions[-1].type
+                
+                if number_batchs < 3:
+                    if type == OrderType.MARKET_BUY:
+                        limit_price = high + range
+                        if current_price >= limit_price:
+                            # Vende la mitad de las posiciones abiertas
+                            completed = True
+                            for position in positions:
+                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                completed = completed and result
+                            if not completed:
+                                continue
+                            trailing_stop = True
+                    else:
+                        limit_price = low - range
+                        if current_price <= limit_price:
+                            # Vende la mitad de las posiciones abiertas
+                            completed = True
+                            for position in positions:
+                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                completed = completed and result
+                            if not completed:
+                                continue
+                            trailing_stop = True
+                else:
+                    in_hedge = True
+                    if type == OrderType.MARKET_BUY:
+                        limit_price = high + (range * 0.625)
+                        if current_price >= limit_price:
+                            # Cierra posiciones con pérdidas
+                            completed = True
+                            for position in positions:
+                                if position.profit < 0:
+                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                    completed = completed and result
+                            if not completed:
+                                continue
+                            trailing_stop = True
+                    else:
+                        limit_price = low - (range * 0.625)
+                        if current_price <= limit_price:
+                            # Cierra posiciones con pérdidas
+                            completed = True
+                            for position in positions:
+                                if position.profit < 0:
+                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                    completed = completed and result
+                            if not completed:
+                                continue
+                            trailing_stop = True
+            
+            if trailing_stop:
+                # Establece el stop loss móvil si se activa el trailing stop
+                type = positions[-1].type
+                if type == OrderType.MARKET_BUY:
+                    trailing_range = (range * 0.5 * number_trailing)
+                    stop_loss = high + trailing_range
+                    next_trailing_range = (range * 0.5 * (number_trailing + 1))
+                    
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price <= stop_loss:
+                        MT5Api.send_close_all_position()
+                    elif current_price >= next_trailing_range:
+                        number_trailing += 1
+            
+            if in_hedge:
+                # Realiza acciones de hedge si se encuentra en modo hedge
+                type = positions[-1].type
+                if type == OrderType.MARKET_BUY:
+                    limit_price = high + range
+                    if current_price >= limit_price:
+                        # Vende la mitad de las posiciones abiertas
+                        completed = True
+                        for position in positions:
+                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            completed = completed and result
+                        if not completed:
+                            continue
+                        trailing_stop = True
+                else:
+                    limit_price = low - range
+                    if current_price <= limit_price:
+                        # Vende la mitad de las posiciones abiertas
+                        completed = True
+                        for position in positions:
+                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            completed = completed and result
+                        if not completed:
+                            continue
+                        trailing_stop = True
+
+    
+    #endregion                 
+    
+    #region HedgeTrailing strategy 
     def _preparing_symbols_data(self):
         """
-        Prepara la data que se usara en la estrategia de HardHedge.
+        Prepara la data que se usara en la estrategia de HedgeTrailing.
         """
-        print("HardHedge: Preparando la data...")
+        print("HedgeTrailing: Preparando la data...")
         # Variable auxiliar
         symbol_data = {}
         
@@ -191,8 +282,7 @@ class HardHedgeTrading:
         digits = info.digits
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
-        range_value = abs(high - low)
-        recovery_range = range_value
+        range = abs(high - low)
                 
         if self.volume_size is None:
             self.volume_size = info.volume_min
@@ -200,7 +290,9 @@ class HardHedgeTrading:
         symbol_data= {
             'symbol': self.symbol,
             'digits': digits,
-            'recovery_range': recovery_range,
+            'high': high,
+            'low': low,
+            'range': range,
             'volume_min': info.volume_min,
             'volume_max': info.volume_max,
         }
@@ -209,196 +301,251 @@ class HardHedgeTrading:
             
             
         # Actualiza la variable compartida
-        self.symbol_data.update(symbol_data)
-        
-    def get_atr(self, symbol: str,  number_bars:int=14)->float:
-        """
-        Calcula el Average True Range (ATR) de un symbolo especifico en mt5.
-
-        Args:
-            high_prices (list or np.array): Lista o arreglo NumPy de precios altos.
-            low_prices (list or np.array): Lista o arreglo NumPy de precios bajos.
-            close_prices (list or np.array): Lista o arreglo NumPy de precios de cierre.
-            n (int): Número de períodos para el cálculo del ATR. El valor predeterminado es 14.
-
-        Returns:
-            float: Valor del Average True Range (ATR).
-        """
-        # Obtiene las barras para el simbolo
-        rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
-        # Crear un DataFrame con los precios de alta, baja y cierre
-        data = {
-            'High': rates_in_range['high'],
-            'Low': rates_in_range['low'],
-            'Close': rates_in_range['close']
-        }
-
-        df = pd.DataFrame(data)
-
-        # Calcular el True Range (TR) utilizando Pandas y NumPy
-        df['High-Low'] = df['High'] - df['Low']
-        df['High-Close-Prev'] = abs(df['High'] - df['Close'].shift(1))
-        df['Low-Close-Prev'] = abs(df['Low'] - df['Close'].shift(1))
-        df['True-Range'] = df[['High-Low', 'High-Close-Prev', 'Low-Close-Prev']].max(axis=1)
-
-        # Calcular el ATR como un promedio exponencial ponderado (SMA)
-        atr = df['True-Range'].rolling(window=number_bars).mean().iloc[-1]
-
-        return atr
+        self.symbol_data = symbol_data
     
     def _hedge_buyer(self):
         """
-        Prepara órdenes para ser enviadas a MetaTrader 5 en función de los datos establecidos.
+        Prepara órdenes para ser enviadas a MetaTrader 5 en función de los datos y las condicionales establecidas.
         """
-        # Verifica si el margen disponible es menor al 10% de el balance de la cuenta
-        account_info = MT5Api.get_account_info()
-        minimun_margin =  0.20 *  account_info.balance
-        positions = MT5Api.get_positions(magic=self.magic)
-        if account_info.margin_free > minimun_margin and (len(positions)*2) < account_info.limit_orders:
-            # Se crea una copia de la lista de symbolos para evitar al modificarse
-            copy_symbols = list(self.symbols)
-            
-            for symbol in copy_symbols:
-                data = self.symbol_data[symbol]
-                
-                # Diccionario que contendra la informacion de la orden
-                order = {
-                    "symbol": symbol,
-                    "order_type": None, 
-                    "volume": self.volume_size,
-                    "price": None,
-                    "stop_loss": None,
-                    "take_profit": None,
-                    "ticket": None,
-                    "comment": None,
-                    "magic": self.magic
-                }
-                
-                # Obtiene la informacion actual para el symbolo                
-                info_symbol =  MT5Api.get_symbol_info(symbol)
-                
-                # Obtiene la ultima barra
-                last_bar = MT5Api.get_last_bar(symbol)
-                
-                # Variables para el calculo de tp y sl
-                radius = data['recovery_range']*3
-                spread_point = info_symbol.spread * info_symbol.point
-                
-                # Se establece el tp y el sl
-                if last_bar['open'] < last_bar['close']:
-                    order['price'] = info_symbol.ask    # recovery high
-                    tp = order['price'] + radius
-                    sl = order['price'] - radius - spread_point
-                    order['order_type'] = OrderType.MARKET_BUY
-                    
-                else:
-                    order['price'] = info_symbol.bid    # recovery low
-                    tp = order['price'] - radius
-                    sl = order['price'] + radius + spread_point
-                    order['order_type'] = OrderType.MARKET_SELL
-                    
-                order['take_profit'] = round(tp, data['digits'])
-                order['stop_loss'] = round(sl, data['digits'])
-                
-                # El comment representara al numero de veces que se ha apliacado el HardHedge
-                order['comment'] = str(0)
-                
-                # Envía la orden a MetaTrader 5
-                MT5Api.send_order(**order)
-       
-    def _hedge_strategy(self):
-        """
-        Ejecuta la estrategia a las posiciones abiertas.
-        """
-        # Se obtienen las posiciones abiertas
-        positions = MT5Api.get_positions(magic=self.magic)
-        for position in positions:
-            # Si la posicion tiene un take profit igual a cero, significa que ya tiene ganancias y se ignora
-            if self.find_position_in_txt(position.ticket):
-                continue
-                
-            data = self.symbol_data[position.symbol]
-            
-            # Obtiene el precio actual para el symbolo                
-            info_symbol =  MT5Api.get_symbol_info(position.symbol)
-            
-            # Variables para el calculo de tp y sl
-            recovery_radius = data['recovery_range']*4
-                       
-            
-            if position.type == OrderType.MARKET_BUY:  # Long
-                recovery_low = position.tp - recovery_radius
-                if info_symbol.bid < recovery_low:  
-                    self._hedge_order(position, data, recovery_low, info_symbol)
-            else:  # Short
-                recovery_high = position.tp + recovery_radius
-                if info_symbol.ask > recovery_high:
-                    self._hedge_order(position, data, recovery_high, info_symbol)
+        print("HedgeTrailing: Iniciando administrador de compras")
         
-        self._sleep_to_next_minute()
+        # Variables del rango
+        high = self.symbol_data['high']
+        low = self.symbol_data['low']
+        range = self.symbol_data['range']
         
-    def _hedge_order(self, position:TradePosition, data:Dict[str, Any], recovery_price:float, info_symbol: SymbolInfo) -> None:
-        """
-        Prepara órdenes para ser enviadas a MetaTrader 5. Cada orden se prepara en función de los datos recibidos.
-
-        Args:
-            position (TradePosition): La posición de la orden original.
-            data (Dict[str, Any]): Datos relevantes para la preparación de la orden.
-            recovery_price (float): El precio de recuperación utilizado para establecer take-profit y stop-loss.
-            info_symbol (SymbolInfo): Información acerca del simbolo en mt5.
-        """         
-        # Se establece la orden y se envia
-        next_hedge = int(position.comment)+1
+        # Condicionales de estados
+        false_rupture= False
+        rupture = False
+        hedge = True
+        
+        while self.is_on.value:
+            # Se obtiene las variables de mt5
+            while True:
+                info = MT5Api.get_symbol_info(self.symbol)
+                positions = MT5Api.get_positions(magic=self.magic)
+                last_bar = MT5Api.get_last_bar(self.symbol)
+                finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
+                    break
+                                        
+            if len(positions) == 0:
+                # Se reinicia los estados
+                false_rupture = False
+                rupture = False
+                hedge = False
+                
+                # Establece las variables
+                open = last_bar['open']
+                current_price = last_bar['close']
+                # Comprueba si la apertura de la barra esta en el rango
+                if open <= high or open >= low:
+                    # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
+                    send_order = False
+                    buyback_range = (range * 0.2)
+                    
+                    # Comprueba si el precio supera el rango
+                    
+                    if current_price > high:
+                        send_order = True
+                        order_type = OrderType.MARKET_BUY
+                        range_limit = high + buyback_range
                         
-        if next_hedge < self.max_hedge:
-            new_volume = self.volume_size * (3 ** (next_hedge))
-            comment = str(next_hedge)
-        else:
-            new_volume = data['counter_hedge'] + self.volume_size
-            comment = str(0)
+                    elif current_price < low:
+                        send_order = True
+                        order_type = OrderType.MARKET_SELL
+                        range_limit = low - buyback_range
+                        
+                    # Envia la primera orden
+                    if send_order: 
+                        result =MT5Api.send_order(
+                            symbol= self.symbol, 
+                            order_type= order_type, 
+                            volume=self.volume_size,
+                            magic=self.magic,
+                            comment= "1"
+                        )
+                        if result is not None:
+                            # Espera a que la vela termine y la obtiene
+                            self._sleep_to_next_minute()
+                            finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                            send_buyback = False
+                            
+                            # Si no se logro obtener la ultima barra se marca como una ruptura simple
+                            if finished_bar is None:
+                                rupture = True
+                                continue
+                            
+                            close = finished_bar['close']
+                            
+                            # Establece el estado de la estrategia
+                            if order_type == OrderType.MARKET_BUY:
+                                if close < high:
+                                    false_rupture = True
+                                    continue
+                                elif close < range_limit:
+                                    send_buyback = True
+                            else:
+                                if close > low:
+                                    false_rupture = True
+                                    continue
+                                elif close > range_limit:
+                                    send_buyback = True
+                            
+                            rupture = True
+                            
+                            # Se hace recompra en caso de que la barra se encuentre en el rango limite
+                            if send_buyback:
+                                result =MT5Api.send_order(
+                                    symbol= self.symbol, 
+                                    order_type= order_type, 
+                                    volume=self.volume_size,
+                                    magic=self.magic,
+                                    comment= "2"
+                                )
+                                continue
                 
-        if new_volume > data['volume_max']:
-            new_volume = float(data['volume_max'])
+            if false_rupture:
+                # Establece las variables
+                open = finished_bar['open']
+                close = finished_bar['close']
+                last_type = positions[-1].type
+                send_buyback = False
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if open <= high and close > high:
+                        send_buyback = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if open >= low and close < low:
+                        send_buyback = True
+                
+                if send_buyback:
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= last_type, 
+                        volume=self.volume_size,
+                        magic=self.magic,
+                        comment= "2"
+                    )
+                    if result:
+                        false_rupture = False
+                        continue
             
-        # Variables para el calculo de tp y sl
-        radius = data['recovery_range']*3
-        spread_point = info_symbol.spread * info_symbol.point
-        
-        if position.type == OrderType.MARKET_BUY:
-            new_order_type = OrderType.MARKET_SELL
-            tp = recovery_price - radius 
-            sl = recovery_price + radius + spread_point
-        else:
-            new_order_type = OrderType.MARKET_BUY
-            tp = recovery_price + radius
-            sl = recovery_price - radius - spread_point
-        
-        order = {
-            "symbol": position.symbol, 
-            "order_type": new_order_type, 
-            "volume": new_volume,
-            "price": None,
-            "stop_loss": round(sl, data['digits']),
-            "take_profit": round(tp, data['digits']),
-            "ticket": None,
-            "comment": comment,
-            "magic": self.magic
-        }
-        # Envía la orden a MetaTrader 5
-        MT5Api.send_order(**order)
-        # Guarda la posicion en un txt para evitar volver hacerle hedge
-        self.save_position_in_txt(position.ticket)
+            if rupture:
+                # Establece las variables
+                open = last_bar['open']
+                current_price = last_bar['close']
+                last_type = positions[-1].type
+                send_order = False
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if open >= low and current_price < low:
+                        order_type = OrderType.MARKET_SELL
+                        send_order = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if open <= high and current_price > high:
+                        order_type =  OrderType.MARKET_BUY
+                        send_order = True
+                
+                if send_order:
+                    last_batch = int(positions[-1].comment)
+                    next_batch = last_batch * 3
+                    next_volume = self.volume_size * next_batch
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= order_type, 
+                        volume=next_volume,
+                        magic=self.magic,
+                        comment= str(next_batch)
+                    )
+                    if result:
+                        rupture = False
+                        false_rupture = False
+                        hedge = True
+                        continue
+            
+            if hedge:
+                # Establece las variables
+                open = last_bar['open']
+                current_price = last_bar['close']
+                last_type = positions[-1].type
+                send_hedge = False
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if open >= low and current_price < low:
+                        order_type = OrderType.MARKET_SELL
+                        send_hedge = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if open <= high and current_price > high:
+                        order_type =  OrderType.MARKET_BUY
+                        send_hedge = True
+                
+                if send_hedge:
+                    last_batch = int(positions[-1].comment)
+                    next_batch = last_batch * 3
+                    next_volume = self.volume_size * next_batch
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= order_type, 
+                        volume=next_volume,
+                        magic=self.magic,
+                        comment= str(next_batch)
+                    )
+                    continue
+       
+    def _update_trend(self):
+        """
+        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
 
-    
+        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
+        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
+        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
+
+        Retorna:
+            None
+        """
+        atr_period = 5  # Período para el cálculo del ATR
+        multiplier = 2  # Multiplicador para el cálculo del SuperTrend
+        first_time = True
+
+        # Obtener los datos de la tasa de 1 minuto iniciales
+        while True:
+            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+            if minute_1_rates is not None:
+                break
+
+        while self.is_on.value:
+            if not first_time:
+                self._sleep_to_next_minute()
+                
+                # Obtener la última barra de 1 minuto
+                while True:
+                    minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                    if minute_1_bar is not None:
+                        break
+                        
+                minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
+
+            # Crear un DataFrame con los datos de la tasa de 1 minuto
+            df = pd.DataFrame(minute_1_rates)
+            
+            # Calcular el indicador SuperTrend y agregarlo al DataFrame
+            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+            direction = int(df.iloc[-1]['direction'])
+
+            # Actualizar el estado de la tendencia si ha cambiado
+            if direction != self.trend_state.value:
+                self.trend_state.value = direction
+
     #endregion
     
     #region start
     def start(self):
         """
-        Inicia la estrategia de HardHedge trading para los símbolos especificados.
+        Inicia la estrategia de HedgeTrailing trading para los símbolos especificados.
         """
 
-        print("HardHedge: Iniciando estrategia...")
+        print("HedgeTrailing: Iniciando estrategia...")
         
         while True:
             positions = MT5Api.get_positions(magic=self.magic)
@@ -407,17 +554,20 @@ class HardHedgeTrading:
         
         # Se crea las variables compartidas
         manager = multiprocessing.Manager()
-        self.symbol_data = manager.dict()
         self.is_on = manager.Value("b", True)
-        self.trend_state = manager.Value("i", TrendState.unassigned)
-        self.symbol_state = manager.Value("i", SymbolState.in_range)
-                
+
         self._preparing_symbols_data()
         
-        # crea los procesos y los inicia
-        self._hedge_strategy()
+        # Crea los procesos y los inicia
+        manage_positions_process = multiprocessing.Process(target= self._manage_positions)
+        manage_positions_process.start()
+        hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
+        hedge_buyer_process.start()
+        
+        # Espera a que termine para continuar
+        manage_positions_process.join()
                     
         # Fin del ciclo
-        print("HardHedge: Finalizando estrategia...")
+        print("HedgeTrailing: Finalizando estrategia...")
           
     #endregion

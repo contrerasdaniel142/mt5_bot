@@ -14,7 +14,7 @@ from models.alpaca.client import AlpacaApi
 from models.mt5.client import MT5Api
 
 # Importacion de las estrategias a usar en controlador
-from models.strategies import HardHedgeTrading
+from models.strategies import HedgeTrailing
 
 # Para trabajo en paralelo
 import multiprocessing
@@ -183,12 +183,13 @@ class BotController:
         while True:
             print("")
             
-            self._sleep_to_next_market_opening(False)
+            #self._sleep_to_next_market_opening(False)
             
             # Se crea el objeto de la estrategia HardHedge 
-            hard_hedge_trading = HardHedgeTrading(
-                symbol= symbol,
-                volume_size= None
-            )
+            hedge = HedgeTrailing(
+                    symbol= symbol,
+                    volume_size= None
+                )
+            hedge.start()
 
     #endregion
