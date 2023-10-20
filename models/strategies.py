@@ -141,7 +141,7 @@ class HedgeTrailing:
                 pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
                 market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
                 # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
-                if False:
+                if pre_closing_time > market_close:
                     self.is_on.value = False
                     continue
 
