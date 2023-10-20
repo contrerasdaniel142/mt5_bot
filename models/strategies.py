@@ -330,6 +330,8 @@ class HedgeTrailing:
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
             
+            current_price = last_bar['close']
+            
             if high >= current_price >= low:
                 in_range = True
                              
@@ -341,7 +343,6 @@ class HedgeTrailing:
                 
                 # Establece las variables
                 open = last_bar['open']
-                current_price = last_bar['close']
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high or open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
