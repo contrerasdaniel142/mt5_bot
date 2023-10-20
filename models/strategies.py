@@ -21,7 +21,6 @@ from .mt5.models import TradePosition, SymbolInfo
 # Importacion de los clientes de las apis para hacer solicitudes
 from .mt5.enums import TimeFrame, OrderType
 from .mt5.client import MT5Api
-from .telegram.client import TelegramApi
 
 # Importaciones necesarias para manejar fechas y tiempo
 from datetime import datetime, timedelta
