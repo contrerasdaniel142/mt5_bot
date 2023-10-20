@@ -355,7 +355,7 @@ class HedgeTrailing:
                 # Establece las variables
                 open = last_bar['open']
                 # Comprueba si la apertura de la barra esta en el rango
-                if open <= high or open >= low:
+                if open <= high and open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
                     send_order = False
                     buyback_range = (range * 0.2)
