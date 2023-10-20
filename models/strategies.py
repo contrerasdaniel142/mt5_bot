@@ -219,7 +219,18 @@ class HedgeTrailing:
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price <= stop_loss:
                         MT5Api.send_close_all_position()
-                    elif current_price >= next_trailing_range:
+                    elif current_price > next_trailing_range:
+                        number_trailing += 1
+                
+                else:
+                    trailing_range = (range * 0.5 * number_trailing)
+                    stop_loss = low - trailing_range
+                    next_trailing_range = (range * 0.5 * (number_trailing + 1))
+                    
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price >= stop_loss:
+                        MT5Api.send_close_all_position()
+                    elif current_price < next_trailing_range:
                         number_trailing += 1
             
             if in_hedge:
