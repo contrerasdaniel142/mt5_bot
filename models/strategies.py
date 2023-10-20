@@ -126,6 +126,7 @@ class HedgeTrailing:
         number_trailing = 1
         in_hedge = False
         trailing_stop = False
+        in_range = False
         
         while self.is_on.value:
             # Se obtienen las posiciones y la información del símbolo de MetaTrader 5
@@ -151,7 +152,7 @@ class HedgeTrailing:
                 continue
             
             current_price = info.bid
-            
+                        
             if not trailing_stop and positions:
                 # Determina el número de lotes y el tipo de última posición
                 number_batchs = int(positions[-1].comment)
@@ -317,6 +318,7 @@ class HedgeTrailing:
         false_rupture= False
         rupture = False
         hedge = True
+        in_range = False
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -327,8 +329,11 @@ class HedgeTrailing:
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
-                                        
-            if len(positions) == 0:
+            
+            if high >= current_price >= low:
+                in_range = True
+                             
+            if len(positions) == 0 and in_range:
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
@@ -364,11 +369,15 @@ class HedgeTrailing:
                             magic=self.magic,
                             comment= "1"
                         )
+                        # Volvemos in_range falso para evitar que entre tarde
+                        in_range = False
+                        
                         if result is not None:
                             # Espera a que la vela termine y la obtiene
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
+                            in_range = False
                             
                             # Si no se logro obtener la ultima barra se marca como una ruptura simple
                             if finished_bar is None:
@@ -404,7 +413,7 @@ class HedgeTrailing:
                                 )
                                 continue
                 
-            if false_rupture:
+            if false_rupture and len(positions) > 0:
                 # Establece las variables
                 open = finished_bar['open']
                 close = finished_bar['close']
@@ -430,7 +439,7 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
             
-            if rupture:
+            if rupture and len(positions) > 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
@@ -463,7 +472,7 @@ class HedgeTrailing:
                         hedge = True
                         continue
             
-            if hedge:
+            if hedge and len(positions) > 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
