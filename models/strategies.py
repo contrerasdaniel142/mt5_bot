@@ -118,6 +118,10 @@ class HedgeTrailing:
         # Envía un mensaje de inicio al canal de Telegram
         print("HedgeTrailing: Iniciando administrador de posiciones")
         
+        # Horario de cierre
+        current_time = datetime.now(pytz.utc)   # Hora actual
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        
         # Comienza el administrador de posiciones
         # Variables del rango
         high = self.symbol_data['high']
@@ -126,7 +130,6 @@ class HedgeTrailing:
         number_trailing = 1
         in_hedge = False
         trailing_stop = False
-        in_range = False
         
         while self.is_on.value:
             # Se obtienen las posiciones y la información del símbolo de MetaTrader 5
@@ -136,11 +139,15 @@ class HedgeTrailing:
                 if positions is not None and info is not None:
                     break
             
+            current_time = datetime.now(pytz.utc)   # Hora actual
+            if current_time > market_close:
+                MT5Api.send_close_all_position()
+                self.is_on.value = False
+                continue
+            
             # Reinicia las variables en caso de que ya no haya posiciones abiertas
             if not positions:
-                current_time = datetime.now(pytz.utc)   # Hora actual
                 pre_closing_time = current_time + timedelta(hours=1, minutes=30)    # Hora para cerrar el programa antes
-                market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
                 # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
                 if pre_closing_time > market_close:
                     self.is_on.value = False
@@ -211,11 +218,10 @@ class HedgeTrailing:
             if trailing_stop:
                 # Establece el stop loss móvil si se activa el trailing stop
                 type = positions[-1].type
+                trailing_range = (range * (number_trailing/2))
+                next_trailing_range = (range * ((number_trailing + 1)/2))
                 if type == OrderType.MARKET_BUY:
-                    trailing_range = (range * 0.5 * number_trailing)
-                    stop_loss = high + trailing_range
-                    next_trailing_range = (range * 0.5 * (number_trailing + 1))
-                    
+                    stop_loss = high + trailing_range                    
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price <= stop_loss:
                         MT5Api.send_close_all_position()
@@ -223,10 +229,7 @@ class HedgeTrailing:
                         number_trailing += 1
                 
                 else:
-                    trailing_range = (range * 0.5 * number_trailing)
                     stop_loss = low - trailing_range
-                    next_trailing_range = (range * 0.5 * (number_trailing + 1))
-                    
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price >= stop_loss:
                         MT5Api.send_close_all_position()
@@ -329,7 +332,6 @@ class HedgeTrailing:
         false_rupture= False
         rupture = False
         hedge = True
-        in_range = False
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -342,11 +344,8 @@ class HedgeTrailing:
                     break
             
             current_price = last_bar['close']
-            
-            if high >= current_price >= low:
-                in_range = True
-                             
-            if len(positions) == 0 and in_range:
+                                         
+            if len(positions) == 0:
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
@@ -381,15 +380,12 @@ class HedgeTrailing:
                             magic=self.magic,
                             comment= "1"
                         )
-                        # Volvemos in_range falso para evitar que entre tarde
-                        in_range = False
                         
                         if result is not None:
                             # Espera a que la vela termine y la obtiene
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
-                            in_range = False
                             
                             # Si no se logro obtener la ultima barra se marca como una ruptura simple
                             if finished_bar is None:

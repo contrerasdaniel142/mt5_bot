@@ -446,7 +446,10 @@ class MT5Api:
             float: El precio de cierre más reciente del símbolo.
         """
         last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
-        return last_rate[-1]
+        if last_rate is None:
+            return None
+        else:
+            return last_rate[-1]
     
     def get_account_info() -> AccountInfo:
         """
