@@ -712,16 +712,19 @@ class MT5Api:
         positions = mt5.positions_get()
         
         if positions is not None:
-            # Itera sobre todas las posiciones abiertas y las cierra
-            for position in positions:  
-                close_result = mt5.Close(position.symbol,ticket=position.ticket)
-                
-                if close_result:
-                    print(f"Posición en {position.symbol} cerrada con éxito")
-                else:
-                    print(f"Error al cerrar la posición en {position.symbol}")
+            if positions:
+                # Itera sobre todas las posiciones abiertas y las cierra
+                for position in positions:  
+                    close_result = mt5.Close(position.symbol,ticket=position.ticket)
+                    
+                    if close_result:
+                        print(f"Posición en {position.symbol} cerrada con éxito.")
+                    else:
+                        print(f"Error al cerrar la posición en {position.symbol}.")
+            else:
+                print("No hay posiciones abiertas para cerrar.")
         else:
-            print("No hay posiciones abiertas para cerrar")
+            print("Error al intentar obtener posicones.")
             
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
