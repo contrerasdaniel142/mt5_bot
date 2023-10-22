@@ -46,8 +46,14 @@ class StateTrend:
     BULLISH = 1
     BEARISH = -1
 
+class Multipliers:
+    N1 = 2
+    N2 = 1.5
+    N3 = 1.7
+    N4 = 1.5
+    
 
-class HedgeTrailing:
+class HedgeTrailing2:
     def __init__(self, symbol: str, volume_size: int = 1) -> None:
         # Indica si el programa debe seguir activo
         self.is_on = None
@@ -357,6 +363,7 @@ class HedgeTrailing:
         # Condicionales de estados
         false_rupture= False
         rupture = False
+        number_hedge = 1
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -371,9 +378,15 @@ class HedgeTrailing:
             current_price = last_bar['close']
                                          
             if len(positions) == 0:
+                # Variables del rango
+                high = self.symbol_data['high']
+                low = self.symbol_data['low']
+                range = self.symbol_data['range']
+                
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
+                number_hedge = 1
                 
                 # Establece las variables
                 open = last_bar['open']
@@ -405,7 +418,7 @@ class HedgeTrailing:
                             comment= "1"
                         )
                         
-                        if result is not None:
+                        if result:
                             # Espera a que la vela termine y la obtiene
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
@@ -493,8 +506,9 @@ class HedgeTrailing:
                         send_order = True
                 
                 if send_order:
+                    multiplier = getattr(Multipliers, "N" + str(number_hedge), 1.5)
                     last_batch = int(positions[-1].comment)
-                    next_batch = last_batch * 3
+                    next_batch = last_batch * multiplier
                     next_volume = self.volume_size * next_batch
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
@@ -503,10 +517,27 @@ class HedgeTrailing:
                         magic=self.magic,
                         comment= str(next_batch)
                     )
-                    if result:
+                    if result == True:
+                        number_hedge += 1
+                        if number_hedge == 4:
+                            high = high - (range * 0.2)
+                            low = low + (range * 0.2)
+   
                         false_rupture = False
                         continue
        
+    def _get_counter_volume(self, positions: List[TradePosition])->float:
+        
+        buys = [position for position in positions if position.type == OrderType.MARKET_BUY]
+        sells = [position for position in positions if position.type == OrderType.MARKET_SELL]
+
+        total_buys = sum(position.volume for position in buys)
+        total_sells = sum(position.volume for position in sells)
+
+        difference = abs(total_sells - total_buys)
+        
+        return difference
+
     def _update_trend(self):
         """
         Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
