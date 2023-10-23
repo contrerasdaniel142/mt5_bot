@@ -420,13 +420,13 @@ class HedgeTrailing2:
                         
                         if result:
                             # Espera a que la vela termine y la obtiene
+                            rupture = True
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
                             
-                            # Si no se logro obtener la ultima barra se marca como una ruptura simple
+                            # Si no se logro obtener la ultima barra continua
                             if finished_bar is None:
-                                rupture = True
                                 continue
                             
                             close = finished_bar['close']
@@ -444,8 +444,6 @@ class HedgeTrailing2:
                                     continue
                                 elif close > range_limit:
                                     send_buyback = True
-                            
-                            rupture = True
                             
                             # Se hace recompra en caso de que la barra se encuentre en el rango limite
                             if send_buyback:
