@@ -549,6 +549,7 @@ class HedgeTrailing2:
         Retorna:
             None
         """
+        print("HedgeTrailing: Iniciando administrador de tendencia")
         atr_period = 5  # Período para el cálculo del ATR
         multiplier = 2  # Multiplicador para el cálculo del SuperTrend
         first_time = True
@@ -585,6 +586,7 @@ class HedgeTrailing2:
             # Actualizar el estado de la tendencia si ha cambiado
             if direction != self.trend_state.value:
                 self.trend_state.value = direction
+                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
 
     #endregion
     
