@@ -56,16 +56,13 @@ class HedgeTrailing:
         self.symbol = symbol
         
         # Variable para indicar el estado del supertrend
-        self.trend_state = None
+        self.trend_state = StateTrend.UNASSIGNED
         
         # Variable que contiene informaciond el symbolo para la estrategia
         self.symbol_data = {}
         
         # El numero que identificara las ordenes de esta estrategia
         self.magic = 63
-        
-        # Indica el estado de la tendencia del supertrend
-        self.trend_state = None
         
         # El tamaño del lote
         if volume_size is None:
@@ -407,13 +404,13 @@ class HedgeTrailing:
                         
                         if result is not None:
                             # Espera a que la vela termine y la obtiene
+                            rupture = True
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
                             
-                            # Si no se logro obtener la ultima barra se marca como una ruptura simple
+                            # Si no se logro obtener la ultima barra continua con otra iteracion
                             if finished_bar is None:
-                                rupture = True
                                 continue
                             
                             close = finished_bar['close']
@@ -431,9 +428,7 @@ class HedgeTrailing:
                                     continue
                                 elif close > range_limit:
                                     send_buyback = True
-                            
-                            rupture = True
-                            
+                                                        
                             # Se hace recompra en caso de que la barra se encuentre en el rango limite
                             if send_buyback:
                                 result =MT5Api.send_order(
@@ -578,12 +573,12 @@ class HedgeTrailing:
         self._preparing_symbols_data()
         
         # Crea los procesos y los inicia
+        update_trend_process = multiprocessing.Process(target=self._update_trend)
+        update_trend_process.start()
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
         hedge_buyer_process.start()
-        update_trend_process = multiprocessing.Process(target=self._update_trend)
-        update_trend_process.start()
         
         # Espera a que termine para continuar
         manage_positions_process.join()
