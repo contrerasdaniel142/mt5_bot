@@ -21,7 +21,7 @@ import multiprocessing
 from multiprocessing.managers import ValueProxy
 
 # Importaciones necesarias para manejar fechas y tiempo
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import time
 
@@ -77,7 +77,7 @@ class BotController:
 
         # Crear objetos time para el horario de apertura y cierre del mercado
         market_open = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0)
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0) - timedelta(hours=1, minutes=0)
 
         # Verificar si la hora actual está dentro del horario de mercado
         if market_open <= current_time <= market_close and self._get_business_hours_today():
