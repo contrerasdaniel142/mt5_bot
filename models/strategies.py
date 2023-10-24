@@ -62,17 +62,14 @@ class HedgeTrailing2:
         self.symbol = symbol
         
         # Variable para indicar el estado del supertrend
-        self.trend_state = None
+        self.trend_state = StateTrend.UNASSIGNED
         
         # Variable que contiene informaciond el symbolo para la estrategia
         self.symbol_data = {}
         
         # El numero que identificara las ordenes de esta estrategia
         self.magic = 63
-        
-        # Indica el estado de la tendencia del supertrend
-        self.trend_state = None
-        
+                
         # El tamaño del lote
         if volume_size is None:
             self.volume_size = None
@@ -609,12 +606,12 @@ class HedgeTrailing2:
         self._preparing_symbols_data()
         
         # Crea los procesos y los inicia
+        update_trend_process = multiprocessing.Process(target=self._update_trend)
+        update_trend_process.start()
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
         hedge_buyer_process.start()
-        update_trend_process = multiprocessing.Process(target=self._update_trend)
-        update_trend_process.start()
         
         # Espera a que termine para continuar
         manage_positions_process.join()
