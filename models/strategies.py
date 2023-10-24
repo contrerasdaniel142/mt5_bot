@@ -453,8 +453,8 @@ class HedgeTrailing:
                                     comment= "2"
                                 )
                                 continue
-                            
-            if rupture and len(positions) > 0:
+
+            if rupture and len(positions) > 0 and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
@@ -485,7 +485,7 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
             
-            if false_rupture and len(positions) > 0:
+            if false_rupture and len(positions) > 0 and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = finished_bar['open']
                 close = finished_bar['close']
