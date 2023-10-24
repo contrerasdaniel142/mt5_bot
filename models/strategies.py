@@ -233,10 +233,22 @@ class HedgeTrailing:
             
             if trailing_stop:
                 type = positions[-1].type
-                if number_trailing < 4:
+                if in_hedge:
+                    if type == OrderType.MARKET_BUY:
+                        stop_loss = high + (range * 0.625)         
+                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                        if current_price < stop_loss:
+                            MT5Api.send_close_all_position()
+                    else:
+                        stop_loss = low - (range * 0.625)
+                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                        if current_price > stop_loss:
+                            MT5Api.send_close_all_position()
+                            
+                elif number_trailing < 3:
                     # Establece el stop loss móvil si se activa el trailing stop
                     trailing_range = (range * (number_trailing/2))
-                    next_trailing_range = (range * ((number_trailing + 1)/2))
+                    next_trailing_range = (range * ((number_trailing + 2)/2))
                     if type == OrderType.MARKET_BUY:
                         stop_loss = high + trailing_range                    
                         # Cierra todas las posiciones si el precio cae por debajo del stop loss
