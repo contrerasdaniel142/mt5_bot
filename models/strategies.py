@@ -296,6 +296,8 @@ class HedgeTrailing:
                         if not completed:
                             continue
                         in_hedge = False
+            
+            time.sleep(0.2)  # Pausa el programa durante 0.2 segundos
 
     
     #endregion                 
@@ -451,7 +453,38 @@ class HedgeTrailing:
                                     comment= "2"
                                 )
                                 continue
+                            
+            if rupture and len(positions) > 0:
+                # Establece las variables
+                open = last_bar['open']
+                current_price = last_bar['close']
+                last_type = positions[-1].type
+                send_order = False
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if open >= low and current_price < low:
+                        order_type = OrderType.MARKET_SELL
+                        send_order = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if open <= high and current_price > high:
+                        order_type =  OrderType.MARKET_BUY
+                        send_order = True
                 
+                if send_order:
+                    last_batch = int(positions[-1].comment)
+                    next_batch = last_batch * 3
+                    next_volume = self.volume_size * next_batch
+                    result =MT5Api.send_order(  
+                        symbol= self.symbol, 
+                        order_type= order_type, 
+                        volume=next_volume,
+                        magic=self.magic,
+                        comment= str(next_batch)
+                    )
+                    if result:
+                        false_rupture = False
+                        continue
+            
             if false_rupture and len(positions) > 0:
                 # Establece las variables
                 open = finished_bar['open']
@@ -483,36 +516,7 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
             
-            if rupture and len(positions) > 0:
-                # Establece las variables
-                open = last_bar['open']
-                current_price = last_bar['close']
-                last_type = positions[-1].type
-                send_order = False
-                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                if last_type == OrderType.MARKET_BUY:
-                    if open >= low and current_price < low:
-                        order_type = OrderType.MARKET_SELL
-                        send_order = True
-                elif last_type == OrderType.MARKET_SELL:
-                    if open <= high and current_price > high:
-                        order_type =  OrderType.MARKET_BUY
-                        send_order = True
-                
-                if send_order:
-                    last_batch = int(positions[-1].comment)
-                    next_batch = last_batch * 3
-                    next_volume = self.volume_size * next_batch
-                    result =MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= order_type, 
-                        volume=next_volume,
-                        magic=self.magic,
-                        comment= str(next_batch)
-                    )
-                    if result:
-                        false_rupture = False
-                        continue
+            time.sleep(0.2)  # Pausa el programa durante 0.2 segundos
        
     def _update_trend(self):
         """
@@ -525,6 +529,7 @@ class HedgeTrailing:
         Retorna:
             None
         """
+        print("HedgeTrailing: Iniciando administrador de tendencia")
         atr_period = 5  # Período para el cálculo del ATR
         multiplier = 2  # Multiplicador para el cálculo del SuperTrend
         first_time = True
@@ -549,7 +554,7 @@ class HedgeTrailing:
                         if minute_1_rates is not None:
                             break
                 else:
-                    minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
+                    minute_1_rates = np.append(minute_1_rates, minute_1_bar)
 
             # Crear un DataFrame con los datos de la tasa de 1 minuto
             df = pd.DataFrame(minute_1_rates)
@@ -561,6 +566,7 @@ class HedgeTrailing:
             # Actualizar el estado de la tendencia si ha cambiado
             if direction != self.trend_state.value:
                 self.trend_state.value = direction
+                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
 
     #endregion
     
