@@ -187,7 +187,7 @@ class HedgeTrailing2:
                 number_batchs = int(positions[-1].comment)
                 type = positions[-1].type
                 
-                if number_batchs < 3:
+                if number_batchs == 1 or number_batchs == 2:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + range
                         if current_price >= limit_price:
@@ -213,7 +213,7 @@ class HedgeTrailing2:
                 else:
                     in_hedge = True
                     if type == OrderType.MARKET_BUY:
-                        limit_price = high + (range * 0.625)
+                        limit_price = high + range
                         if current_price >= limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
@@ -225,7 +225,7 @@ class HedgeTrailing2:
                                 continue
                             trailing_stop = True
                     else:
-                        limit_price = low - (range * 0.625)
+                        limit_price = low - range
                         if current_price <= limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
@@ -237,45 +237,26 @@ class HedgeTrailing2:
                                 continue
                             trailing_stop = True
             
-            if trailing_stop:
+            if trailing_stop and not in_hedge:
+                # Establece el stop loss móvil si se activa el trailing stop
                 type = positions[-1].type
-                if in_hedge:
-                    if type == OrderType.MARKET_BUY:
-                        stop_loss = high + (range * 0.625)                 
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price < stop_loss:
-                            MT5Api.send_close_all_position()
-                    else:
-                        stop_loss = low - (range * 0.625)
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price > stop_loss:
-                            MT5Api.send_close_all_position()
-                            
-                elif number_trailing < 3:
-                    # Establece el stop loss móvil si se activa el trailing stop
-                    trailing_range = (range * (number_trailing/2))
-                    next_trailing_range = (range * ((number_trailing + 2)/2))
-                    if type == OrderType.MARKET_BUY:
-                        stop_loss = high + trailing_range             
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price <= stop_loss:
-                            MT5Api.send_close_all_position()
-                        elif current_price > next_trailing_range:
-                            number_trailing += 1
-                    
-                    else:
-                        stop_loss = low - trailing_range
-                        # Cierra todas las posici24ones si el precio cae por debajo del stop loss
-                        if current_price >= stop_loss:
-                            MT5Api.send_close_all_position()
-                        elif current_price < next_trailing_range:
-                            number_trailing += 1
+                trailing_range = (range * (number_trailing/2))
+                next_trailing_range = (range * ((number_trailing + 2)/2))
+                if type == OrderType.MARKET_BUY:
+                    stop_loss = high + trailing_range             
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price <= stop_loss:
+                        MT5Api.send_close_all_position()
+                    elif current_price > next_trailing_range:
+                        number_trailing += 1
                 
                 else:
-                    if type == OrderType.MARKET_BUY and self.trend_state.value == StateTrend.BEARISH:
+                    stop_loss = low - trailing_range
+                    # Cierra todas las posici24ones si el precio cae por debajo del stop loss
+                    if current_price >= stop_loss:
                         MT5Api.send_close_all_position()
-                    elif type == OrderType.MARKET_SELL and self.trend_state.value == StateTrend.BULLISH:
-                        MT5Api.send_close_all_position()
+                    elif current_price < next_trailing_range:
+                        number_trailing += 1
             
             if in_hedge:
                 # Realiza acciones de hedge si se encuentra en modo hedge
@@ -290,6 +271,7 @@ class HedgeTrailing2:
                             completed = completed and result
                         if not completed:
                             continue
+                        number_trailing += 1
                         in_hedge = False
                 else:
                     limit_price = low - range
@@ -301,6 +283,7 @@ class HedgeTrailing2:
                             completed = completed and result
                         if not completed:
                             continue
+                        number_trailing += 1
                         in_hedge = False
 
     
@@ -473,11 +456,11 @@ class HedgeTrailing2:
                     send_order = False
                     # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                     if last_type == OrderType.MARKET_BUY:
-                        if open >= low and current_price < low:
+                        if current_price < low:
                             order_type = OrderType.MARKET_SELL
                             send_order = True
                     elif last_type == OrderType.MARKET_SELL:
-                        if open <= high and current_price > high:
+                        if current_price > high:
                             order_type =  OrderType.MARKET_BUY
                             send_order = True
                     
@@ -613,13 +596,10 @@ class HedgeTrailing2:
         # Se crea las variables compartidas
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
-        self.trend_state = manager.Value("i", StateTrend.UNASSIGNED)
 
         self._preparing_symbols_data()
         
         # Crea los procesos y los inicia
-        update_trend_process = multiprocessing.Process(target=self._update_trend)
-        update_trend_process.start()
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
