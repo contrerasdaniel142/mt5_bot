@@ -181,7 +181,7 @@ class HedgeTrailing:
                 number_batchs = int(positions[-1].comment)
                 type = positions[-1].type
                 
-                if number_batchs < 3:
+                if number_batchs == 1 or number_batchs == 2:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + range
                         if current_price >= limit_price:
@@ -231,49 +231,42 @@ class HedgeTrailing:
                                 continue
                             trailing_stop = True
             
-            if trailing_stop:
+            if trailing_stop and not in_hedge:
                 type = positions[-1].type
-                if in_hedge:
-                    if type == OrderType.MARKET_BUY:
-                        stop_loss = high + (range * 0.625)         
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price < stop_loss:
-                            MT5Api.send_close_all_position()
-                    else:
-                        stop_loss = low - (range * 0.625)
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price > stop_loss:
-                            MT5Api.send_close_all_position()
-                            
-                elif number_trailing < 3:
-                    # Establece el stop loss móvil si se activa el trailing stop
-                    trailing_range = (range * (number_trailing/2))
-                    next_trailing_range = (range * ((number_trailing + 2)/2))
-                    if type == OrderType.MARKET_BUY:
-                        stop_loss = high + trailing_range                    
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price <= stop_loss:
-                            MT5Api.send_close_all_position()
-                        elif current_price > next_trailing_range:
-                            number_trailing += 1
-                    
-                    else:
-                        stop_loss = low - trailing_range
-                        # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                        if current_price >= stop_loss:
-                            MT5Api.send_close_all_position()
-                        elif current_price < next_trailing_range:
-                            number_trailing += 1
+                # Establece el stop loss móvil si se activa el trailing stop
+                trailing_range = (range * (number_trailing/2))
+                next_trailing_range = (range * ((number_trailing + 2)/2))
+                if type == OrderType.MARKET_BUY:
+                    stop_loss = high + trailing_range                    
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price <= stop_loss:
+                        MT5Api.send_close_all_position()
+                    elif current_price > next_trailing_range:
+                        number_trailing += 1
                 
                 else:
-                    if type == OrderType.MARKET_BUY and self.trend_state.value == StateTrend.BEARISH:
+                    stop_loss = low - trailing_range
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price >= stop_loss:
                         MT5Api.send_close_all_position()
-                    elif type == OrderType.MARKET_SELL and self.trend_state.value == StateTrend.BULLISH:
-                        MT5Api.send_close_all_position()
-            
+                    elif current_price < next_trailing_range:
+                        number_trailing += 1
+                
             if in_hedge:
-                # Realiza acciones de hedge si se encuentra en modo hedge
                 type = positions[-1].type
+                # Verifica el stop loss cuando esta en hedge
+                if type == OrderType.MARKET_BUY:
+                    stop_loss = high + (range * 0.625)         
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price < stop_loss:
+                        MT5Api.send_close_all_position()
+                else:
+                    stop_loss = low - (range * 0.625)
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if current_price > stop_loss:
+                        MT5Api.send_close_all_position()
+                
+                # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
                     limit_price = high + range
                     if current_price >= limit_price:
@@ -296,8 +289,6 @@ class HedgeTrailing:
                         if not completed:
                             continue
                         in_hedge = False
-            
-            time.sleep(0.2)  # Pausa el programa durante 0.2 segundos
 
     
     #endregion                 
@@ -462,11 +453,11 @@ class HedgeTrailing:
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
-                    if open >= low and current_price < low:
+                    if current_price < low:
                         order_type = OrderType.MARKET_SELL
                         send_order = True
                 elif last_type == OrderType.MARKET_SELL:
-                    if open <= high and current_price > high:
+                    if current_price > high:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                 
@@ -515,58 +506,6 @@ class HedgeTrailing:
                     if result:
                         false_rupture = False
                         continue
-            
-            time.sleep(0.2)  # Pausa el programa durante 0.2 segundos
-       
-    def _update_trend(self):
-        """
-        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
-
-        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
-        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
-        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
-
-        Retorna:
-            None
-        """
-        print("HedgeTrailing: Iniciando administrador de tendencia")
-        atr_period = 5  # Período para el cálculo del ATR
-        multiplier = 2  # Multiplicador para el cálculo del SuperTrend
-        first_time = True
-
-        # Obtener los datos de la tasa de 1 minuto iniciales
-        while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-            if minute_1_rates is not None:
-                break
-
-        while self.is_on.value:
-            if not first_time:
-                self._sleep_to_next_minute()
-                
-                # Obtener la última barra de 1 minuto
-                minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                
-                # En caso de que exista un error, intentara actualizar todo el trend
-                if minute_1_bar is None:
-                    while True:
-                        minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-                        if minute_1_rates is not None:
-                            break
-                else:
-                    minute_1_rates = np.append(minute_1_rates, minute_1_bar)
-
-            # Crear un DataFrame con los datos de la tasa de 1 minuto
-            df = pd.DataFrame(minute_1_rates)
-            
-            # Calcular el indicador SuperTrend y agregarlo al DataFrame
-            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-            direction = int(df.iloc[-1]['direction'])
-
-            # Actualizar el estado de la tendencia si ha cambiado
-            if direction != self.trend_state.value:
-                self.trend_state.value = direction
-                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
 
     #endregion
     
@@ -586,13 +525,10 @@ class HedgeTrailing:
         # Se crea las variables compartidas
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
-        self.trend_state = manager.Value("i", StateTrend.UNASSIGNED)
 
         self._preparing_symbols_data()
         
         # Crea los procesos y los inicia
-        update_trend_process = multiprocessing.Process(target=self._update_trend)
-        update_trend_process.start()
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
