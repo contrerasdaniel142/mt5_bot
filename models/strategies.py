@@ -243,22 +243,24 @@ class HedgeTrailing:
                 trailing_range = (range * (number_trailing/2))
                 next_trailing_range = (range * ((number_trailing + 2)/2))
                 if type == OrderType.MARKET_BUY:
-                    stop_loss = high + trailing_range                    
+                    stop_loss = high + trailing_range
+                    next_stop_price = high + next_trailing_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price >= next_trailing_range:
+                    elif current_price >= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
                 
                 else:
                     stop_loss = low - trailing_range
+                    next_stop_price = low - next_trailing_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price <= next_trailing_range:
+                    elif current_price <= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
                 
