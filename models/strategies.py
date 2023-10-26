@@ -142,6 +142,7 @@ class HedgeTrailing:
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         range = self.symbol_data['range']
+        hedge_range = (range * 0.625)
         number_trailing = 1
         in_hedge = False
         trailing_stop = False
@@ -205,10 +206,9 @@ class HedgeTrailing:
                                 continue
                             trailing_stop = True
                 else:
-                    in_hedge = True
                     if type == OrderType.MARKET_BUY:
-                        limit_price = high + (range * 0.625)
-                        if current_price >= limit_price:
+                        limit_price = high + hedge_range
+                        if current_price > limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -217,10 +217,11 @@ class HedgeTrailing:
                                     completed = completed and result
                             if not completed:
                                 continue
+                            in_hedge = True
                             trailing_stop = True
                     else:
-                        limit_price = low - (range * 0.625)
-                        if current_price <= limit_price:
+                        limit_price = low - hedge_range
+                        if current_price < limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -229,9 +230,10 @@ class HedgeTrailing:
                                     completed = completed and result
                             if not completed:
                                 continue
+                            in_hedge = True
                             trailing_stop = True
             
-            if trailing_stop and not in_hedge:
+            if trailing_stop:
                 type = positions[-1].type
                 # Establece el stop loss móvil si se activa el trailing stop
                 trailing_range = (range * (number_trailing/2))
@@ -240,32 +242,24 @@ class HedgeTrailing:
                     stop_loss = high + trailing_range                    
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price <= stop_loss:
+                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price > next_trailing_range:
+                    elif current_price >= next_trailing_range:
+                        print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
                 
                 else:
                     stop_loss = low - trailing_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price >= stop_loss:
+                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price < next_trailing_range:
+                    elif current_price <= next_trailing_range:
+                        print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
                 
             if in_hedge:
-                type = positions[-1].type
-                # Verifica el stop loss cuando esta en hedge
-                if type == OrderType.MARKET_BUY:
-                    stop_loss = high + (range * 0.625)         
-                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if current_price < stop_loss:
-                        MT5Api.send_close_all_position()
-                else:
-                    stop_loss = low - (range * 0.625)
-                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if current_price > stop_loss:
-                        MT5Api.send_close_all_position()
-                
+                type = positions[-1].type             
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
                     limit_price = high + range
@@ -369,15 +363,14 @@ class HedgeTrailing:
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
-            
-            current_price = last_bar['close']
-                                         
+                                                     
             if len(positions) == 0:
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
                 
                 # Establece las variables
+                current_price = last_bar['close']
                 open = last_bar['open']
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
@@ -445,7 +438,7 @@ class HedgeTrailing:
                                 )
                                 continue
 
-            if rupture and len(positions) > 0 and int(positions[-1].comment) != 0:
+            if rupture and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
@@ -476,7 +469,7 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
             
-            if false_rupture and len(positions) > 0 and int(positions[-1].comment) != 0:
+            if false_rupture and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = finished_bar['open']
                 close = finished_bar['close']
