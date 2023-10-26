@@ -371,15 +371,9 @@ class HedgeTrailing2:
                     break
                                                      
             if len(positions) == 0:
-                # Variables del rango
-                high = self.symbol_data['high']
-                low = self.symbol_data['low']
-                range = self.symbol_data['range']
-                
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
-                number_hedge = 1
                 
                 # Establece las variables
                 current_price = last_bar['close']
@@ -413,14 +407,14 @@ class HedgeTrailing2:
                             comment= "1"
                         )
                         
-                        if result:
+                        if result is not None:
                             # Espera a que la vela termine y la obtiene
                             rupture = True
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
                             
-                            # Si no se logro obtener la ultima barra continua
+                            # Si no se logro obtener la ultima barra continua con otra iteracion
                             if finished_bar is None:
                                 continue
                             
@@ -439,9 +433,10 @@ class HedgeTrailing2:
                                     continue
                                 elif close > range_limit:
                                     send_buyback = True
-                            
+                                                        
                             # Se hace recompra en caso de que la barra se encuentre en el rango limite
                             if send_buyback:
+                                print("HedgeTrailing: Primer trade, recompra")
                                 result =MT5Api.send_order(
                                     symbol= self.symbol, 
                                     order_type= order_type, 
@@ -450,77 +445,77 @@ class HedgeTrailing2:
                                     comment= "2"
                                 )
                                 continue
-            
-                if rupture and positions and int(positions[-1].comment) != 0:
-                    # Establece las variables
-                    open = last_bar['open']
-                    current_price = last_bar['close']
-                    last_type = positions[-1].type
-                    send_order = False
-                    # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                    if last_type == OrderType.MARKET_BUY:
-                        if current_price < low:
-                            order_type = OrderType.MARKET_SELL
-                            send_order = True
-                    elif last_type == OrderType.MARKET_SELL:
-                        if current_price > high:
-                            order_type =  OrderType.MARKET_BUY
-                            send_order = True
-                    
-                    if send_order:
-                        print("HedgeTrailing: Hedge trade")
-                        name_atr ="N" + str(number_hedge)
-                        multiplier = getattr(Multipliers, name_atr, 1.5)
-                        last_batch = float(positions[-1].comment)
-                        next_batch = last_batch * multiplier
-                        next_volume = self.volume_size * next_batch
-                        result =MT5Api.send_order(
-                            symbol= self.symbol, 
-                            order_type= order_type, 
-                            volume=next_volume,
-                            magic=self.magic,
-                            comment= str(next_batch)
-                        )
-                        if result:
-                            number_hedge += 1
-                            if number_hedge == 3:
-                                high = high - (range * 0.2)
-                                low = low + (range * 0.2)
-    
-                            false_rupture = False
-                            continue
+        
+            if rupture and positions and int(positions[-1].comment) != 0:
+                # Establece las variables
+                open = last_bar['open']
+                current_price = last_bar['close']
+                last_type = positions[-1].type
+                send_order = False
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if current_price < low:
+                        order_type = OrderType.MARKET_SELL
+                        send_order = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if current_price > high:
+                        order_type =  OrderType.MARKET_BUY
+                        send_order = True
                 
-                if false_rupture and positions and int(positions[-1].comment) != 0:
-                    # Establece las variables
-                    open = finished_bar['open']
-                    close = finished_bar['close']
-                    last_type = positions[-1].type
-                    send_buyback = False
-                    buyback_range = (range * 0.2)
-                    # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                    if last_type == OrderType.MARKET_BUY:
-                        if open <= high and close > high:
-                            range_limit = high + buyback_range
-                            if close < range_limit:
-                                send_buyback = True
-                    elif last_type == OrderType.MARKET_SELL:
-                        if open >= low and close < low:
-                            range_limit = low - buyback_range
-                            if close > range_limit:
-                                send_buyback = True
-                    
-                    if send_buyback:
-                        print("HedgeTrailing: Falsa ruptura trade")
-                        result =MT5Api.send_order(
-                            symbol= self.symbol, 
-                            order_type= last_type, 
-                            volume=self.volume_size,
-                            magic=self.magic,
-                            comment= "2"
-                        )
-                        if result:
-                            false_rupture = False
-                            continue
+                if send_order:
+                    print("HedgeTrailing: Hedge trade")
+                    name_atr ="N" + str(number_hedge)
+                    multiplier = getattr(Multipliers, name_atr, 1.5)
+                    last_batch = float(positions[-1].comment)
+                    next_batch = last_batch * multiplier
+                    next_volume = self.volume_size * next_batch
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= order_type, 
+                        volume=next_volume,
+                        magic=self.magic,
+                        comment= str(next_batch)
+                    )
+                    if result:
+                        number_hedge += 1
+                        if number_hedge == 3:
+                            high = high - (range * 0.2)
+                            low = low + (range * 0.2)
+
+                        false_rupture = False
+                        continue
+            
+            if false_rupture and positions and int(positions[-1].comment) != 0:
+                # Establece las variables
+                open = finished_bar['open']
+                close = finished_bar['close']
+                last_type = positions[-1].type
+                send_buyback = False
+                buyback_range = (range * 0.2)
+                # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
+                if last_type == OrderType.MARKET_BUY:
+                    if open <= high and close > high:
+                        range_limit = high + buyback_range
+                        if close < range_limit:
+                            send_buyback = True
+                elif last_type == OrderType.MARKET_SELL:
+                    if open >= low and close < low:
+                        range_limit = low - buyback_range
+                        if close > range_limit:
+                            send_buyback = True
+                
+                if send_buyback:
+                    print("HedgeTrailing: Falsa ruptura trade")
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= last_type, 
+                        volume=self.volume_size,
+                        magic=self.magic,
+                        comment= "2"
+                    )
+                    if result:
+                        false_rupture = False
+                        continue
        
     def _get_counter_volume(self, positions: List[TradePosition])->float:
         
