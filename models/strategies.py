@@ -237,7 +237,7 @@ class HedgeTrailing:
                             in_hedge = True
                             trailing_stop = True
             
-            if trailing_stop:
+            if trailing_stop and positions:
                 type = positions[-1].type
                 # Establece el stop loss móvil si se activa el trailing stop
                 trailing_range = (range * (number_trailing/2))
@@ -262,7 +262,7 @@ class HedgeTrailing:
                         print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
                 
-            if in_hedge:
+            if in_hedge and positions:
                 type = positions[-1].type             
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
@@ -444,7 +444,7 @@ class HedgeTrailing:
                                 )
                                 continue
 
-            if rupture and int(positions[-1].comment) != 0:
+            if rupture and positions and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
@@ -476,7 +476,7 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
             
-            if false_rupture and int(positions[-1].comment) != 0:
+            if false_rupture and positions and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = finished_bar['open']
                 close = finished_bar['close']
