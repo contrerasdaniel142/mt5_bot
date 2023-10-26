@@ -193,6 +193,7 @@ class HedgeTrailing:
                                 completed = completed and result
                             if not completed:
                                 continue
+                            print("HedgeTrailing: Comenzando trailing stop")
                             trailing_stop = True
                     else:
                         limit_price = low - range
@@ -204,6 +205,7 @@ class HedgeTrailing:
                                 completed = completed and result
                             if not completed:
                                 continue
+                            print("HedgeTrailing: Comenzando trailing stop")
                             trailing_stop = True
                 else:
                     if type == OrderType.MARKET_BUY:
@@ -217,6 +219,7 @@ class HedgeTrailing:
                                     completed = completed and result
                             if not completed:
                                 continue
+                            print("HedgeTrailing: Comenzando trailing stop")
                             in_hedge = True
                             trailing_stop = True
                     else:
@@ -230,6 +233,7 @@ class HedgeTrailing:
                                     completed = completed and result
                             if not completed:
                                 continue
+                            print("HedgeTrailing: Comenzando trailing stop")
                             in_hedge = True
                             trailing_stop = True
             
@@ -391,7 +395,8 @@ class HedgeTrailing:
                         range_limit = low - buyback_range
                         
                     # Envia la primera orden
-                    if send_order: 
+                    if send_order:
+                        print("HedgeTrailing: Primer trade")
                         result =MT5Api.send_order(
                             symbol= self.symbol, 
                             order_type= order_type, 
@@ -429,6 +434,7 @@ class HedgeTrailing:
                                                         
                             # Se hace recompra en caso de que la barra se encuentre en el rango limite
                             if send_buyback:
+                                print("HedgeTrailing: Primer trade, recompra")
                                 result =MT5Api.send_order(
                                     symbol= self.symbol, 
                                     order_type= order_type, 
@@ -455,6 +461,7 @@ class HedgeTrailing:
                         send_order = True
                 
                 if send_order:
+                    print("HedgeTrailing: Hedge trade")
                     last_batch = int(positions[-1].comment)
                     next_batch = last_batch * 3
                     next_volume = self.volume_size * next_batch
@@ -489,6 +496,7 @@ class HedgeTrailing:
                             send_buyback = True
                 
                 if send_buyback:
+                    print("HedgeTrailing: Falsa ruptura trade")
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
                         order_type= last_type, 
