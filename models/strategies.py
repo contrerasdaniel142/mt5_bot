@@ -194,7 +194,7 @@ class HedgeTrailing2:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -205,7 +205,7 @@ class HedgeTrailing2:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -274,7 +274,7 @@ class HedgeTrailing2:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -285,7 +285,7 @@ class HedgeTrailing2:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                             completed = completed and result
                         if not completed:
                             continue

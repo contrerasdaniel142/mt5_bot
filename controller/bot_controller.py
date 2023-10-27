@@ -112,7 +112,7 @@ class BotController:
         
         for calendar in calendars:
             next_market_open = calendar.open.astimezone(pytz.utc).replace(
-                hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute']
+                hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=1
             )
             if current_time < next_market_open:
                 break
