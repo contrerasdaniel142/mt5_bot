@@ -402,9 +402,6 @@ class HedgeTrailing:
                     outdated = range * self.number_outdated.value
                     high = high + outdated
                     low = low + outdated
-            
-                else:
-                    continue
                 
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
