@@ -64,6 +64,8 @@ class HedgeTrailing:
         # El numero que identificara las ordenes de esta estrategia
         self.magic = 63
         
+        self.number_outdated = 0
+        
         # El tamaño del lote
         if volume_size is None:
             self.volume_size = None
@@ -169,7 +171,15 @@ class HedgeTrailing:
                 if pre_closing_time > market_close:
                     self.is_on.value = False
                     continue
-
+                
+                # Si el desfase esta dentro del rango se calcula el high y low
+                if 3 > self.number_outdated.value < -3:
+                    high = self.symbol_data['high']
+                    low = self.symbol_data['low']
+                    outdated = range * self.number_outdated.value
+                    high = high + outdated
+                    low = low + outdated
+                
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
@@ -189,7 +199,7 @@ class HedgeTrailing:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -201,7 +211,7 @@ class HedgeTrailing:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -241,27 +251,31 @@ class HedgeTrailing:
                 type = positions[-1].type
                 # Establece el stop loss móvil si se activa el trailing stop
                 trailing_range = (range * (number_trailing/2))
-                next_trailing_range = (range * ((number_trailing + 2)/2))
+                next_trailing_range = (range * ((number_trailing + 1)/2))
+                next_stop_price_range = (range * ((number_trailing + 2)/2))
                 if type == OrderType.MARKET_BUY:
                     stop_loss = high + trailing_range
-                    next_stop_price = high + next_trailing_range
+                    next_stop_loss = high + next_trailing_range
+                    next_stop_price = high + next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
                     elif current_price >= next_stop_price:
-                        print(f"HedgeTrailing: stop loss en {stop_loss}")
+                        print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
+                        
                 
                 else:
                     stop_loss = low - trailing_range
-                    next_stop_price = low - next_trailing_range
+                    next_stop_loss = low - next_trailing_range
+                    next_stop_price = low - next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if current_price >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
                     elif current_price <= next_stop_price:
-                        print(f"HedgeTrailing: stop loss en {stop_loss}")
+                        print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 
             if in_hedge and positions:
@@ -273,7 +287,7 @@ class HedgeTrailing:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -284,7 +298,7 @@ class HedgeTrailing:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(self.symbol, (position.volume/2), position.ticket, "0")
+                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -365,7 +379,7 @@ class HedgeTrailing:
             while True:
                 info = MT5Api.get_symbol_info(self.symbol)
                 positions = MT5Api.get_positions(magic=self.magic)
-                last_bar = MT5Api.get_last_bar(self.symbol)
+                last_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
@@ -373,11 +387,25 @@ class HedgeTrailing:
             if len(positions) == 0:
                 # Se reinicia los estados
                 false_rupture = False
-                rupture = False
-                
+                rupture = False                
                 # Establece las variables
                 current_price = last_bar['close']
                 open = last_bar['open']
+                
+                # Encuentra el desfase
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
+                
+                # Si el desfase esta dentro del rango se calcula el high y low
+                if 3 > self.number_outdated.value < -3:
+                    high = self.symbol_data['high']
+                    low = self.symbol_data['low']
+                    outdated = range * self.number_outdated.value
+                    high = high + outdated
+                    low = low + outdated
+            
+                else:
+                    continue
+                
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
@@ -510,6 +538,17 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
 
+    def _check_outdated(self, high:float, low:float, range:float, current_price:float):
+        if current_price > high:
+            price_diff = current_price - high
+            count = int(price_diff // range) + 1
+        elif current_price < low:
+            price_diff = low - current_price
+            count = (-int(price_diff // range)) - 1
+        else:
+            count = 0
+        self.number_outdated.value = count
+        
     #endregion
     
     #region start
@@ -528,6 +567,7 @@ class HedgeTrailing:
         # Se crea las variables compartidas
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
+        self.number_outdated = manager.Value("i", 0)
 
         self._preparing_symbols_data()
         

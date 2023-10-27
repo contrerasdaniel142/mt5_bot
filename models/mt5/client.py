@@ -524,6 +524,10 @@ class MT5Api:
         #Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
         
+        if order_request is None:
+            print(f"No se pudo realizar la orden. Fallo de conexion")
+            return None
+        
         if order_request.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
             print(f"Comentario: {order_request.comment}")
@@ -534,14 +538,13 @@ class MT5Api:
         
         return order_request
     
-    def send_sell_partial_order(symbol: str, volume_to_sell: float, ticket:int, comment:str = None)->bool:
+    def send_sell_partial_order(position: TradePosition, volume_to_sell: float, comment: str = None)->bool:
         """
         Vende una parte de una posición abierta en MT5.
 
         Args:
-            symbol (str): El símbolo del instrumento.
+            position (TradePosition): La posicion a la cual se le hara una venta parcial.
             volume_to_sell (float): El volumen de la posición a vender.
-            ticket (int): El número de ticket de la posición a vender.
             comment (str, opcional): Un comentario opcional para la orden de venta.
                 Si no se establece, se conservará el comentario anterior de la posición.
         
@@ -550,51 +553,40 @@ class MT5Api:
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
-
-        positions = mt5.positions_get(ticket=ticket)
-        
-        request_type = 0
-        
-        
-        if positions is not None:
-            position = positions[-1]
-            if position.type == 0:
-                request_type = OrderType.MARKET_SELL
-            else:
-                request_type = OrderType.MARKET_BUY
-            
-            if comment is None:
-                comment = position.comment
-                
-            request = {
-                "action": TradeActions.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": volume_to_sell,
-                "type": request_type,
-                "price": mt5.symbol_info_tick(symbol).ask,
-                "position": ticket,
-                "comment": comment
-            }
-
-            order_request = mt5.order_send(request)
-            
-            #Cierra la conexión con MetaTrader 5
-            MT5Api.shutdown()
-            if order_request is None:
-                return False
-            if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
-                print(f"Comentario: {order_request.comment}")
-                return False
-            else:
-                print("Venta parcial completada.")
-                return True
-                
+    
+        if position.type == 0:
+            request_type = OrderType.MARKET_SELL
         else:
-            #Cierra la conexión con MetaTrader 5
-            MT5Api.shutdown()
-            print("Ticket no encontrado.")
+            request_type = OrderType.MARKET_BUY
+        
+        if comment is None:
+            comment = position.comment
+            
+        request = {
+            "action": TradeActions.TRADE_ACTION_DEAL,
+            "symbol": position.symbol,
+            "volume": volume_to_sell,
+            "type": request_type,
+            "price": position.price_current,
+            "position": position.ticket,
+            "comment": comment
+        }
+
+        order_request = mt5.order_send(request)
+        
+        #Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        if order_request is None:
+            print(f"No se pudo realizar la venta parcial. Error de conexion")
             return False
+        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+            print(f"Comentario: {order_request.comment}")
+            return False
+        else:
+            print("Venta parcial completada.")
+            return True
+
     
     def send_change_stop_loss_and_take_profit(symbol:str, new_stop_loss: float,  new_take_profit: float, ticket:int)->bool:
         """
