@@ -199,7 +199,8 @@ class HedgeTrailing:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                                new_volume = round((position.volume/2), self.symbol_data['digits'])
+                                result = MT5Api.send_sell_partial_order(position, new_volume, "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -211,7 +212,8 @@ class HedgeTrailing:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
-                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                                new_volume = round((position.volume/2), self.symbol_data['digits'])
+                                result = MT5Api.send_sell_partial_order(position, new_volume, "0")
                                 completed = completed and result
                             if not completed:
                                 continue
@@ -287,7 +289,8 @@ class HedgeTrailing:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                            new_volume = round((position.volume/2), self.symbol_data['digits'])
+                            result = MT5Api.send_sell_partial_order(position, new_volume, "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -298,7 +301,8 @@ class HedgeTrailing:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                            new_volume = round((position.volume/2), self.symbol_data['digits'])
+                            result = MT5Api.send_sell_partial_order(position, new_volume, "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -338,10 +342,10 @@ class HedgeTrailing:
         digits = info.digits
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
-        range = abs(high - low)
+        range = round(abs(high - low), digits)
                 
         if self.volume_size is None:
-            self.volume_size = info.volume_min
+            self.volume_size = info.volume_min * 2
   
         symbol_data= {
             'symbol': self.symbol,
