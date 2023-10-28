@@ -295,13 +295,16 @@ class MT5Api:
         MT5Api.initialize()
         
         if magic is not None:
-            positions = mt5.positions_get(magic=magic)
-        if ticket is not None:
-            positions = mt5.positions_get(ticket=ticket)
+            positions: Tuple[TradePosition] = mt5.positions_get(magic=magic)
+            if symbol is not None:
+                filtered_positions = [position for position in positions if position.symbol == symbol]
+                positions = filtered_positions
+        elif ticket is not None:
+            positions: Tuple[TradePosition] = mt5.positions_get(ticket=ticket)
         elif symbol is not None:
-            positions = mt5.positions_get(symbol=symbol)
+            positions: Tuple[TradePosition] = mt5.positions_get(symbol=symbol)
         else:
-            positions = mt5.positions_get()
+            positions: Tuple[TradePosition] = mt5.positions_get()
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -586,7 +589,6 @@ class MT5Api:
         else:
             print("Venta parcial completada.")
             return True
-
     
     def send_change_stop_loss_and_take_profit(symbol:str, new_stop_loss: float,  new_take_profit: float, ticket:int)->bool:
         """

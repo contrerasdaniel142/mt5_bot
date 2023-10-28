@@ -174,7 +174,7 @@ class BotController:
         print("Iniciando bot..")
                 
         # Establece los symbolos
-        symbol= "US30.cash"
+        symbols= ["US30.cash"]
                                 
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
@@ -183,11 +183,11 @@ class BotController:
         while True:
             print("")
             
-            self._sleep_to_next_market_opening(False)
+            #self._sleep_to_next_market_opening(False)
             
             # Se crea el objeto de la estrategia HardHedge 
             hedge = HedgeTrailing(
-                    symbol= symbol,
+                    symbols= symbols,
                     volume_size= 1
                 )
             hedge.start()
