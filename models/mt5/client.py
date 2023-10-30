@@ -472,7 +472,7 @@ class MT5Api:
     #endregion
     
     #region Setters
-    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None, magic: int = None, type_filling: int = None) -> MqlTradeResult:
+    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None, magic: int = None) -> MqlTradeResult:
         """
         Envía una orden al servidor de MetaTrader 5.
 
@@ -486,7 +486,6 @@ class MT5Api:
             ticket (int, optional): Ticket de la orden. Es necesario para modificar las órdenes pendientes.
             comment (str, optional): Comentario opcional para la orden.
             magic(int, optional): Identificador del experto. Permite organizar el procesamiento analítico de órdenes comerciales. Cada experto puede colocar su propio identificador único al enviar una solicitud comercial
-            type_filling(int, optional): Tipo de llenado de la orden
         Returns:
             MqlTradeResult: Contiene la informacion sobre el resultado de la orden, None si la orden no es valida.
 
@@ -522,8 +521,7 @@ class MT5Api:
         if magic is not None:
             request["magic"] = magic
 
-        if type_filling is None:
-            request["type_filling"] = mt5.ORDER_FILLING_FOK
+        #request["type_filling"] = mt5.ORDER_FILLING_IOC
         
         order_request: MqlTradeResult = mt5.order_send(request)
 
@@ -544,7 +542,7 @@ class MT5Api:
         
         return order_request
     
-    def send_sell_partial_order(position: TradePosition, volume_to_sell: float, comment: str = None, type_filling:int =None)->bool:
+    def send_sell_partial_order(position: TradePosition, volume_to_sell: float, comment: str = None)->bool:
         """
         Vende una parte de una posición abierta en MT5.
 
@@ -552,9 +550,7 @@ class MT5Api:
             position (TradePosition): La posicion a la cual se le hara una venta parcial.
             volume_to_sell (float): El volumen de la posición a vender.
             comment (str, opcional): Un comentario opcional para la orden de venta.
-                Si no se establece, se conservará el comentario anterior de la posición.
-            type_filling(int, optional): Tipo de llenado de la orden
-        
+                Si no se establece, se conservará el comentario anterior de la posición.        
         Returns: 
             bool: Retorna True si la orden se ejecuto con exito, en caso contrario False
         """
@@ -569,9 +565,6 @@ class MT5Api:
         if comment is None:
             comment = position.comment
         
-        if type_filling is None:
-            type_filling = mt5.ORDER_FILLING_FOK
-            
         request = {
             "action": TradeActions.TRADE_ACTION_DEAL,
             "symbol": position.symbol,
@@ -579,10 +572,10 @@ class MT5Api:
             "type": request_type,
             "price": position.price_current,
             "position": position.ticket,
-            "comment": comment,
-            "type_filling": type_filling
-            
+            "comment": comment
         }
+        
+        #request["type_filling"] = mt5.ORDER_FILLING_IOC
 
         order_request = mt5.order_send(request)
         
@@ -779,12 +772,13 @@ class MT5Api:
         
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
-        
+        order = {}
         # process only simple buy, sell
         if position.type == mt5.ORDER_TYPE_BUY or position.type == mt5.ORDER_TYPE_SELL:
             tried += 1
             for tries in range(10):
                 info = mt5.symbol_info_tick(position.symbol)
+                #order["type_filling"] = mt5.ORDER_FILLING_IOC
                 if info is None:
                     return None
                 if position.type == mt5.ORDER_TYPE_BUY:
