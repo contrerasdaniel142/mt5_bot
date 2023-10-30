@@ -3,7 +3,7 @@ import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
 from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
-from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition
+from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition, AccountInfo
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
@@ -277,7 +277,7 @@ class MT5Api:
         MT5Api.shutdown()
         return ticks
 
-    def get_positions(symbol: str = None, ticket: int = None)-> Tuple[TradePosition, ...]:
+    def get_positions(symbol: str = None, ticket: int = None, magic:int = None)-> Tuple[TradePosition, ...]:
         """
         Obtiene las posiciones abiertas para un símbolo específico en MetaTrader 5.
         
@@ -286,6 +286,7 @@ class MT5Api:
         Args:
             symbol (str, optional): El símbolo del instrumento financiero para el cual se desean obtener las posiciones.
             ticket (int, optional): El número de ticket de la posición que se desea obtener de manera específica.
+            magic(int, optional): Identificador del experto. Permite organizar el procesamiento analítico de órdenes comerciales. Cada experto puede colocar su propio identificador único al enviar una solicitud comercial
 
         Returns:
             Tuple[TradePosition, ...] or None: Una tupla de objetos TradePosition que representan las posiciones abiertas.
@@ -293,12 +294,17 @@ class MT5Api:
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
-        if ticket is not None:
-            positions = mt5.positions_get(ticket=ticket)
+        if magic is not None:
+            positions: Tuple[TradePosition] = mt5.positions_get(magic=magic)
+            if positions is not None and symbol is not None:
+                filtered_positions = [position for position in positions if position.symbol == symbol]
+                positions = filtered_positions
+        elif ticket is not None:
+            positions: Tuple[TradePosition] = mt5.positions_get(ticket=ticket)
         elif symbol is not None:
-            positions = mt5.positions_get(symbol=symbol)
+            positions: Tuple[TradePosition] = mt5.positions_get(symbol=symbol)
         else:
-            positions = mt5.positions_get()
+            positions: Tuple[TradePosition] = mt5.positions_get()
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -390,7 +396,7 @@ class MT5Api:
         MT5Api.initialize()
         
         # Obtiene la información del símbolo
-        symbol_info = mt5.symbol_info(symbol)
+        symbol_info: SymbolInfo = mt5.symbol_info(symbol)
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -443,24 +449,44 @@ class MT5Api:
             float: El precio de cierre más reciente del símbolo.
         """
         last_rate = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
-        return last_rate[-1]
+        if last_rate is None:
+            return None
+        else:
+            return last_rate[-1]
     
-    #endregion
+    def get_account_info() -> AccountInfo:
+        """
+        Obtiene la información de la cuenta en MetaTrader 5.
 
+        Returns:
+            AccountInfo: Un objeto que contiene información de la cuenta en MetaTrader 5.
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        # Obtener información de la cuenta
+        account_info: AccountInfo = mt5.account_info()
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        return account_info
+        
+    #endregion
+    
     #region Setters
-    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None) -> MqlTradeResult:
+    def send_order(symbol:str, order_type:OrderType, volume:float, price:float=None, stop_loss:float=None, take_profit:float=None, ticket:int=None, comment:str=None, magic: int = None, type_filling: int = None) -> MqlTradeResult:
         """
         Envía una orden al servidor de MetaTrader 5.
 
         Args:
-            symbol (str): El nombre del símbolo en el que deseas realizar la orden.
+            symbol (str): Nombre del instrumento comercial del que se coloca la orden. No es necesario en las operaciones de modificación de órdenes y el cierre de posiciones.
             order_type (int): El tipo de orden (por ejemplo, ORDER_TYPE_BUY o ORDER_TYPE_SELL).
-            volume (float): El volumen (cantidad) que deseas comprar o vender.
+            volume (float): Volumen de la transacción solicitado en lotes. El valor real del volumen al darse la apertura dependerá del tipo de orden según la ejecución.
             price (float, optional): El precio al que deseas realizar la orden. Si no se especifica, se utilizará el precio de mercado actual.
             stop_loss (float, optional): El nivel de Stop Loss para la orden.
             take_profit (float, optional): El nivel de Take Profit para la orden.
+            ticket (int, optional): Ticket de la orden. Es necesario para modificar las órdenes pendientes.
             comment (str, optional): Comentario opcional para la orden.
-
+            magic(int, optional): Identificador del experto. Permite organizar el procesamiento analítico de órdenes comerciales. Cada experto puede colocar su propio identificador único al enviar una solicitud comercial
+            type_filling(int, optional): Tipo de llenado de la orden
         Returns:
             MqlTradeResult: Contiene la informacion sobre el resultado de la orden, None si la orden no es valida.
 
@@ -482,90 +508,133 @@ class MT5Api:
         request['action'] = TradeActions.TRADE_ACTION_DEAL
         request['symbol'] = symbol
         request['volume'] = volume
-        request["deviation"]= 10
         request["type"] = order_type
-
-        if comment is not None:
-            request["comment"] = comment
         
         if stop_loss is not None:
             request["sl"] = float(stop_loss)
 
         if take_profit is not None:
             request["tp"] = float(take_profit)
+        
+        if comment is not None:
+            request["comment"] = comment
+            
+        if magic is not None:
+            request["magic"] = magic
 
+        if type_filling is None:
+            request["type_filling"] = mt5.ORDER_FILLING_FOK
+        
         order_request: MqlTradeResult = mt5.order_send(request)
+
+        #Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        
+        if order_request is None:
+            print(f"No se pudo realizar la orden. Fallo de conexion")
+            return None
+        
         if order_request.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"No se pudo realizar la orden. Código de error: {order_request.retcode}")
             print(f"Comentario: {order_request.comment}")
             return None
         else:
-            print(f"Orden completada. {symbol}: vol[{volume}] price[{price}] sl[{stop_loss}] tp [{take_profit}]")
+            print(f"Orden completada: {request}")
 
-        #Cierra la conexión con MetaTrader 5
-        MT5Api.shutdown()
+        
         return order_request
     
-    def send_sell_partial_order(symbol: str, volume_to_sell: float, ticket:int, comment:str = None)->bool:
+    def send_sell_partial_order(position: TradePosition, volume_to_sell: float, comment: str = None, type_filling:int =None)->bool:
         """
         Vende una parte de una posición abierta en MT5.
 
         Args:
-            symbol (str): El símbolo del instrumento.
+            position (TradePosition): La posicion a la cual se le hara una venta parcial.
             volume_to_sell (float): El volumen de la posición a vender.
-            ticket (int): El número de ticket de la posición a vender.
             comment (str, opcional): Un comentario opcional para la orden de venta.
                 Si no se establece, se conservará el comentario anterior de la posición.
+            type_filling(int, optional): Tipo de llenado de la orden
         
         Returns: 
             bool: Retorna True si la orden se ejecuto con exito, en caso contrario False
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
-
-        positions = mt5.positions_get(ticket=ticket)
-        
-        request_type = 0
-        
-        
-        if positions is not None:
-            position = positions[-1]
-            if position.type == 0:
-                request_type = OrderType.MARKET_SELL
-            else:
-                request_type = OrderType.MARKET_BUY
-            
-            if comment is None:
-                comment = position.comment
-                
-            request = {
-                "action": TradeActions.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": volume_to_sell,
-                "type": request_type,
-                "price": mt5.symbol_info_tick(symbol).ask,
-                "position": ticket,
-                "comment": comment
-            }
-
-            order_request = mt5.order_send(request)
-            
-            #Cierra la conexión con MetaTrader 5
-            MT5Api.shutdown()
-
-            if order_request.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
-                print(f"Comentario: {order_request.comment}")
-                return False
-            else:
-                print("Venta parcial completada.")
-                return True
-                
+    
+        if position.type == 0:
+            request_type = OrderType.MARKET_SELL
         else:
-            #Cierra la conexión con MetaTrader 5
-            MT5Api.shutdown()
-            print("Ticket no encontrado.")
+            request_type = OrderType.MARKET_BUY
+        
+        if comment is None:
+            comment = position.comment
+        
+        if type_filling is None:
+            type_filling = mt5.ORDER_FILLING_FOK
+            
+        request = {
+            "action": TradeActions.TRADE_ACTION_DEAL,
+            "symbol": position.symbol,
+            "volume": volume_to_sell,
+            "type": request_type,
+            "price": position.price_current,
+            "position": position.ticket,
+            "comment": comment,
+            "type_filling": type_filling
+            
+        }
+
+        order_request = mt5.order_send(request)
+        
+        #Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+        if order_request is None:
+            print(f"No se pudo realizar la venta parcial. Error de conexion")
             return False
+        if order_request.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"No se pudo realizar la venta parcial. Código de error: {order_request.retcode}")
+            print(f"Comentario: {order_request.comment}")
+            return False
+        else:
+            print("Venta parcial completada.")
+            return True
+    
+    def send_change_stop_loss_and_take_profit(symbol:str, new_stop_loss: float,  new_take_profit: float, ticket:int)->bool:
+        """
+        Cambia el nivel de stop loss  y el take profit de una posición abierta en MT5.
+
+        Args:
+            symbol (str): El símbolo del instrumento.
+            new_stop_loss (float): El nuevo nivel de stop loss.
+            new_take_profit (float): El nuevo nivel de take profit.
+            ticket (int): El número de ticket de la posición a modificar.
+        
+        Return:
+            Bool: True Si la orden se ejecuto con exito, false si no
+        """
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+
+        modify_request = {
+            "action": TradeActions.TRADE_ACTION_SLTP,
+            "symbol": symbol,
+            "position": ticket,
+            "sl": new_stop_loss,
+            "tp": new_take_profit,
+        }
+
+        modify_result = mt5.order_send(modify_request)
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+
+        if modify_result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"Modificación del sl y tp ejecutada. {symbol}: sl {new_stop_loss} tp {new_take_profit}")
+            return True
+        else:
+            print(f"Error al ejecutar la modificación del sl y tp: {modify_result.retcode}")
+            print(f"Comentario: {modify_result.comment}")
+            return False  
     
     def send_change_stop_loss(symbol:str, new_stop_loss: float, ticket:int)->bool:
         """
@@ -646,16 +715,19 @@ class MT5Api:
         positions = mt5.positions_get()
         
         if positions is not None:
-            # Itera sobre todas las posiciones abiertas y las cierra
-            for position in positions:  
-                close_result = mt5.Close(position.symbol,ticket=position.ticket)
-                
-                if close_result:
-                    print(f"Posición en {position.symbol} cerrada con éxito")
-                else:
-                    print(f"Error al cerrar la posición en {position.symbol}")
+            if positions:
+                # Itera sobre todas las posiciones abiertas y las cierra
+                for position in positions:  
+                    close_result = MT5Api.send_close_position(position)
+                    
+                    if close_result:
+                        print(f"Posición en {position.symbol} cerrada con éxito.")
+                    else:
+                        print(f"Error al cerrar la posición en {position.symbol}.")
+            else:
+                print("No hay posiciones abiertas para cerrar.")
         else:
-            print("No hay posiciones abiertas para cerrar")
+            print("Error al intentar obtener posicones.")
             
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
@@ -692,6 +764,69 @@ class MT5Api:
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
+    
+    def send_close_position(position: TradePosition)-> bool:
+        """
+        Cierra una posicion abiertas en la plataforma MetaTrader 5.
+        
+        Args:
+            position (TradePosition): Posicion a cerrar.
+        Returns:
+            bool: Verdadero si se ejecuto con exito, falso o None en caso contrario y "Partially" en caso de no completar toda la venta.
+        """
+        tried = 0
+        done = 0
+        
+        # Inicializa la conexión con la plataforma MetaTrader 5
+        MT5Api.initialize()
+        
+        # process only simple buy, sell
+        if position.type == mt5.ORDER_TYPE_BUY or position.type == mt5.ORDER_TYPE_SELL:
+            tried += 1
+            for tries in range(10):
+                info = mt5.symbol_info_tick(position.symbol)
+                if info is None:
+                    return None
+                if position.type == mt5.ORDER_TYPE_BUY:
+                    order = {
+                        "action":    mt5.TRADE_ACTION_DEAL,
+                        "symbol":    position.symbol,
+                        "volume":    position.volume,
+                        "type":      mt5.ORDER_TYPE_SELL,
+                        "price":     info.bid,
+                        "deviation": 10,
+                        "ticket": position.ticket
+                        }
+                    result = mt5.order_send(order)
+                else:
+                    order = {
+                        "action":    mt5.TRADE_ACTION_DEAL,
+                        "symbol":    position.symbol,
+                        "volume":    position.volume,
+                        "type":      mt5.ORDER_TYPE_BUY,
+                        "price":     info.ask,
+                        "deviation": 10,
+                        "ticket": position.ticket
+                        }
+                    result = mt5.order_send(order)
+                # check results
+                if result is None:
+                    return None
+                if result.retcode != mt5.TRADE_RETCODE_REQUOTE and result.retcode != mt5.TRADE_RETCODE_PRICE_OFF:
+                    if result.retcode == mt5.TRADE_RETCODE_DONE:
+                        done += 1
+                    break
+        
+        # Cierra la conexión con MetaTrader 5
+        MT5Api.shutdown()
+                   
+        if done > 0:
+            if done == tried:
+                return True
+            else:
+                return "Partially"
+        return False
+    
     #endregion
     
     #region Utilities
@@ -710,4 +845,3 @@ class MT5Api:
         
         return dt_mt5
     #endregion
-
