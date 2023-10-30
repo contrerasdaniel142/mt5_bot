@@ -48,7 +48,7 @@ class StateTrend:
     
 
 class HedgeTrailing:
-    def __init__(self, symbol: str, user_risk: float = 50) -> None:
+    def __init__(self, symbol: str) -> None:
         # Indica si el programa debe seguir activo
         self.is_on = None
         
@@ -63,10 +63,7 @@ class HedgeTrailing:
         
         # El numero que identificara las ordenes de esta estrategia
         self.magic = 63
-                
-        # Riesgo que se manejara en el primer trade
-        self.user_risk = user_risk
-                
+                                
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
@@ -158,6 +155,9 @@ class HedgeTrailing:
             current_price = info.bid
             high = self.symbol_data['high_outdated'].value
             low = self.symbol_data['low_outdated'].value
+            
+            if high == 0 or low == 0:
+                continue
                         
             if not trailing_stop and positions:
                 # Determina el número de lotes y el tipo de última posición
@@ -336,7 +336,7 @@ class HedgeTrailing:
                 open = last_bar['open']
                 
                 # Encuentra el desfase
-                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, last_bar['open'])
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
                 if 6 > self.number_outdated.value or self.number_outdated.value < -6:
@@ -494,7 +494,28 @@ class HedgeTrailing:
         else:
             count = 0
         self.number_outdated.value = count
+    
+    def _get_counter_volume(self, positions: List[TradePosition])->float:
         
+        buys = [position for position in positions if position.type == OrderType.MARKET_BUY]
+        sells = [position for position in positions if position.type == OrderType.MARKET_SELL]
+
+        total_buys = sum(position.volume for position in buys)
+        total_sells = sum(position.volume for position in sells)
+
+        difference = abs(total_sells - total_buys)
+        
+        return difference
+    
+    def _get_optimal_range_size(self, rates: np.ndarray, atr_timeperiod=14):
+        brick_size = 0.0
+        df = pd.DataFrame(rates)
+        # Si tenemos suficientes datos
+        if len(rates) > atr_timeperiod:
+            atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
+            brick_size = np.median(atr[atr_timeperiod:])
+        return brick_size
+    
     def _preparing_symbols_data(self):
         """
         Prepara la data que se usara en la estrategia de HedgeTrailing.
@@ -503,55 +524,57 @@ class HedgeTrailing:
         
         # Establece el periodo de tiempo para calcular el rango
         current_time = datetime.now(pytz.utc)
-        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
-        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
         
-        for symbol in self.symbols:
-            while True:
-                info = MT5Api.get_symbol_info(symbol)
-                rates_in_range = MT5Api.get_rates_range(symbol, TimeFrame.MINUTE_1, start_time, end_time)
+        while True:
+            info = MT5Api.get_symbol_info(self.symbol)
+            account_info = MT5Api.get_account_info()
+            # Obtiene las barras de 30 minutos de 7 dias
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, 5040)
+            
+            if info is not None and rates_in_range is not None and account_info is not None:
+                break
+        
+        # Obtiene el nuemro de digitos en el symbolo
+        digits = info.digits
+        # Establece el rango
+        range = self._get_optimal_range_size(rates_in_range)
+        range = round(range, digits)
+        
+        # Obtiene el cierre de la ultima barra
+        last_close = rates_in_range[-1]['close']
+        
+        # Establece el high y el low con respecto al rango
+        quantity_high = int(last_close/range) + 1
+        quantity_low = int(last_close/range)
                 
-                # Para testear fuera de horarios de mercado 
-                if rates_in_range is None or rates_in_range.size == 0:
-                    number_bars = 30
-                    rates_in_range = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, number_bars)
+        # Establece el high
+        high = quantity_high * range
+        # Establece el low
+        low = quantity_low * range
+        
+        volume = (account_info.balance * 0.001) / range
+        volume = round(volume, digits)
+        
+        if volume < (info.volume_min * 2):
+            volume = info.volume_min * 2
 
-                if info is not None and rates_in_range is not None:
-                    break
+        symbol_data= {
+            'symbol': self.symbol,
+            'digits': digits,
+            'high': high,
+            'low': low,
+            'range': range,
+            'volume': volume,
+            'volume_min': info.volume_min,
+            'volume_max': info.volume_max,
+        }
+        
+        print(symbol_data)
             
-            
-            digits = info.digits
-            # Establece el high
-            high = np.max(rates_in_range['high'])
-            # Establece el low
-            low = np.min(rates_in_range['low'])
-            # Establece el rango
-            range = round(abs(high - low), digits)
-            # Establece el nuevo high y low basado en el rango
-            high = high - (range*0.25)
-            low = low + (range*0.25)
-            # Establece el nuevo rango
-            range = range * 0.5
-            
-            volume = round((self.user_risk / range), digits)
-                                
-            symbol_data= {
-                'symbol': self.symbol,
-                'digits': digits,
-                'high': high,
-                'low': low,
-                'range': range,
-                'volume': volume,
-                'volume_min': info.volume_min,
-                'volume_max': info.volume_max,
-            }
-            
-            print(symbol_data)
-                
-                
-            # Actualiza la variable compartida
-            self.symbol_data = symbol_data
-                    
+        
+        # Actualiza la variable compartida
+        self.symbol_data = symbol_data
+        
     
     #endregion
     
@@ -574,8 +597,8 @@ class HedgeTrailing:
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
         self.number_outdated = manager.Value("i", 0)
-        self.symbol_data['high_outdated'] = manager.Value("f", self.symbol_data['high'])
-        self.symbol_data['low_outdated'] = manager.Value("f", self.symbol_data['low'])
+        self.symbol_data['high_outdated'] = manager.Value("f", 0.0)
+        self.symbol_data['low_outdated'] = manager.Value("f", 0.0)
                 
         # Crea los procesos y los inicia
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
