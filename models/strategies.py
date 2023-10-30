@@ -304,6 +304,7 @@ class HedgeTrailing:
         # Condicionales de estados
         false_rupture= False
         rupture = False
+        counter_hedge = False
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -330,7 +331,8 @@ class HedgeTrailing:
                                 
                 # Se reinicia los estados
                 false_rupture = False
-                rupture = False                
+                rupture = False
+                counter_hedge = False       
                 # Establece las variables
                 current_price = last_bar['close']
                 open = last_bar['open']
@@ -340,7 +342,7 @@ class HedgeTrailing:
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
                 if 6 > self.number_outdated.value or self.number_outdated.value < -6:
-                    outdated = range * self.number_outdated.value
+                    outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
                     new_high = self.symbol_data['high'] + outdated
                     new_low = self.symbol_data['low'] + outdated
                     if new_high != high:
@@ -420,7 +422,7 @@ class HedgeTrailing:
                                 )
                                 continue
 
-            if rupture and positions and int(positions[-1].comment) != 0:
+            if rupture and positions and not counter_hedge and int(positions[-1].comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
                 current_price = last_bar['close']
@@ -441,6 +443,11 @@ class HedgeTrailing:
                     last_batch = int(positions[-1].comment)
                     next_batch = last_batch * 3
                     next_volume = volume * next_batch
+                    next_profit = range * next_volume
+                    if next_profit > 2500:
+                        print("HedgeTrailing: Counter Hedge trade")
+                        next_volume = self._get_counter_volume(positions)
+                            
                     result =MT5Api.send_order(  
                         symbol= self.symbol, 
                         order_type= order_type, 
@@ -449,6 +456,8 @@ class HedgeTrailing:
                         comment= str(next_batch)
                     )
                     if result:
+                        if next_profit > 2500:
+                            counter_hedge = True
                         false_rupture = False
                         continue
             
@@ -521,10 +530,7 @@ class HedgeTrailing:
         Prepara la data que se usara en la estrategia de HedgeTrailing.
         """
         print("HedgeTrailing: Preparando la data...")
-        
-        # Establece el periodo de tiempo para calcular el rango
-        current_time = datetime.now(pytz.utc)
-        
+                
         while True:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
@@ -538,8 +544,7 @@ class HedgeTrailing:
         digits = info.digits
         # Establece el rango
         range = self._get_optimal_range_size(rates_in_range)
-        range = round(range, digits)
-        
+                
         # Obtiene el cierre de la ultima barra
         last_close = rates_in_range[-1]['close']
         
@@ -549,8 +554,10 @@ class HedgeTrailing:
                 
         # Establece el high
         high = quantity_high * range
+        high = round(high,digits)
         # Establece el low
         low = quantity_low * range
+        low = round(low,digits)
         
         volume = (account_info.balance * 0.001) / range
         volume = round(volume, digits)

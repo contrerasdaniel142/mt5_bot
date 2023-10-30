@@ -718,7 +718,7 @@ class MT5Api:
             if positions:
                 # Itera sobre todas las posiciones abiertas y las cierra
                 for position in positions:  
-                    close_result = mt5.Close(position.symbol,ticket=position.ticket)
+                    close_result = MT5Api.send_close_position(position)
                     
                     if close_result:
                         print(f"Posición en {position.symbol} cerrada con éxito.")
@@ -765,32 +765,67 @@ class MT5Api:
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
     
-    def send_close_position(symbol:str, ticket:int)-> bool:
+    def send_close_position(position: TradePosition)-> bool:
         """
         Cierra una posicion abiertas en la plataforma MetaTrader 5.
         
         Args:
-            symbol (str): El símbolo del instrumento.
-            ticket (int): El número de ticket de la posición a vender.
+            position (TradePosition): Posicion a cerrar.
         Returns:
-            bool: Verdadero si se ejecuto con exito, falso en caso contrario
+            bool: Verdadero si se ejecuto con exito, falso o None en caso contrario y "Partially" en caso de no completar toda la venta.
         """
+        tried = 0
+        done = 0
+        
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
         
-        close_result = mt5.Close(symbol=symbol, ticket=ticket)
+        # process only simple buy, sell
+        if position.type == mt5.ORDER_TYPE_BUY or position.type == mt5.ORDER_TYPE_SELL:
+            tried += 1
+            for tries in range(10):
+                info = mt5.symbol_info_tick(position.symbol)
+                if info is None:
+                    return None
+                if position.type == mt5.ORDER_TYPE_BUY:
+                    order = {
+                        "action":    mt5.TRADE_ACTION_DEAL,
+                        "symbol":    position.symbol,
+                        "volume":    position.volume,
+                        "type":      mt5.ORDER_TYPE_SELL,
+                        "price":     info.bid,
+                        "deviation": 10,
+                        "ticket": position.ticket
+                        }
+                    result = mt5.order_send(order)
+                else:
+                    order = {
+                        "action":    mt5.TRADE_ACTION_DEAL,
+                        "symbol":    position.symbol,
+                        "volume":    position.volume,
+                        "type":      mt5.ORDER_TYPE_BUY,
+                        "price":     info.ask,
+                        "deviation": 10,
+                        "ticket": position.ticket
+                        }
+                    result = mt5.order_send(order)
+                # check results
+                if result is None:
+                    return None
+                if result.retcode != mt5.TRADE_RETCODE_REQUOTE and result.retcode != mt5.TRADE_RETCODE_PRICE_OFF:
+                    if result.retcode == mt5.TRADE_RETCODE_DONE:
+                        done += 1
+                    break
         
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
                    
-        if close_result:
-            print(f"Posición {ticket} cerrada con éxito")
-            return True
-        else:
-            print(f"Error al cerrar la posición ticket")
-            return False
-            
-    
+        if done > 0:
+            if done == tried:
+                return True
+            else:
+                return "Partially"
+        return False
     
     #endregion
     
