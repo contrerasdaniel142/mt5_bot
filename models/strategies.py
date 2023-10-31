@@ -319,7 +319,7 @@ class HedgeTrailing:
                 positions = MT5Api.get_positions(magic=self.magic)
                 last_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                range_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 2, 1)
+                range_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 3, 1)
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None and range_bar is not None:
                     break
             
