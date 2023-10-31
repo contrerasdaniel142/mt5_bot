@@ -226,9 +226,12 @@ class HedgeTrailing:
                 # Establece el stop loss móvil si se activa el trailing stop
                 trailing_range = (range * (number_trailing/2))
                 next_trailing_range = (range * ((number_trailing + 1)/2))
-                next_stop_price_range = (range * ((number_trailing + 2)/2))
+                next_stop_price_range = (range * ((number_trailing + 2)/2))                    
                 if type == OrderType.MARKET_BUY:
-                    stop_loss = high + trailing_range
+                    if in_hedge:
+                        stop_loss = high + hedge_range
+                    else:
+                        stop_loss = high + trailing_range
                     next_stop_loss = high + next_trailing_range
                     next_stop_price = high + next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
@@ -241,7 +244,10 @@ class HedgeTrailing:
                         
                 
                 else:
-                    stop_loss = low - trailing_range
+                    if in_hedge:
+                        stop_loss = low - hedge_range
+                    else:
+                        stop_loss = low - trailing_range
                     next_stop_loss = low - next_trailing_range
                     next_stop_price = low - next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
