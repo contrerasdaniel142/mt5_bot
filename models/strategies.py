@@ -199,7 +199,7 @@ class HedgeTrailing:
                             completed = True
                             for position in positions:
                                 if position.profit < 0:
-                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                    result = MT5Api.send_close_position(position)
                                     completed = completed and result
                             if not completed:
                                 continue
@@ -213,7 +213,7 @@ class HedgeTrailing:
                             completed = True
                             for position in positions:
                                 if position.profit < 0:
-                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                    result = MT5Api.send_close_position(position)
                                     completed = completed and result
                             if not completed:
                                 continue
@@ -535,7 +535,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, 5040)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
