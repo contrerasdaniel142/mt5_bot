@@ -344,22 +344,21 @@ class HedgeTrailing:
                 open = last_bar['open']
                 
                 # Encuentra el desfase
-                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, last_bar['open'])
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
-                if 6 > self.number_outdated.value or self.number_outdated.value < -6:
-                    outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
-                    new_high = self.symbol_data['high'] + outdated
-                    new_low = self.symbol_data['low'] + outdated
-                    if new_high != high:
-                        print(f"HedgeTrailing: high establecido en {new_high}")
-                        high = new_high
-                        self.symbol_data['high_outdated'].value = new_high
-                    if new_low != low:
-                        print(f"HedgeTrailing: low establecido en {new_low}")
-                        low = new_low
-                        self.symbol_data['low_outdated'].value = new_low
-                
+                outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
+                new_high = self.symbol_data['high'] + outdated
+                new_low = self.symbol_data['low'] + outdated
+                if new_high != high:
+                    print(f"HedgeTrailing: high establecido en {new_high}")
+                    high = new_high
+                    self.symbol_data['high_outdated'].value = new_high
+                if new_low != low:
+                    print(f"HedgeTrailing: low establecido en {new_low}")
+                    low = new_low
+                    self.symbol_data['low_outdated'].value = new_low
+            
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
