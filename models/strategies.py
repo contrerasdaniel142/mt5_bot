@@ -319,7 +319,8 @@ class HedgeTrailing:
                 positions = MT5Api.get_positions(magic=self.magic)
                 last_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
+                range_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                if info is not None and positions is not None and last_bar is not None and finished_bar is not None and range_bar is not None:
                     break
             
             current_time = datetime.now(pytz.utc)   # Hora actual
@@ -344,7 +345,7 @@ class HedgeTrailing:
                 open = last_bar['open']
                 
                 # Encuentra el desfase
-                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, range_bar['open'])
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
                 outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
