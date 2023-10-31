@@ -345,7 +345,7 @@ class HedgeTrailing:
                 open = last_bar['open']
                 
                 # Encuentra el desfase
-                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, range_bar['open'])
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
                 outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
