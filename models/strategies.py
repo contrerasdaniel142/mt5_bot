@@ -371,12 +371,12 @@ class HedgeTrailing:
                     
                     # Comprueba si el precio supera el rango
                     
-                    if current_price > high and self.trend_state.value == StateTrend.BULLISH:
+                    if info.ask > high and self.trend_state.value == StateTrend.BULLISH:
                         send_order = True
                         order_type = OrderType.MARKET_BUY
                         range_limit = high + buyback_range
                         
-                    elif current_price < low and self.trend_state.value == StateTrend.BEARISH:
+                    elif info.bid < low and self.trend_state.value == StateTrend.BEARISH:
                         send_order = True
                         order_type = OrderType.MARKET_SELL
                         range_limit = low - buyback_range
@@ -439,11 +439,11 @@ class HedgeTrailing:
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
-                    if current_price < low:
+                    if info.bid < low:
                         order_type = OrderType.MARKET_SELL
                         send_order = True
                 elif last_type == OrderType.MARKET_SELL:
-                    if current_price > high:
+                    if info.ask > high:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                 
@@ -595,7 +595,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
