@@ -13,6 +13,7 @@ import pandas as pd
 
 # Para trabajo en paralelo
 import multiprocessing
+from multiprocessing.managers import ValueProxy
 
 # Importacion de los clientes de las apis para hacer solicitudes
 from .mt5.enums import TimeFrame, OrderType
@@ -41,7 +42,6 @@ class StateTrend:
     - BULLISH: Estado alcista, con valor 1.
     - BEARISH: Estado bajista, con valor -1.
     """
-
     UNASSIGNED = 0
     BULLISH = 1
     BEARISH = -1
@@ -50,23 +50,25 @@ class StateTrend:
 class HedgeTrailing:
     def __init__(self, symbol: str) -> None:
         # Indica si el programa debe seguir activo
-        self.is_on = None
+        self.is_on: ValueProxy[bool] = None
         
         # Lista de symbolos para administar dentro de la estrategia
-        self.symbol = symbol
+        self.symbol: str = symbol
         
         # Variable que contiene informaciond el symbolo para la estrategia
-        self.symbol_data = {}
+        self.symbol_data: dict[str, Any] = {}
         
         # Numero de desfase
-        self.number_outdated = 0
+        self.number_outdated: ValueProxy[int] = None
         
         # El numero que identificara las ordenes de esta estrategia
-        self.magic = 63
+        self.magic: int = 63
+        
+        self.trend_state: ValueProxy[int] = None
                                 
         # Horario de apertura y cierre del mercado
-        self._market_opening_time = {'hour':13, 'minute':30}
-        self._market_closed_time = {'hour':19, 'minute':55}
+        self._market_opening_time: dict[str, int] = {'hour':13, 'minute':30}
+        self._market_closed_time: dict[str, int] = {'hour':19, 'minute':55}
     
     #region Utilities
     def _is_in_market_hours(self):
@@ -368,12 +370,12 @@ class HedgeTrailing:
                     
                     # Comprueba si el precio supera el rango
                     
-                    if current_price > high:
+                    if current_price > high and self.trend_state.value == StateTrend.BULLISH:
                         send_order = True
                         order_type = OrderType.MARKET_BUY
                         range_limit = high + buyback_range
                         
-                    elif current_price < low:
+                    elif current_price < low and self.trend_state.value == StateTrend.BEARISH:
                         send_order = True
                         order_type = OrderType.MARKET_SELL
                         range_limit = low - buyback_range
@@ -588,7 +590,56 @@ class HedgeTrailing:
         # Actualiza la variable compartida
         self.symbol_data = symbol_data
         
-    
+    def _update_trend(self):
+        """
+        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
+
+        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
+        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
+        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
+
+        Retorna:
+            None
+        """
+        print("HedgeTrailing: Iniciando administrador de tendencia")
+        atr_period = 5  # Período para el cálculo del ATR
+        multiplier = 3  # Multiplicador para el cálculo del SuperTrend
+        first_time = True
+
+        # Obtener los datos de la tasa de 1 minuto iniciales
+        while True:
+            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+            if minute_1_rates is not None:
+                break
+
+        while self.is_on.value:
+            if not first_time:
+                self._sleep_to_next_minute()
+                
+                # Obtener la última barra de 1 minuto
+                minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                
+                # En caso de que exista un error, intentara actualizar todo el trend
+                if minute_1_bar is None:
+                    while True:
+                        minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+                        if minute_1_rates is not None:
+                            break
+                else:
+                    minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
+
+            # Crear un DataFrame con los datos de la tasa de 1 minuto
+            df = pd.DataFrame(minute_1_rates)
+            
+            # Calcular el indicador SuperTrend y agregarlo al DataFrame
+            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+            direction = int(df.iloc[-1]['direction'])
+
+            # Actualizar el estado de la tendencia si ha cambiado
+            if direction != self.trend_state.value:
+                self.trend_state.value = direction
+                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
+                
     #endregion
     
     #region start
@@ -612,12 +663,15 @@ class HedgeTrailing:
         self.number_outdated = manager.Value("i", 0)
         self.symbol_data['high_outdated'] = manager.Value("f", 0.0)
         self.symbol_data['low_outdated'] = manager.Value("f", 0.0)
+        self.trend_state = manager.Value("int", StateTrend.UNASSIGNED)
                 
         # Crea los procesos y los inicia
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
         hedge_buyer_process.start()
+        hedge_update_trend = multiprocessing.Process(target=self._update_trend)
+        hedge_update_trend.start()
         
         # Espera a que termine para continuar
         manage_positions_process.join()
