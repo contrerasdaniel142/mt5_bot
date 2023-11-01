@@ -615,7 +615,7 @@ class HedgeTrailing:
         # Establece el high y el low con respecto al rango
         quantity_high = int(last_close/range) + 1
         quantity_low = int(last_close/range)
-                
+        
         # Establece el high
         high = quantity_high * range
         high = round(high,digits)
