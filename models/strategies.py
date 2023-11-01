@@ -314,6 +314,8 @@ class HedgeTrailing:
         false_rupture= False
         rupture = False
         counter_hedge = False
+        last_trend = StateTrend.UNASSIGNED
+        firs_trade_in_trend = True
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -329,9 +331,13 @@ class HedgeTrailing:
             current_time = datetime.now(pytz.utc)   # Hora actual
             if current_time > market_close:
                 MT5Api.send_close_all_position()
-                continue 
+                continue
+            
+            if last_trend != self.trend_state.value:
+                last_trend = self.trend_state.value
+                firs_trade_in_trend = True
                                       
-            if len(positions) == 0:
+            if len(positions) == 0 and firs_trade_in_trend:
                 # Hora para cerrar el programa antes
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
                 # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
@@ -342,7 +348,7 @@ class HedgeTrailing:
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
-                counter_hedge = False       
+                counter_hedge = False
                 # Establece las variables
                 current_price = last_bar['close']
                 open = last_bar['open']
@@ -395,6 +401,7 @@ class HedgeTrailing:
                         if result is not None:
                             # Espera a que la vela termine y la obtiene
                             rupture = True
+                            firs_trade_in_trend = False
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
