@@ -260,33 +260,35 @@ class HedgeTrailing:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 
-            if in_hedge and positions:
-                type = positions[-1].type             
+            if in_hedge and positions: 
+                send_partial_order = False
                 # Realiza acciones de hedge si se encuentra en modo hedge
-                if type == OrderType.MARKET_BUY:
-                    limit_price = high + range
-                    if info.bid >= limit_price:
-                        # Vende la mitad de las posiciones abiertas
-                        completed = True
-                        for position in positions:
-                            new_volume = round((position.volume/2), self.symbol_data['digits'])
-                            result = MT5Api.send_sell_partial_order(position, new_volume, "0")
-                            completed = completed and result
-                        if not completed:
-                            continue
-                        in_hedge = False
-                else:
-                    limit_price = low - range
-                    if info.ask <= limit_price:
-                        # Vende la mitad de las posiciones abiertas
-                        completed = True
-                        for position in positions:
-                            new_volume = round((position.volume/2), self.symbol_data['digits'])
-                            result = MT5Api.send_sell_partial_order(position, new_volume, "0")
-                            completed = completed and result
-                        if not completed:
-                            continue
-                        in_hedge = False
+                limit_high = high + range
+                if info.bid >= limit_high:
+                    send_partial_order = True               
+                limit_low = low - range
+                if info.ask <= limit_low:
+                    send_partial_order = True
+                    
+                if send_partial_order:
+                    # Vende la mitad de las posiciones abiertas
+                    completed = True
+                    for position in positions:
+                        new_volume = round((position.volume/2), self.symbol_data['digits'])
+                        result = MT5Api.send_sell_partial_order(position, new_volume, "0")
+                        completed = completed and result
+                    if not completed:
+                        continue
+                    in_hedge = False
+                    # Vende la mitad de las posiciones abiertas
+                    completed = True
+                    for position in positions:
+                        new_volume = round((position.volume/2), self.symbol_data['digits'])
+                        result = MT5Api.send_sell_partial_order(position, new_volume, "0")
+                        completed = completed and result
+                    if not completed:
+                        continue
+                    in_hedge = False
 
     
     #endregion                 
