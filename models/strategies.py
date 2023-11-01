@@ -620,7 +620,7 @@ class HedgeTrailing:
         low = round(low,digits)
         
         spread = info.spread * info.point
-        volume = (account_info.balance * 0.001) / (range+spread)
+        volume = (account_info.balance * 0.001) / (range-spread)
         volume = round(volume, digits)
         
         if volume < (info.volume_min * 2):
