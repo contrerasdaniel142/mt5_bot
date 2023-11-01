@@ -501,6 +501,56 @@ class HedgeTrailing:
                         false_rupture = False
                         continue
 
+    def _update_trend(self):
+        """
+        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
+
+        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
+        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
+        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
+
+        Retorna:
+            None
+        """
+        print("HedgeTrailing: Iniciando administrador de tendencia")
+        atr_period = 5  # Período para el cálculo del ATR
+        multiplier = 3  # Multiplicador para el cálculo del SuperTrend
+        first_time = True
+
+        # Obtener los datos de la tasa de 1 minuto iniciales
+        while True:
+            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+            if minute_1_rates is not None:
+                break
+
+        while self.is_on.value:
+            if not first_time:
+                self._sleep_to_next_minute()
+                
+                # Obtener la última barra de 1 minuto
+                minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                
+                # En caso de que exista un error, intentara actualizar todo el trend
+                if minute_1_bar is None:
+                    while True:
+                        minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
+                        if minute_1_rates is not None:
+                            break
+                else:
+                    minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
+
+            # Crear un DataFrame con los datos de la tasa de 1 minuto
+            df = pd.DataFrame(minute_1_rates)
+            
+            # Calcular el indicador SuperTrend y agregarlo al DataFrame
+            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+            direction = int(df.iloc[-1]['direction'])
+
+            # Actualizar el estado de la tendencia si ha cambiado
+            if direction != self.trend_state.value:
+                self.trend_state.value = direction
+                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
+               
     def _check_outdated(self, high:float, low:float, range:float, current_price:float):
         if current_price > high:
             price_diff = current_price - high
@@ -552,6 +602,7 @@ class HedgeTrailing:
         digits = info.digits
         # Establece el rango
         range = self._get_optimal_range_size(rates_in_range)
+        range = round(range, digits)
                 
         # Obtiene el cierre de la ultima barra
         last_close = rates_in_range[-1]['close']
@@ -589,57 +640,7 @@ class HedgeTrailing:
         
         # Actualiza la variable compartida
         self.symbol_data = symbol_data
-        
-    def _update_trend(self):
-        """
-        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
-
-        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
-        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
-        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
-
-        Retorna:
-            None
-        """
-        print("HedgeTrailing: Iniciando administrador de tendencia")
-        atr_period = 5  # Período para el cálculo del ATR
-        multiplier = 3  # Multiplicador para el cálculo del SuperTrend
-        first_time = True
-
-        # Obtener los datos de la tasa de 1 minuto iniciales
-        while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-            if minute_1_rates is not None:
-                break
-
-        while self.is_on.value:
-            if not first_time:
-                self._sleep_to_next_minute()
-                
-                # Obtener la última barra de 1 minuto
-                minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                
-                # En caso de que exista un error, intentara actualizar todo el trend
-                if minute_1_bar is None:
-                    while True:
-                        minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-                        if minute_1_rates is not None:
-                            break
-                else:
-                    minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
-
-            # Crear un DataFrame con los datos de la tasa de 1 minuto
-            df = pd.DataFrame(minute_1_rates)
-            
-            # Calcular el indicador SuperTrend y agregarlo al DataFrame
-            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-            direction = int(df.iloc[-1]['direction'])
-
-            # Actualizar el estado de la tendencia si ha cambiado
-            if direction != self.trend_state.value:
-                self.trend_state.value = direction
-                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
-                
+         
     #endregion
     
     #region start
