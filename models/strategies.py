@@ -196,7 +196,7 @@ class HedgeTrailing:
                 else:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + hedge_range
-                        if info.bid > limit_price:
+                        if info.ask > limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -210,7 +210,7 @@ class HedgeTrailing:
                             trailing_stop = True
                     else:
                         limit_price = low - hedge_range
-                        if info.ask < limit_price:
+                        if info.bid < limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -333,10 +333,10 @@ class HedgeTrailing:
                 MT5Api.send_close_all_position()
                 continue
             
-            if last_trend != self.trend_state.value:
-                print("HedgeTrailing: Buscando primer trade en tendencia.")
-                last_trend = self.trend_state.value
-                firs_trade_in_trend = True
+            # if last_trend != self.trend_state.value:
+            #     print("HedgeTrailing: Buscando primer trade en tendencia.")
+            #     last_trend = self.trend_state.value
+            #     firs_trade_in_trend = True
                                       
             if len(positions) == 0 and firs_trade_in_trend:
                 # Hora para cerrar el programa antes
@@ -403,7 +403,7 @@ class HedgeTrailing:
                             print("HedgeTrailing: Primer trade en tendencia realizado.")
                             # Espera a que la vela termine y la obtiene
                             rupture = True
-                            firs_trade_in_trend = False
+                            #firs_trade_in_trend = False
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
