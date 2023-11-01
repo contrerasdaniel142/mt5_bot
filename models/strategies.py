@@ -645,9 +645,9 @@ class HedgeTrailing:
             'volume_spread': volume_spread
         }
         
+        # imprime la data
         print(symbol_data)
-            
-        
+                
         # Actualiza la variable compartida
         self.symbol_data = symbol_data
          
