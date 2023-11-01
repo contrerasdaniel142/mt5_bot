@@ -326,18 +326,18 @@ class HedgeTrailing:
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None and range_bar is not None:
                     break
             
-            # current_time = datetime.now(pytz.utc)   # Hora actual
-            # if current_time > market_close:
-            #     MT5Api.send_close_all_position()
-            #     continue 
+            current_time = datetime.now(pytz.utc)   # Hora actual
+            if current_time > market_close:
+                MT5Api.send_close_all_position()
+                continue 
                                       
             if len(positions) == 0:
                 # Hora para cerrar el programa antes
-                # pre_closing_time = current_time + timedelta(hours=1, minutes=0)
-                # # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
-                # if pre_closing_time > market_close:
-                #     self.is_on.value = False
-                #     continue
+                pre_closing_time = current_time + timedelta(hours=1, minutes=0)
+                # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
+                if pre_closing_time > market_close:
+                    self.is_on.value = False
+                    continue
                                 
                 # Se reinicia los estados
                 false_rupture = False
