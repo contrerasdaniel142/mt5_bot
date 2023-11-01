@@ -308,6 +308,7 @@ class HedgeTrailing:
         low = self.symbol_data['low_outdated'].value
         range = self.symbol_data['range']
         volume = self.symbol_data['volume']
+        volume_spread = self.symbol_data['volume_spread']
         
         # Condicionales de estados
         false_rupture= False
@@ -450,7 +451,7 @@ class HedgeTrailing:
                     print("HedgeTrailing: Hedge trade")
                     last_batch = int(positions[-1].comment)
                     next_batch = last_batch * 3
-                    next_volume = volume * next_batch
+                    next_volume = (volume * next_batch) + volume_spread
                     next_profit = range * next_volume
                     if next_profit > 2500:
                         print("HedgeTrailing: Counter Hedge trade")
@@ -594,7 +595,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, 10080)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
@@ -620,7 +621,10 @@ class HedgeTrailing:
         low = round(low,digits)
         
         spread = info.spread * info.point
-        volume = (account_info.balance * 0.001) / (range-spread)
+        volume = (account_info.balance * 0.001) / (range)
+        volume_spread = (account_info.balance * 0.001) / (range-spread)
+        volume_spread = abs(volume - volume_spread)
+        volume_spread = round(volume_spread, digits)
         volume = round(volume, digits)
         
         if volume < (info.volume_min * 2):
@@ -635,6 +639,7 @@ class HedgeTrailing:
             'volume': volume,
             'volume_min': info.volume_min,
             'volume_max': info.volume_max,
+            'volume_spread': volume_spread
         }
         
         print(symbol_data)
