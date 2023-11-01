@@ -334,6 +334,7 @@ class HedgeTrailing:
                 continue
             
             if last_trend != self.trend_state.value:
+                print("HedgeTrailing: Buscando primer trade en tendencia.")
                 last_trend = self.trend_state.value
                 firs_trade_in_trend = True
                                       
@@ -399,6 +400,7 @@ class HedgeTrailing:
                         )
                         
                         if result is not None:
+                            print("HedgeTrailing: Primer trade en tendencia realizado.")
                             # Espera a que la vela termine y la obtiene
                             rupture = True
                             firs_trade_in_trend = False
