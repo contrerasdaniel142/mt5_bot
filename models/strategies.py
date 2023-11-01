@@ -347,7 +347,7 @@ class HedgeTrailing:
                 open = last_bar['open']
                 
                 # Encuentra el desfase
-                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, range_bar['open'])
+                self._check_outdated(self.symbol_data['high'], self.symbol_data['low'], range, finished_bar['open'])
                 
                 # Si el desfase esta dentro del rango se calcula el high y low
                 outdated = round((range * self.number_outdated.value), self.symbol_data['digits'])
@@ -548,6 +548,7 @@ class HedgeTrailing:
 
             # Actualizar el estado de la tendencia si ha cambiado
             if direction != self.trend_state.value:
+                first_time = False
                 self.trend_state.value = direction
                 print(f"HedgeTrailing: Actualizando tendencia: {direction}")
                
@@ -618,7 +619,8 @@ class HedgeTrailing:
         low = quantity_low * range
         low = round(low,digits)
         
-        volume = (account_info.balance * 0.001) / range
+        spread = info.spread * info.point
+        volume = (account_info.balance * 0.001) / (range+spread)
         volume = round(volume, digits)
         
         if volume < (info.volume_min * 2):
