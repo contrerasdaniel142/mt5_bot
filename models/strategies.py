@@ -169,7 +169,7 @@ class HedgeTrailing:
                 if number_batchs == 1 or number_batchs == 2:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + range
-                        if info.ask >= limit_price:
+                        if info.bid >= limit_price:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
@@ -182,7 +182,7 @@ class HedgeTrailing:
                             trailing_stop = True
                     else:
                         limit_price = low - range
-                        if info.bid <= limit_price:
+                        if info.ask <= limit_price:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
@@ -196,7 +196,7 @@ class HedgeTrailing:
                 else:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + hedge_range
-                        if info.ask > limit_price:
+                        if info.bid > limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -210,7 +210,7 @@ class HedgeTrailing:
                             trailing_stop = True
                     else:
                         limit_price = low - hedge_range
-                        if info.bid < limit_price:
+                        if info.ask < limit_price:
                             # Cierra posiciones con pérdidas
                             completed = True
                             for position in positions:
@@ -237,10 +237,10 @@ class HedgeTrailing:
                     next_stop_loss = high + next_trailing_range
                     next_stop_price = high + next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.ask <= stop_loss:
+                    if info.bid <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.ask >= next_stop_price:
+                    elif info.bid >= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                         
@@ -253,10 +253,10 @@ class HedgeTrailing:
                     next_stop_loss = low - next_trailing_range
                     next_stop_price = low - next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.bid >= stop_loss:
+                    if info.ask >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.bid <= next_stop_price:
+                    elif info.ask <= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 
@@ -265,7 +265,7 @@ class HedgeTrailing:
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
                     limit_price = high + range
-                    if info.ask >= limit_price:
+                    if info.bid >= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -277,7 +277,7 @@ class HedgeTrailing:
                         in_hedge = False
                 else:
                     limit_price = low - range
-                    if info.bid <= limit_price:
+                    if info.ask <= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -315,7 +315,7 @@ class HedgeTrailing:
         rupture = False
         counter_hedge = False
         last_trend = StateTrend.UNASSIGNED
-        firs_trade_in_trend = True
+        first_trade_in_trend = True
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -336,9 +336,9 @@ class HedgeTrailing:
             # if last_trend != self.trend_state.value:
             #     print("HedgeTrailing: Buscando primer trade en tendencia.")
             #     last_trend = self.trend_state.value
-            #     firs_trade_in_trend = True
+            #     first_trade_in_trend = True
                                       
-            if len(positions) == 0 and firs_trade_in_trend:
+            if len(positions) == 0 and first_trade_in_trend:
                 # Hora para cerrar el programa antes
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
                 # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
@@ -403,7 +403,7 @@ class HedgeTrailing:
                             print("HedgeTrailing: Primer trade en tendencia realizado.")
                             # Espera a que la vela termine y la obtiene
                             rupture = True
-                            #firs_trade_in_trend = False
+                            #first_trade_in_trend = False
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
@@ -448,11 +448,11 @@ class HedgeTrailing:
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
-                    if info.ask < low:
+                    if info.bid < low:
                         order_type = OrderType.MARKET_SELL
                         send_order = True
                 elif last_type == OrderType.MARKET_SELL:
-                    if info.bid > high:
+                    if info.ask > high:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                 
@@ -604,7 +604,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, 10080)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
@@ -628,9 +628,9 @@ class HedgeTrailing:
         # Establece el low
         low = quantity_low * range
         low = round(low,digits)
-        percentage_balance = 0.01
+        percentage_balance = 0.001
         spread = info.spread * info.point
-        volume = (account_info.balance * percentage_balance) / (range-spread)
+        volume = (account_info.balance * percentage_balance) / (range)
         volume_spread = (account_info.balance * percentage_balance) / (range-spread)
         volume_spread = abs(volume - volume_spread)
         volume_spread = round(volume_spread, digits)
