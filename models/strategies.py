@@ -169,7 +169,7 @@ class HedgeTrailing:
                 if number_batchs == 1 or number_batchs == 2:
                     if type == OrderType.MARKET_BUY:
                         limit_price = high + range
-                        if info.bid >= limit_price:
+                        if info.ask >= limit_price:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
@@ -182,7 +182,7 @@ class HedgeTrailing:
                             trailing_stop = True
                     else:
                         limit_price = low - range
-                        if info.ask <= limit_price:
+                        if info.bid <= limit_price:
                             # Vende la mitad de las posiciones abiertas
                             completed = True
                             for position in positions:
@@ -237,10 +237,10 @@ class HedgeTrailing:
                     next_stop_loss = high + next_trailing_range
                     next_stop_price = high + next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.bid <= stop_loss:
+                    if info.ask <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.bid >= next_stop_price:
+                    elif info.ask >= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                         
@@ -253,10 +253,10 @@ class HedgeTrailing:
                     next_stop_loss = low - next_trailing_range
                     next_stop_price = low - next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.ask >= stop_loss:
+                    if info.bid >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.ask <= next_stop_price:
+                    elif info.bid <= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 
@@ -265,7 +265,7 @@ class HedgeTrailing:
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
                     limit_price = high + range
-                    if info.bid >= limit_price:
+                    if info.ask >= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -277,7 +277,7 @@ class HedgeTrailing:
                         in_hedge = False
                 else:
                     limit_price = low - range
-                    if info.ask <= limit_price:
+                    if info.bid <= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -371,12 +371,12 @@ class HedgeTrailing:
                     
                     # Comprueba si el precio supera el rango
                     
-                    if info.bid > high and self.trend_state.value == StateTrend.BULLISH:
+                    if info.ask > high and self.trend_state.value == StateTrend.BULLISH:
                         send_order = True
                         order_type = OrderType.MARKET_BUY
                         range_limit = high + buyback_range
                         
-                    elif info.ask < low and self.trend_state.value == StateTrend.BEARISH:
+                    elif info.bid < low and self.trend_state.value == StateTrend.BEARISH:
                         send_order = True
                         order_type = OrderType.MARKET_SELL
                         range_limit = low - buyback_range
