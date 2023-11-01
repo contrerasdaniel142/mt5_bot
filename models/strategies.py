@@ -515,7 +515,7 @@ class HedgeTrailing:
         """
         print("HedgeTrailing: Iniciando administrador de tendencia")
         atr_period = 5  # Período para el cálculo del ATR
-        multiplier = 3  # Multiplicador para el cálculo del SuperTrend
+        multiplier = 2  # Multiplicador para el cálculo del SuperTrend
         first_time = True
 
         # Obtener los datos de la tasa de 1 minuto iniciales
