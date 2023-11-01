@@ -333,10 +333,10 @@ class HedgeTrailing:
                 MT5Api.send_close_all_position()
                 continue
             
-            # if last_trend != self.trend_state.value:
-            #     print("HedgeTrailing: Buscando primer trade en tendencia.")
-            #     last_trend = self.trend_state.value
-            #     first_trade_in_trend = True
+            if last_trend != self.trend_state.value:
+                print("HedgeTrailing: Buscando primer trade en tendencia.")
+                last_trend = self.trend_state.value
+                first_trade_in_trend = True
                                       
             if len(positions) == 0 and first_trade_in_trend:
                 # Hora para cerrar el programa antes
@@ -403,7 +403,7 @@ class HedgeTrailing:
                             print("HedgeTrailing: Primer trade en tendencia realizado.")
                             # Espera a que la vela termine y la obtiene
                             rupture = True
-                            #first_trade_in_trend = False
+                            first_trade_in_trend = False
                             self._sleep_to_next_minute()
                             finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                             send_buyback = False
@@ -604,7 +604,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, 10080)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.HOUR_1, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
@@ -638,9 +638,6 @@ class HedgeTrailing:
         
         if volume < (info.volume_min * 2):
             volume = info.volume_min * 2
-        # Corregir
-        # elif (volume*range) > (account_info.balance/7):
-        #     volume = volume/2
 
         symbol_data= {
             'symbol': self.symbol,
