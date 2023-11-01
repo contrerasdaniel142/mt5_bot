@@ -598,7 +598,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             # Obtiene las barras de 30 minutos de 7 dias
-            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.HOUR_1, 1, 10080)
+            rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, 10080)
             
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
