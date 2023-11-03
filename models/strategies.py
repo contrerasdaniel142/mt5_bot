@@ -148,6 +148,7 @@ class HedgeTrailing2:
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         range = self.symbol_data['range']
+        hedge_range = range
         number_trailing = 1
         in_hedge = False
         trailing_stop = False
@@ -179,98 +180,96 @@ class HedgeTrailing2:
                 in_hedge = False
                 trailing_stop = False
                 continue
-            
-            current_price = info.bid
-                        
+                                    
             if not trailing_stop and positions:
                 # Determina el número de lotes y el tipo de última posición
                 number_batchs = float(positions[-1].comment)
                 type = positions[-1].type
                 
+                # Para el caso del primer trade
                 if number_batchs == 1 or number_batchs == 2:
-                    if type == OrderType.MARKET_BUY:
-                        limit_price = high + range
-                        if current_price >= limit_price:
-                            # Vende la mitad de las posiciones abiertas
-                            completed = True
-                            for position in positions:
-                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
-                                completed = completed and result
-                            if not completed:
-                                continue
-                            trailing_stop = True
-                    else:
-                        limit_price = low - range
-                        if current_price <= limit_price:
-                            # Vende la mitad de las posiciones abiertas
-                            completed = True
-                            for position in positions:
-                                result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
-                                completed = completed and result
-                            if not completed:
-                                continue
-                            trailing_stop = True
+                    send_partial_order = False
+                    limit_high = high + range
+                    limit_low = low - range
+                    
+                    # Para longs
+                    if info.bid >= limit_high:
+                        send_partial_order = True
+                                            
+                    # Para shorts
+                    if info.ask <= limit_low:
+                        send_partial_order = True
+                    
+                    if send_partial_order:
+                        # Vende la mitad de las posiciones abiertas
+                        completed = True
+                        for position in positions:
+                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                            completed = completed and result
+                        if not completed:
+                            continue
+                        trailing_stop = True
+                        
+                # Para el caso donde hallan hedges
                 else:
-                    if type == OrderType.MARKET_BUY:
-                        limit_price = high + range
-                        if current_price >= limit_price:
-                            # Cierra posiciones con pérdidas
-                            completed = True
-                            for position in positions:
-                                if position.profit < 0:
-                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
-                                    completed = completed and result
-                            if not completed:
-                                continue
-                            trailing_stop = True
-                            in_hedge = True
-                    else:
-                        limit_price = low - range
-                        if current_price <= limit_price:
-                            # Cierra posiciones con pérdidas
-                            completed = True
-                            for position in positions:
-                                if position.profit < 0:
-                                    result = MT5Api.send_close_position(self.symbol, position.ticket)
-                                    completed = completed and result
-                            if not completed:
-                                continue
-                            in_hedge = True
-                            trailing_stop = True
+                    send_close_order = False
+                    limit_high_hedge = high + hedge_range
+                    limit_low_hedge = low + hedge_range
+                    
+                    # Para longs
+                    if info.bid >= limit_high_hedge:
+                        send_close_order = True
+                    # Para shorts
+                    if info.ask <= limit_low_hedge:
+                        send_close_order = True
+                        
+                    if send_close_order:
+                        # Cierra posiciones con pérdidas
+                        completed = True
+                        for position in positions:
+                            if position.profit < 0:
+                                result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                completed = completed and result
+                        if not completed:
+                            continue
+                        in_hedge = True
+                        trailing_stop = True
             
+            # Para el traling no usaremos el bid para las compras y el ask para las ventas,
+            # esto es debido a que queremos darle un rango del spread para evitar cierres prematuros
             if trailing_stop and positions:
-                type = positions[-1].type
                 # Establece el stop loss móvil si se activa el trailing stop
+                send_close_order = False
+                type = positions[-1].type
                 trailing_range = (range * (number_trailing/2))
                 next_trailing_range = (range * ((number_trailing + 2)/2))
                 if type == OrderType.MARKET_BUY:
                     stop_loss = high + trailing_range
                     next_stop_price = high + next_trailing_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if current_price <= stop_loss:
+                    if info.ask < stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price >= next_stop_price:
+                    elif info.ask > next_stop_price:
                         print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
-                
                 else:
                     stop_loss = low - trailing_range
                     next_stop_price = low - next_trailing_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if current_price >= stop_loss:
+                    if info.bid > stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif current_price <= next_stop_price:
+                    elif info.bid <= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {stop_loss}")
                         number_trailing += 1
-                
+            
             if in_hedge and positions:
-                type = positions[-1].type             
+                type = positions[-1].type
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
                     limit_price = high + range
-                    if current_price >= limit_price:
+                    if info.bid >= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -281,7 +280,7 @@ class HedgeTrailing2:
                         in_hedge = False
                 else:
                     limit_price = low - range
-                    if current_price <= limit_price:
+                    if info.ask <= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
@@ -295,56 +294,6 @@ class HedgeTrailing2:
     #endregion                 
     
     #region HedgeTrailing strategy 
-    def _preparing_symbols_data(self):
-        """
-        Prepara la data que se usara en la estrategia de HedgeTrailing.
-        """
-        print("HedgeTrailing: Preparando la data...")
-        # Variable auxiliar
-        symbol_data = {}
-        
-        # Establece el periodo de tiempo para calcular el rango
-        current_time = datetime.now(pytz.utc)
-        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
-        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
-        
-                
-        while True:
-            info = MT5Api.get_symbol_info(self.symbol)
-            rates_in_range = MT5Api.get_rates_range(self.symbol, TimeFrame.MINUTE_1, start_time, end_time)
-            
-            # Para testear fuera de horarios de mercado 
-            if rates_in_range is None or rates_in_range.size == 0:
-                number_bars = 30
-                rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
-
-            if info is not None and rates_in_range is not None:
-                break
-        
-        
-        digits = info.digits
-        high = np.max(rates_in_range['high'])
-        low = np.min(rates_in_range['low'])
-        range = abs(high - low)
-                
-        if self.volume_size is None:
-            self.volume_size = info.volume_min
-  
-        symbol_data= {
-            'symbol': self.symbol,
-            'digits': digits,
-            'high': high,
-            'low': low,
-            'range': range,
-            'volume_min': info.volume_min,
-            'volume_max': info.volume_max,
-        }
-        
-        print(symbol_data)
-            
-            
-        # Actualiza la variable compartida
-        self.symbol_data = symbol_data
     
     def _hedge_buyer(self):
         """
@@ -388,12 +337,12 @@ class HedgeTrailing2:
                     
                     # Comprueba si el precio supera el rango
                     
-                    if current_price > high:
+                    if info.ask > high:
                         send_order = True
                         order_type = OrderType.MARKET_BUY
                         range_limit = high + buyback_range
                         
-                    elif current_price < low:
+                    elif info.bid < low:
                         send_order = True
                         order_type = OrderType.MARKET_SELL
                         range_limit = low - buyback_range
@@ -456,11 +405,11 @@ class HedgeTrailing2:
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
-                    if current_price < low:
+                    if info.bid < low:
                         order_type = OrderType.MARKET_SELL
                         send_order = True
                 elif last_type == OrderType.MARKET_SELL:
-                    if current_price > high:
+                    if info.ask > high:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                 
@@ -578,8 +527,61 @@ class HedgeTrailing2:
 
             # Actualizar el estado de la tendencia si ha cambiado
             if direction != self.trend_state.value:
+                first_time = False
                 self.trend_state.value = direction
                 print(f"HedgeTrailing: Actualizando tendencia: {direction}")
+
+    def _preparing_symbols_data(self):
+        """
+        Prepara la data que se usara en la estrategia de HedgeTrailing.
+        """
+        print("HedgeTrailing: Preparando la data...")
+        # Variable auxiliar
+        symbol_data = {}
+        
+        # Establece el periodo de tiempo para calcular el rango
+        current_time = datetime.now(pytz.utc)
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=self._market_opening_time['minute'], second=0, microsecond=0)
+        
+                
+        while True:
+            info = MT5Api.get_symbol_info(self.symbol)
+            rates_in_range = MT5Api.get_rates_range(self.symbol, TimeFrame.MINUTE_1, start_time, end_time)
+            
+            # Para testear fuera de horarios de mercado 
+            if rates_in_range is None or rates_in_range.size == 0:
+                number_bars = 30
+                rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
+
+            if info is not None and rates_in_range is not None:
+                break
+        
+        
+        digits = info.digits
+        high = np.max(rates_in_range['high'])
+        low = np.min(rates_in_range['low'])
+        range = abs(high - low)
+                
+        if self.volume_size is None:
+            self.volume_size = info.volume_min
+  
+        symbol_data= {
+            'symbol': self.symbol,
+            'digits': digits,
+            'high': high,
+            'low': low,
+            'range': range,
+            'volume_min': info.volume_min,
+            'volume_max': info.volume_max,
+        }
+        
+        print(symbol_data)
+            
+            
+        # Actualiza la variable compartida
+        self.symbol_data = symbol_data
+    
 
     #endregion
     
