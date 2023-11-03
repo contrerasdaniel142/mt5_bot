@@ -188,7 +188,8 @@ class BotController:
             # Se crea el objeto de la estrategia HardHedge 
             hedge = HedgeTrailing2(
                     symbol= symbol,
-                    user_risk= 100
+                    user_risk= 100,
+                    number_bars= None
                 )
             hedge.start()
 
