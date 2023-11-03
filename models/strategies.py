@@ -54,7 +54,7 @@ class Multipliers:
     
 
 class HedgeTrailing2:
-    def __init__(self, symbol: str, volume_size: int = 1) -> None:
+    def __init__(self, symbol: str, user_risk: float = None) -> None:
         # Indica si el programa debe seguir activo
         self.is_on = None
         
@@ -71,11 +71,8 @@ class HedgeTrailing2:
         self.magic = 63
                 
         # El tamaño del lote
-        if volume_size is None:
-            self.volume_size = None
-        else:
-            self.volume_size = float(volume_size)
-                
+        self.user_risk = user_risk
+        
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':13, 'minute':30}
         self._market_closed_time = {'hour':19, 'minute':55}
@@ -139,10 +136,6 @@ class HedgeTrailing2:
         # Envía un mensaje de inicio al canal de Telegram
         print("HedgeTrailing: Iniciando administrador de posiciones")
         
-        # Horario de cierre
-        current_time = datetime.now(pytz.utc)   # Hora actual
-        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
-        
         # Comienza el administrador de posiciones
         # Variables del rango
         high = self.symbol_data['high']
@@ -160,44 +153,36 @@ class HedgeTrailing2:
                 info = MT5Api.get_symbol_info(self.symbol)
                 if positions is not None and info is not None:
                     break
-            
-            current_time = datetime.now(pytz.utc)   # Hora actual
-            if current_time > market_close:
-                MT5Api.send_close_all_position()
-                if not positions:
-                    self.is_on.value = False
-                continue
-            
+                        
             # Reinicia las variables en caso de que ya no haya posiciones abiertas
             if not positions:
-                pre_closing_time = current_time + timedelta(hours=1, minutes=0)    # Hora para cerrar el programa antes
-                # Si el programa no se encuentra aun horario de pre cierre puede seguir comprando
-                if pre_closing_time > market_close:
-                    self.is_on.value = False
-                    continue
-
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
                 continue
-                                    
+            
+            # Para el manejo de posiciones tendremos en cuenta como se maneja el cierre en mt5
+            # Compras al precio ask.
+            # Cierras una posición de compra al precio bid.
+            # Vendes al precio bid.
+            # Cierras una posición de venta al precio ask.         
             if not trailing_stop and positions:
                 # Determina el número de lotes y el tipo de última posición
-                number_batchs = float(positions[-1].comment)
+                number_step = float(positions[-1].comment)
                 type = positions[-1].type
                 
                 # Para el caso del primer trade
-                if number_batchs == 1 or number_batchs == 2:
+                if number_step == 1 or number_step == 2:
                     send_partial_order = False
                     limit_high = high + range
                     limit_low = low - range
                     
                     # Para longs
-                    if info.bid >= limit_high:
+                    if info.bid > limit_high:
                         send_partial_order = True
                                             
                     # Para shorts
-                    if info.ask <= limit_low:
+                    if info.ask < limit_low:
                         send_partial_order = True
                     
                     if send_partial_order:
@@ -217,10 +202,10 @@ class HedgeTrailing2:
                     limit_low_hedge = low + hedge_range
                     
                     # Para longs
-                    if info.bid >= limit_high_hedge:
+                    if info.bid > limit_high_hedge:
                         send_close_order = True
                     # Para shorts
-                    if info.ask <= limit_low_hedge:
+                    if info.ask < limit_low_hedge:
                         send_close_order = True
                         
                     if send_close_order:
@@ -235,35 +220,7 @@ class HedgeTrailing2:
                         in_hedge = True
                         trailing_stop = True
             
-            # Para el traling no usaremos el bid para las compras y el ask para las ventas,
-            # esto es debido a que queremos darle un rango del spread para evitar cierres prematuros
-            if trailing_stop and positions:
-                # Establece el stop loss móvil si se activa el trailing stop
-                send_close_order = False
-                type = positions[-1].type
-                trailing_range = (range * (number_trailing/2))
-                next_trailing_range = (range * ((number_trailing + 2)/2))
-                if type == OrderType.MARKET_BUY:
-                    stop_loss = high + trailing_range
-                    next_stop_price = high + next_trailing_range
-                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.ask < stop_loss:
-                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
-                        MT5Api.send_close_all_position()
-                    elif info.ask > next_stop_price:
-                        print(f"HedgeTrailing: stop loss en {stop_loss}")
-                        number_trailing += 1
-                else:
-                    stop_loss = low - trailing_range
-                    next_stop_price = low - next_trailing_range
-                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
-                    if info.bid > stop_loss:
-                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
-                        MT5Api.send_close_all_position()
-                    elif info.bid <= next_stop_price:
-                        print(f"HedgeTrailing: stop loss en {stop_loss}")
-                        number_trailing += 1
-            
+            # Cuando esta en Hedge revisa si llego al rango limite para hacer ventas parciales
             if in_hedge and positions:
                 type = positions[-1].type
                 # Realiza acciones de hedge si se encuentra en modo hedge
@@ -289,6 +246,43 @@ class HedgeTrailing2:
                         if not completed:
                             continue
                         in_hedge = False
+            
+            # Para el traling se manejara x/2 de distancia entre cada stop,
+            # para el caso donde halla hedge se pondra el primer stop donde se hicieron las ventas negativas
+            if trailing_stop and positions:
+                type = positions[-1].type
+                # Establece el stop loss móvil si se activa el trailing stop
+                trailing_range = (range * (number_trailing/2))
+                next_trailing_range = (range * ((number_trailing + 1)/2))
+                next_stop_price_range = (range * ((number_trailing + 2)/2))                    
+                if type == OrderType.MARKET_BUY:
+                    if in_hedge:
+                        stop_loss = high + hedge_range
+                    else:
+                        stop_loss = high + trailing_range
+                    next_stop_loss = high + next_trailing_range
+                    next_stop_price = high + next_stop_price_range
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if info.bid <= stop_loss:
+                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
+                        MT5Api.send_close_all_position()
+                    elif info.bid >= next_stop_price:
+                        print(f"HedgeTrailing: stop loss en {next_stop_loss}")
+                        number_trailing += 1
+                else:
+                    if in_hedge:
+                        stop_loss = low - hedge_range
+                    else:
+                        stop_loss = low - trailing_range
+                    next_stop_loss = low - next_trailing_range
+                    next_stop_price = low - next_stop_price_range
+                    # Cierra todas las posiciones si el precio cae por debajo del stop loss
+                    if info.ask >= stop_loss:
+                        print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
+                        MT5Api.send_close_all_position()
+                    elif info.ask <= next_stop_price:
+                        print(f"HedgeTrailing: stop loss en {next_stop_loss}")
+                        number_trailing += 1
 
     
     #endregion                 
@@ -301,10 +295,15 @@ class HedgeTrailing2:
         """
         print("HedgeTrailing: Iniciando administrador de compras")
         
+        # Horario de cierre
+        current_time = datetime.now(pytz.utc)   # Hora actual
+        market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        
         # Variables del rango
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         range = self.symbol_data['range']
+        volume = self.symbol_data['volume']
         
         # Condicionales de estados
         false_rupture= False
@@ -320,15 +319,32 @@ class HedgeTrailing2:
                 finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
-                                                     
-            if len(positions) == 0:
+            
+            # Hora actual
+            current_time = datetime.now(pytz.utc)
+            
+            if positions and current_time > market_close:
+                MT5Api.send_close_all_position()
+                continue
+            
+            if not positions:
+                # Hora para cerrar el programa antes
+                pre_closing_time = current_time + timedelta(hours=1, minutes=0)
+                # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
+                if pre_closing_time > market_close:
+                    self.is_on.value = False
+                    continue
+                
                 # Se reinicia los estados
                 false_rupture = False
                 rupture = False
                 
                 # Establece las variables
-                current_price = last_bar['close']
                 open = last_bar['open']
+                high = self.symbol_data['high']
+                low = self.symbol_data['low']
+                range = self.symbol_data['range']
+                
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
@@ -353,7 +369,7 @@ class HedgeTrailing2:
                         result =MT5Api.send_order(
                             symbol= self.symbol, 
                             order_type= order_type, 
-                            volume=self.volume_size,
+                            volume=volume,
                             magic=self.magic,
                             comment= "1"
                         )
@@ -391,7 +407,7 @@ class HedgeTrailing2:
                                 result =MT5Api.send_order(
                                     symbol= self.symbol, 
                                     order_type= order_type, 
-                                    volume=self.volume_size,
+                                    volume=volume,
                                     magic=self.magic,
                                     comment= "2"
                                 )
@@ -400,7 +416,6 @@ class HedgeTrailing2:
             if rupture and positions and float(positions[-1].comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
-                current_price = last_bar['close']
                 last_type = positions[-1].type
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
@@ -415,23 +430,26 @@ class HedgeTrailing2:
                 
                 if send_order:
                     print("HedgeTrailing: Hedge trade")
-                    name_atr ="N" + str(number_hedge)
-                    multiplier = getattr(Multipliers, name_atr, 1.5)
-                    last_batch = float(positions[-1].comment)
-                    next_batch = last_batch * multiplier
-                    next_volume = self.volume_size * next_batch
+                    counter_volume = self._get_counter_volume(positions)
+                    profit = abs(sum(position.profit for position in positions))
+                    volume_to_even = (profit / range) + counter_volume
+                    next_step = int(positions[-1].comment) + 1
+                    
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
                         order_type= order_type, 
-                        volume=next_volume,
+                        volume=volume_to_even,
                         magic=self.magic,
-                        comment= str(next_batch)
+                        comment= str(next_step)
                     )
                     if result:
                         number_hedge += 1
                         if number_hedge == 3:
-                            high = high - (range * 0.2)
-                            low = low + (range * 0.2)
+                            part_range = (range * 0.2)
+                            spread = info.spread * info.point
+                            high = high - part_range
+                            low = low + part_range
+                            range = range + part_range #- spread
 
                         false_rupture = False
                         continue
@@ -460,7 +478,7 @@ class HedgeTrailing2:
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
                         order_type= last_type, 
-                        volume=self.volume_size,
+                        volume=volume,
                         magic=self.magic,
                         comment= "2"
                     )
@@ -547,6 +565,7 @@ class HedgeTrailing2:
                 
         while True:
             info = MT5Api.get_symbol_info(self.symbol)
+            account_info = MT5Api.get_account_info()
             rates_in_range = MT5Api.get_rates_range(self.symbol, TimeFrame.MINUTE_1, start_time, end_time)
             
             # Para testear fuera de horarios de mercado 
@@ -554,7 +573,7 @@ class HedgeTrailing2:
                 number_bars = 30
                 rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
 
-            if info is not None and rates_in_range is not None:
+            if info is not None and rates_in_range is not None and account_info is not None:
                 break
         
         
@@ -562,16 +581,20 @@ class HedgeTrailing2:
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
         range = abs(high - low)
-                
-        if self.volume_size is None:
-            self.volume_size = info.volume_min
-  
+        user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
+        volume = user_risk / (range)
+        volume = round(volume, digits)
+        
+        if volume < (info.volume_min * 2):
+            volume = info.volume_min * 2
+               
         symbol_data= {
             'symbol': self.symbol,
             'digits': digits,
             'high': high,
             'low': low,
             'range': range,
+            'volume': volume,
             'volume_min': info.volume_min,
             'volume_max': info.volume_max,
         }
