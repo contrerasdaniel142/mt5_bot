@@ -164,7 +164,7 @@ class HedgeTrailing2:
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
-                continue
+                continue              
             
             # Para el manejo de posiciones tendremos en cuenta como se maneja el cierre en mt5
             # Compras al precio ask.
@@ -309,6 +309,7 @@ class HedgeTrailing2:
         low = self.symbol_data['low']
         range = self.symbol_data['range']
         volume = self.symbol_data['volume']
+        volume_decimals = self.symbol_data['volume_decimals']
         
         # Condicionales de estados
         false_rupture= False
@@ -332,6 +333,11 @@ class HedgeTrailing2:
                 MT5Api.send_close_all_position()
                 continue
             
+            # Para deriv, para que vuelva a calcular el rango
+            if not positions and false_rupture and self.number_bars is not None:
+                self.is_on.value = False
+                continue
+                    
             if not positions:
                 # Hora para cerrar el programa antes
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
@@ -437,7 +443,7 @@ class HedgeTrailing2:
                     print("HedgeTrailing: Hedge trade")
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
-                    volume_to_even = (profit / range) + counter_volume
+                    volume_to_even = round((profit / range) + counter_volume, volume_decimals)
                     next_step = int(positions[-1].comment) + 1
                     
                     result =MT5Api.send_order(
@@ -614,7 +620,7 @@ class HedgeTrailing2:
         self.symbol_data = symbol_data
     
 
-    def count_decimal_places(number)-> int:
+    def count_decimal_places(self, number)-> int:
         if isinstance(number, float):
             # Convierte el número a una cadena (string) para analizar los decimales
             number_str = str(number)
