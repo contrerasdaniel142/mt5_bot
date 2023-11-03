@@ -309,7 +309,9 @@ class HedgeTrailing2:
         low = self.symbol_data['low']
         range = self.symbol_data['range']
         volume = self.symbol_data['volume']
+        volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
+        spread = self.symbol_data['spread']
         
         # Condicionales de estados
         false_rupture= False
@@ -334,7 +336,7 @@ class HedgeTrailing2:
                 continue
             
             # Para deriv, para que vuelva a calcular el rango
-            if not positions and false_rupture and self.number_bars is not None:
+            if not positions and rupture and self.number_bars is not None:
                 self.is_on.value = False
                 continue
                     
@@ -444,24 +446,28 @@ class HedgeTrailing2:
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
                     volume_to_even = round((profit / range) + counter_volume, volume_decimals)
-                    next_step = int(positions[-1].comment) + 1
+                    next_step = int(positions[-1].comment) + 1 if not false_rupture else 3
                     
-                    result =MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= order_type, 
-                        volume=volume_to_even,
-                        magic=self.magic,
-                        comment= str(next_step)
-                    )
+                    parts = (volume_to_even // volume_max) + 1
+                    volume_part = volume_to_even/parts
+                    complete = True
+                    for _ in range(parts):             
+                        result =MT5Api.send_order(
+                            symbol= self.symbol, 
+                            order_type= order_type, 
+                            volume=volume_part,
+                            magic=self.magic,
+                            comment= str(next_step)
+                        )
+                        if not result:
+                            continue
                     if result:
                         number_hedge += 1
                         if number_hedge == 3:
                             part_range = (range * 0.2)
-                            spread = info.spread * info.point
                             high = high - part_range
                             low = low + part_range
-                            range = range + part_range #- spread
-
+                            range = range + part_range
                         false_rupture = False
                         continue
             
@@ -611,6 +617,7 @@ class HedgeTrailing2:
             'volume_decimals': volume_decimals,
             'volume_min': info.volume_min,
             'volume_max': info.volume_max,
+            'spread': info.spread * info.point,
         }
         
         print(symbol_data)
