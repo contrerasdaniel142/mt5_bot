@@ -577,24 +577,25 @@ class HedgeTrailing2:
                 break
         
         
-        digits = info.digits
+        volume_decimals = self.count_decimal_places(info.volume_min)
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
         range = abs(high - low)
         user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
         volume = user_risk / (range)
-        volume = round(volume, digits)
+        volume = round(volume, volume_decimals)
         
         if volume < (info.volume_min * 2):
             volume = info.volume_min * 2
                
         symbol_data= {
             'symbol': self.symbol,
-            'digits': digits,
+            'price_decimals': info.digits,
             'high': high,
             'low': low,
             'range': range,
             'volume': volume,
+            'volume_decimals': volume_decimals,
             'volume_min': info.volume_min,
             'volume_max': info.volume_max,
         }
@@ -606,6 +607,18 @@ class HedgeTrailing2:
         self.symbol_data = symbol_data
     
 
+    def count_decimal_places(number)-> int:
+        if isinstance(number, float):
+            # Convierte el número a una cadena (string) para analizar los decimales
+            number_str = str(number)
+            # Divide la cadena en dos partes: la parte entera y la parte decimal
+            integer_part, decimal_part = number_str.split(".")
+            # Retorna la longitud de la parte decimal
+            return len(decimal_part)
+        else:
+            # Si el número no es un float, retorna 0 decimales
+            return 0
+    
     #endregion
     
     #region start
