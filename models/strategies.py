@@ -205,22 +205,25 @@ class HedgeTrailing2:
                 # Para el caso donde hallan hedges
                 else:
                     send_close_order = False
+                    positions_to_close = []
                     
                     # Para longs
                     if type == OrderType.MARKET_BUY:
                         limit_high_hedge = high + hedge_range
                         if info.bid > limit_high_hedge:
+                            positions_to_close = [position for position in positions if position.type == OrderType.MARKET_SELL]
                             send_close_order = True
                     # Para shorts
                     else:
                         limit_low_hedge = low + hedge_range
                         if info.ask < limit_low_hedge:
+                            positions_to_close = [position for position in positions if position.type == OrderType.MARKET_BUY]
                             send_close_order = True
                         
                     if send_close_order:
                         # Cierra posiciones con pérdidas
-                        completed = True
-                        for position in positions:
+                        completed = True                            
+                        for position in positions_to_close:
                             if position.profit < 0:
                                 result = MT5Api.send_close_position(self.symbol, position.ticket)
                                 completed = completed and result
@@ -338,7 +341,7 @@ class HedgeTrailing2:
             if positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
-            
+             
             # Para deriv, para que vuelva a calcular el rango
             if not positions and rupture and self.number_bars is not None:
                 self.is_on.value = False
@@ -496,8 +499,8 @@ class HedgeTrailing2:
                 if send_buyback:
                     print("HedgeTrailing: Falsa ruptura trade")
                     result =MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= last_type, 
+                        symbol= self.symbol,
+                        order_type= last_type,
                         volume=volume,
                         magic=self.magic,
                         comment= "2"
