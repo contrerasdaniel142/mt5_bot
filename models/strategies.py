@@ -145,6 +145,7 @@ class HedgeTrailing2:
         # Variables del rango
         high = self.symbol_data['high']
         low = self.symbol_data['low']
+        volume_decimals = self.symbol_data['volume_decimals']
         price_range = self.symbol_data['price_range']
         hedge_range = price_range
         number_trailing = 1
@@ -196,7 +197,8 @@ class HedgeTrailing2:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
                         for position in positions:
-                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
+                            partial_volume = round(position.volume/2, volume_decimals)
+                            result = MT5Api.send_sell_partial_order(position, partial_volume, "0")
                             completed = completed and result
                         if not completed:
                             continue
@@ -215,7 +217,7 @@ class HedgeTrailing2:
                             send_close_order = True
                     # Para shorts
                     else:
-                        limit_low_hedge = low + hedge_range
+                        limit_low_hedge = low - hedge_range
                         if info.ask < limit_low_hedge:
                             positions_to_close = [position for position in positions if position.type == OrderType.MARKET_BUY]
                             send_close_order = True
@@ -235,30 +237,31 @@ class HedgeTrailing2:
             # Cuando esta en Hedge revisa si llego al rango limite para hacer ventas parciales
             if in_hedge and positions:
                 type = positions[-1].type
-                # Realiza acciones de hedge si se encuentra en modo hedge
+                send_partial_order = False
+                                        
+                # Para longs
                 if type == OrderType.MARKET_BUY:
-                    limit_price = high + price_range
-                    if info.bid >= limit_price:
-                        # Vende la mitad de las posiciones abiertas
-                        completed = True
-                        for position in positions:
-                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
-                            completed = completed and result
-                        if not completed:
-                            continue
-                        in_hedge = False
+                    limit_high = high + price_range
+                    if info.bid > limit_high:
+                        send_partial_order = True
+                                        
+                # Para shorts
                 else:
-                    limit_price = low - price_range
-                    if info.ask <= limit_price:
-                        # Vende la mitad de las posiciones abiertas
-                        completed = True
-                        for position in positions:
-                            result = MT5Api.send_sell_partial_order(position, (position.volume/2), "0")
-                            completed = completed and result
-                        if not completed:
-                            continue
-                        in_hedge = False
-            
+                    limit_low = low - price_range
+                    if info.ask < limit_low:
+                        send_partial_order = True
+                
+                if send_partial_order:
+                    # Vende la mitad de las posiciones abiertas
+                    completed = True
+                    for position in positions:
+                        partial_volume = round(position.volume/2, volume_decimals)
+                        result = MT5Api.send_sell_partial_order(position, partial_volume, "0")
+                        completed = completed and result
+                    if not completed:
+                        continue
+                    in_hedge = False
+                            
             # Para el traling se manejara x/2 de distancia entre cada stop,
             # para el caso donde halla hedge se pondra el primer stop donde se hicieron las ventas negativas
             if trailing_stop and positions:
