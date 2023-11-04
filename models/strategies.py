@@ -445,11 +445,11 @@ class HedgeTrailing2:
                     print("HedgeTrailing: Hedge trade")
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
-                    volume_to_even = round((profit / price_range) + counter_volume, volume_decimals)
+                    volume_to_even = (profit / price_range) + counter_volume
                     next_step = int(positions[-1].comment) + 1 if not false_rupture else 3
                     
                     parts = int(volume_to_even // volume_max) + 1
-                    volume_part = volume_to_even/parts
+                    volume_part = round(volume_to_even/parts, volume_decimals)
                     for _ in range(parts):             
                         result =MT5Api.send_order(
                             symbol= self.symbol, 
