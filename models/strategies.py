@@ -145,8 +145,8 @@ class HedgeTrailing2:
         # Variables del rango
         high = self.symbol_data['high']
         low = self.symbol_data['low']
-        range = self.symbol_data['range']
-        hedge_range = range
+        price_range = self.symbol_data['price_range']
+        hedge_range = price_range
         number_trailing = 1
         in_hedge = False
         trailing_stop = False
@@ -179,8 +179,8 @@ class HedgeTrailing2:
                 # Para el caso del primer trade
                 if number_step == 1 or number_step == 2:
                     send_partial_order = False
-                    limit_high = high + range
-                    limit_low = low - range
+                    limit_high = high + price_range
+                    limit_low = low - price_range
                     
                     # Para longs
                     if info.bid > limit_high:
@@ -230,7 +230,7 @@ class HedgeTrailing2:
                 type = positions[-1].type
                 # Realiza acciones de hedge si se encuentra en modo hedge
                 if type == OrderType.MARKET_BUY:
-                    limit_price = high + range
+                    limit_price = high + price_range
                     if info.bid >= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
@@ -241,7 +241,7 @@ class HedgeTrailing2:
                             continue
                         in_hedge = False
                 else:
-                    limit_price = low - range
+                    limit_price = low - price_range
                     if info.ask <= limit_price:
                         # Vende la mitad de las posiciones abiertas
                         completed = True
@@ -257,9 +257,9 @@ class HedgeTrailing2:
             if trailing_stop and positions:
                 type = positions[-1].type
                 # Establece el stop loss móvil si se activa el trailing stop
-                trailing_range = (range * (number_trailing/2))
-                next_trailing_range = (range * ((number_trailing + 1)/2))
-                next_stop_price_range = (range * ((number_trailing + 2)/2))                    
+                trailing_range = (price_range * (number_trailing/2))
+                next_trailing_range = (price_range * ((number_trailing + 1)/2))
+                next_stop_price_range = (price_range * ((number_trailing + 2)/2))                    
                 if type == OrderType.MARKET_BUY:
                     if in_hedge:
                         stop_loss = high + hedge_range
@@ -307,7 +307,7 @@ class HedgeTrailing2:
         # Variables del rango
         high = self.symbol_data['high']
         low = self.symbol_data['low']
-        range = self.symbol_data['range']
+        price_range = self.symbol_data['price_range']
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
@@ -356,13 +356,13 @@ class HedgeTrailing2:
                 open = last_bar['open']
                 high = self.symbol_data['high']
                 low = self.symbol_data['low']
-                range = self.symbol_data['range']
+                price_range = self.symbol_data['price_range']
                 
                 # Comprueba si la apertura de la barra esta en el rango
                 if open <= high and open >= low:
                     # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
                     send_order = False
-                    buyback_range = (range * 0.2)
+                    buyback_range = (price_range * 0.2)
                     
                     # Comprueba si el precio supera el rango
                     
@@ -445,12 +445,11 @@ class HedgeTrailing2:
                     print("HedgeTrailing: Hedge trade")
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
-                    volume_to_even = round((profit / range) + counter_volume, volume_decimals)
+                    volume_to_even = round((profit / price_range) + counter_volume, volume_decimals)
                     next_step = int(positions[-1].comment) + 1 if not false_rupture else 3
                     
-                    parts = (volume_to_even // volume_max) + 1
+                    parts = int(volume_to_even // volume_max) + 1
                     volume_part = volume_to_even/parts
-                    complete = True
                     for _ in range(parts):             
                         result =MT5Api.send_order(
                             symbol= self.symbol, 
@@ -464,10 +463,10 @@ class HedgeTrailing2:
                     if result:
                         number_hedge += 1
                         if number_hedge == 3:
-                            part_range = (range * 0.2)
+                            part_range = (price_range * 0.2)
                             high = high - part_range
                             low = low + part_range
-                            range = range + part_range
+                            price_range = price_range + part_range
                         false_rupture = False
                         continue
             
@@ -477,7 +476,7 @@ class HedgeTrailing2:
                 close = finished_bar['close']
                 last_type = positions[-1].type
                 send_buyback = False
-                buyback_range = (range * 0.2)
+                buyback_range = (price_range * 0.2)
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
                     if open <= high and close > high:
@@ -589,8 +588,8 @@ class HedgeTrailing2:
             
             # Para testear fuera de horarios de mercado 
             if rates_in_range is None or rates_in_range.size == 0:
-                number_bars = 30 if self.number_bars is None else self.number_bars
-                rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
+                number_bars = 31 if self.number_bars is None else self.number_bars
+                rates_in_range = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, number_bars)
 
             if info is not None and rates_in_range is not None and account_info is not None:
                 break
@@ -599,9 +598,9 @@ class HedgeTrailing2:
         volume_decimals = self.count_decimal_places(info.volume_min)
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
-        range = abs(high - low)
+        price_range = abs(high - low)
         user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
-        volume = user_risk / (range)
+        volume = user_risk / (price_range)
         volume = round(volume, volume_decimals)
         
         if volume < (info.volume_min * 2):
@@ -612,7 +611,7 @@ class HedgeTrailing2:
             'price_decimals': info.digits,
             'high': high,
             'low': low,
-            'range': range,
+            'price_range': price_range,
             'volume': volume,
             'volume_decimals': volume_decimals,
             'volume_min': info.volume_min,
