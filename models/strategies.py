@@ -235,9 +235,10 @@ class HedgeTrailing2:
                             continue
                         in_hedge = True
                         trailing_stop = True
+                        continue
             
             # Cuando esta en Hedge revisa si llego al rango limite para hacer ventas parciales
-            if in_hedge and positions:
+            if in_hedge and positions and int(positions[-1].comment) > 0:
                 type = last_position.type
                 send_partial_order = False
                                         
@@ -262,7 +263,6 @@ class HedgeTrailing2:
                         completed = completed and result
                     if not completed:
                         continue
-                    in_hedge = False
                             
             # Para el traling se manejara x/2 de distancia entre cada stop,
             # para el caso donde halla hedge se pondra el primer stop donde se hicieron las ventas negativas
@@ -273,7 +273,7 @@ class HedgeTrailing2:
                 next_trailing_range = (price_range * ((number_trailing + 1)/2))
                 next_stop_price_range = (price_range * ((number_trailing + 2)/2))                    
                 if type == OrderType.MARKET_BUY:
-                    if in_hedge:
+                    if in_hedge and number_trailing == 1:
                         stop_loss = high + hedge_range
                     else:
                         stop_loss = high + trailing_range
