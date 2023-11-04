@@ -179,16 +179,18 @@ class HedgeTrailing2:
                 # Para el caso del primer trade
                 if number_step == 1 or number_step == 2:
                     send_partial_order = False
-                    limit_high = high + price_range
-                    limit_low = low - price_range
-                    
+                                        
                     # Para longs
-                    if info.bid > limit_high:
-                        send_partial_order = True
+                    if type == OrderType.MARKET_BUY:
+                        limit_high = high + price_range
+                        if info.bid > limit_high:
+                            send_partial_order = True
                                             
                     # Para shorts
-                    if info.ask < limit_low:
-                        send_partial_order = True
+                    else:
+                        limit_low = low - price_range
+                        if info.ask < limit_low:
+                            send_partial_order = True
                     
                     if send_partial_order:
                         # Vende la mitad de las posiciones abiertas
@@ -203,15 +205,17 @@ class HedgeTrailing2:
                 # Para el caso donde hallan hedges
                 else:
                     send_close_order = False
-                    limit_high_hedge = high + hedge_range
-                    limit_low_hedge = low + hedge_range
                     
                     # Para longs
-                    if info.bid > limit_high_hedge:
-                        send_close_order = True
+                    if type == OrderType.MARKET_BUY:
+                        limit_high_hedge = high + hedge_range
+                        if info.bid > limit_high_hedge:
+                            send_close_order = True
                     # Para shorts
-                    if info.ask < limit_low_hedge:
-                        send_close_order = True
+                    else:
+                        limit_low_hedge = low + hedge_range
+                        if info.ask < limit_low_hedge:
+                            send_close_order = True
                         
                     if send_close_order:
                         # Cierra posiciones con pérdidas
@@ -445,7 +449,7 @@ class HedgeTrailing2:
                     print("HedgeTrailing: Hedge trade")
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
-                    volume_to_even = (profit / price_range) + counter_volume
+                    volume_to_even = (profit / (price_range - spread)) + counter_volume
                     next_step = int(positions[-1].comment) + 1 if not false_rupture else 3
                     
                     parts = int(volume_to_even // volume_max) + 1
