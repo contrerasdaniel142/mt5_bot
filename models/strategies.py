@@ -167,6 +167,8 @@ class HedgeTrailing2:
                 trailing_stop = False
                 continue              
             
+            last_position = max(positions, key=lambda position: position.time)
+            
             # Para el manejo de posiciones tendremos en cuenta como se maneja el cierre en mt5
             # Compras al precio ask.
             # Cierras una posición de compra al precio bid.
@@ -174,8 +176,8 @@ class HedgeTrailing2:
             # Cierras una posición de venta al precio ask.         
             if not trailing_stop and positions:
                 # Determina el número de lotes y el tipo de última posición
-                number_step = float(positions[-1].comment)
-                type = positions[-1].type
+                number_step = float(last_position.comment)
+                type = last_position.type
                 
                 # Para el caso del primer trade
                 if number_step == 1 or number_step == 2:
@@ -236,7 +238,7 @@ class HedgeTrailing2:
             
             # Cuando esta en Hedge revisa si llego al rango limite para hacer ventas parciales
             if in_hedge and positions:
-                type = positions[-1].type
+                type = last_position.type
                 send_partial_order = False
                                         
                 # Para longs
@@ -265,7 +267,7 @@ class HedgeTrailing2:
             # Para el traling se manejara x/2 de distancia entre cada stop,
             # para el caso donde halla hedge se pondra el primer stop donde se hicieron las ventas negativas
             if trailing_stop and positions:
-                type = positions[-1].type
+                type = last_position.type
                 # Establece el stop loss móvil si se activa el trailing stop
                 trailing_range = (price_range * (number_trailing/2))
                 next_trailing_range = (price_range * ((number_trailing + 1)/2))
@@ -436,10 +438,11 @@ class HedgeTrailing2:
                                 )
                                 continue
         
-            if rupture and positions and float(positions[-1].comment) != 0:
+            if rupture and positions and float(last_position.comment) != 0:
                 # Establece las variables
                 open = last_bar['open']
-                last_type = positions[-1].type
+                last_position = max(positions, key=lambda position: position.time)
+                last_type = last_position.type
                 send_order = False
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
                 if last_type == OrderType.MARKET_BUY:
@@ -456,7 +459,7 @@ class HedgeTrailing2:
                     counter_volume = self._get_counter_volume(positions)
                     profit = abs(sum(position.profit for position in positions))
                     volume_to_even = (profit / (price_range - spread)) + counter_volume
-                    next_step = int(positions[-1].comment) + 1 if not false_rupture else 3
+                    next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
                     
                     parts = int(volume_to_even // volume_max) + 1
                     volume_part = round(volume_to_even/parts, volume_decimals)
@@ -480,11 +483,12 @@ class HedgeTrailing2:
                         false_rupture = False
                         continue
             
-            if false_rupture and positions and float(positions[-1].comment) != 0:
+            if false_rupture and positions and float(last_position.comment) != 0:
                 # Establece las variables
                 open = finished_bar['open']
                 close = finished_bar['close']
-                last_type = positions[-1].type
+                last_position = max(positions, key=lambda position: position.time)
+                last_type = last_position.type
                 send_buyback = False
                 buyback_range = (price_range * 0.2)
                 # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
