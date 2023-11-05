@@ -459,7 +459,7 @@ class HedgeTrailing2:
                         print("HedgeTrailing: Hedge trade")
                         counter_volume = self._get_counter_volume(positions)
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = (profit / (price_range - spread)) + counter_volume
+                        volume_to_even = (profit / (price_range - (spread * 2))) + counter_volume
                         next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
                         
                         parts = int(volume_to_even // volume_max) + 1
