@@ -287,7 +287,7 @@ class HedgeTrailing2:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 else:
-                    if in_hedge:
+                    if in_hedge and number_trailing == 1:
                         stop_loss = low - hedge_range
                     else:
                         stop_loss = low - trailing_range
@@ -615,7 +615,7 @@ class HedgeTrailing2:
         high = np.max(rates_in_range['high'])
         low = np.min(rates_in_range['low'])
         price_range = abs(high - low)
-        user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
+        user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
         volume = user_risk / (price_range)
         volume = round(volume, volume_decimals)
         
