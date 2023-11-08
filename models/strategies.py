@@ -79,8 +79,8 @@ class HedgeTrailing2:
         self.number_bars = number_bars
                 
         # Horario de apertura y cierre del mercado
-        self._market_opening_time = {'hour':13, 'minute':30}
-        self._market_closed_time = {'hour':19, 'minute':55}
+        self._market_opening_time = {'hour':14, 'minute':30}
+        self._market_closed_time = {'hour':20, 'minute':55}
     
     #region Utilities
     def _is_in_market_hours(self):
@@ -229,7 +229,7 @@ class HedgeTrailing2:
                         completed = True                            
                         for position in positions_to_close:
                             if position.profit < 0:
-                                result = MT5Api.send_close_position(self.symbol, position.ticket)
+                                result = MT5Api.send_close_position(position.ticket)
                                 completed = completed and result
                         if not completed:
                             continue
