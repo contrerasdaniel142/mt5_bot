@@ -2,8 +2,8 @@ import MetaTrader5 as mt5   # Para conectarse y realizar solicitudes a una termi
 import numpy as np          # Para realizar operaciones numéricas eficientes
 
 # Importaciones para el manejo de datos
-from enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
-from models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition, AccountInfo
+from .enums import FieldType, TimeFrame, CopyTicks, OrderType, TradeActions, TickFlag
+from .models import Tick, MqlTradeResult, SymbolInfo, TradeDeal, TradeOrder, TradePosition, AccountInfo
 from numpy import ndarray
 
 # Importaciones necesarias para manejar fechas y tiempo
