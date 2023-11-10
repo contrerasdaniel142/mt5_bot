@@ -905,16 +905,3 @@ class MT5Api:
         MT5Api.shutdown()
         return result
     #endregion
-
-MT5Api.initialize()
-tf = mt5.account_info()
-si = mt5.symbol_info("US30")
-
-_market_opening_time = {'hour':14, 'minute':30}
-_market_closed_time = {'hour':20, 'minute':55}
-current_time = datetime.now(pytz.utc) - timedelta(hours=5)
-start_time = current_time.replace(hour=_market_opening_time['hour'], minute=0, second=0, microsecond=0)
-end_time = current_time.replace(hour=_market_opening_time['hour'], minute=(_market_opening_time['minute'] - 1), second=0, microsecond=0)
-
-rates_in_range = MT5Api.get_rates_range("US30", TimeFrame.MINUTE_1, start_time, end_time)
-print(rates_in_range)
