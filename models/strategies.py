@@ -591,8 +591,8 @@ class HedgeTrailing2:
         
         # Establece el periodo de tiempo para calcular el rango
         current_time = datetime.now(pytz.utc)
-        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0) - timedelta(days=1)
-        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=(self._market_opening_time['minute'] - 1), second=1, microsecond=0)- timedelta(days=1)
+        start_time = current_time.replace(hour=self._market_opening_time['hour'], minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=self._market_opening_time['hour'], minute=(self._market_opening_time['minute'] - 1), second=1, microsecond=0)
         
                 
         while True:
