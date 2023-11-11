@@ -601,7 +601,6 @@ class HedgeTrailing2:
             rates_in_range = None
             if self.number_bars is None:
                 rates_in_range = MT5Api.get_rates_range(self.symbol, TimeFrame.MINUTE_1, start_time, end_time)
-                print(rates_in_range)
             # Para testear fuera de horarios de mercado 
             if rates_in_range is None or rates_in_range.size == 0:
                 number_bars = 30 if self.number_bars is None else self.number_bars
