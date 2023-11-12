@@ -586,7 +586,8 @@ class HedgeTrailing:
             account_info = MT5Api.get_account_info()
             number_bars = 60
             rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, number_bars)
-            if info is not None and rates is not None and account_info is not None:
+            last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+            if info is not None and rates is not None and account_info is not None and last_minute_bar is not None:
                 break
         
         # Establece variables             
@@ -605,7 +606,8 @@ class HedgeTrailing:
         price_range = np.median(atr[atr_timeperiod:])
         
         # Establece el high y low
-        quantity = int(rates[-1]['close']/price_range)
+        current_price = last_minute_bar[-1]['close']
+        quantity = int(current_price/price_range)
         high = (quantity + 1) * price_range
         low = quantity * price_range
         
