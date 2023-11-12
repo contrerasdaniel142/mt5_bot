@@ -128,18 +128,7 @@ class HedgeTrailing:
         
         # Envía un mensaje de inicio al canal de Telegram
         print("HedgeTrailing: Iniciando administrador de posiciones")
-        
-        # Comienza el administrador de posiciones
-        # Variables del rango
-        high = self.symbol_data['high']
-        low = self.symbol_data['low']
-        volume_decimals = self.symbol_data['volume_decimals']
-        price_range = self.symbol_data['price_range']
-        hedge_range = price_range
-        number_trailing = 1
-        in_hedge = False
-        trailing_stop = False
-        
+                
         while self.is_on.value:
             # Se obtienen las posiciones y la información del símbolo de MetaTrader 5
             while True:
@@ -150,6 +139,13 @@ class HedgeTrailing:
                         
             # Reinicia las variables en caso de que ya no haya posiciones abiertas
             if not positions:
+                # Comienza el administrador de posiciones
+                # Variables del rango
+                high = self.symbol_data['high']
+                low = self.symbol_data['low']
+                volume_decimals = self.symbol_data['volume_decimals']
+                price_range = self.symbol_data['price_range']
+                hedge_range = price_range
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
