@@ -332,7 +332,7 @@ class HedgeTrailing:
             # Hora actual
             current_time = datetime.now(pytz.utc)
             
-            if positions and current_time > market_close:
+            if not positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
                     
@@ -463,9 +463,9 @@ class HedgeTrailing:
                             number_hedge += 1
                             if number_hedge == 3:
                                 part_range = (price_range * 0.2)
-                                high = high - part_range
-                                low = low + part_range
-                                price_range = price_range + part_range
+                                high = high + part_range
+                                low = low - part_range
+                                price_range = price_range - part_range
                             false_rupture = False
                             continue
             
@@ -581,7 +581,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 60
-            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, number_bars)
+            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, number_bars)
             if info is not None and rates is not None and account_info is not None:
                 break
         
