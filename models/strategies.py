@@ -472,6 +472,7 @@ class HedgeTrailing:
                                 high = high + part_range
                                 low = low - part_range
                                 price_range = price_range - part_range
+                                hedge_range = price_range/2
                             false_rupture = False
                             continue
             
