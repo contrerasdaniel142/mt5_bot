@@ -145,7 +145,7 @@ class HedgeTrailing:
                 low = self.symbol_data['low']
                 volume_decimals = self.symbol_data['volume_decimals']
                 price_range = self.symbol_data['price_range']
-                hedge_range = price_range
+                hedge_range = price_range/2
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
@@ -304,6 +304,7 @@ class HedgeTrailing:
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         price_range = self.symbol_data['price_range']
+        hedge_range = price_range/2
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
@@ -341,6 +342,7 @@ class HedgeTrailing:
                 high = self.symbol_data['high']
                 low = self.symbol_data['low']
                 price_range = self.symbol_data['price_range']
+                hedge_range = price_range/2
                 volume = self.symbol_data['volume']
                 volume_max = self.symbol_data['volume_max']
                 volume_decimals = self.symbol_data['volume_decimals']
@@ -448,7 +450,7 @@ class HedgeTrailing:
                         print("HedgeTrailing: Hedge trade")
                         counter_volume = self._get_counter_volume(positions)
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = (profit / (price_range - (spread * 2))) + counter_volume
+                        volume_to_even = (profit / (hedge_range - (spread * 2))) + counter_volume
                         next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
                         
                         parts = int(volume_to_even // volume_max) + 1
