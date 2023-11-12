@@ -47,7 +47,7 @@ class StateTrend:
     BEARISH = -1
 
 class HedgeTrailing:
-    def __init__(self, symbol: str, user_risk: float = None, number_bars: int = None) -> None:
+    def __init__(self, symbol: str, user_risk: float = None) -> None:
         # Indica si el programa debe seguir activo
         self.is_on = None
         
@@ -65,11 +65,6 @@ class HedgeTrailing:
                 
         # El tamaño del lote
         self.user_risk = user_risk
-        
-        # Indica el numero de barras que quiere que se tomen en cuenta para calcular el rango
-        # Es por defecto None, lo que siginifica las ultimas 30 barras o los primeros 30 minutos antes de apertura
-        # Si se establece entonces solo toma las number_bars antes de la actual
-        self.number_bars = number_bars
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':14, 'minute':30}
@@ -339,11 +334,6 @@ class HedgeTrailing:
             
             if positions and current_time > market_close:
                 MT5Api.send_close_all_position()
-                continue
-             
-            # Para deriv, para que vuelva a calcular el rango
-            if not positions and rupture and self.number_bars is not None:
-                self.is_on.value = False
                 continue
                     
             if not positions:
