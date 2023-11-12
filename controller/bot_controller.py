@@ -14,7 +14,7 @@ from models.alpaca.client import AlpacaApi
 from models.mt5.client import MT5Api
 
 # Importacion de las estrategias a usar en controlador
-from models.strategies import HedgeTrailing
+from models.strategies import HedgeTrailing2
 
 # Para trabajo en paralelo
 import multiprocessing
@@ -30,8 +30,8 @@ import time
 class BotController:
     def __init__(self) -> None:
         # Estos horarios estan en utc
-        self._market_opening_time = {'hour':13, 'minute':30}
-        self._market_closed_time = {'hour':19, 'minute':55}
+        self._market_opening_time = {'hour':14, 'minute':30}
+        self._market_closed_time = {'hour':20, 'minute':55}
         self._alpaca_api = AlpacaApi()
 
 
@@ -183,11 +183,13 @@ class BotController:
         while True:
             print("")
             
-            self._sleep_to_next_market_opening(False)
+            #self._sleep_to_next_market_opening(False)
             
             # Se crea el objeto de la estrategia HardHedge 
-            hedge = HedgeTrailing(
-                    symbol= symbol
+            hedge = HedgeTrailing2(
+                    symbol= symbol,
+                    user_risk= None,
+                    number_bars= None
                 )
             hedge.start()
 

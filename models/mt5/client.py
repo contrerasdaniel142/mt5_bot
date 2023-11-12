@@ -96,9 +96,15 @@ class MT5Api:
         """
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
-        
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        current_time = datetime.now(pytz.utc).timestamp()
+        symbol_timestamp = info.time
+        date_from = date_from.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
         rates = mt5.copy_rates_from(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
@@ -192,13 +198,21 @@ class MT5Api:
         MT5Api.initialize()
         
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        symbol_timestamp = info.time
+        current_time = datetime.now(pytz.utc).timestamp()
+        date_from = date_from.timestamp()
+        date_to = date_to.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
+        date_to_mt5 = date_to + diff_timestamp
         rates = mt5.copy_rates_range(
             symbol,       # nombre del símbolo
             timeframe,    # marco temporal
             date_from_mt5,    # fecha a partir de la cual se solicitan las barras
-            date_to_gmt_mt5       # fecha hasta la cual se solicitan las barras
+            date_to_mt5       # fecha hasta la cual se solicitan las barras
             )
         if rates is None:
             return None
@@ -227,7 +241,14 @@ class MT5Api:
         MT5Api.initialize()
         
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        symbol_timestamp = info.time
+        current_time = datetime.now(pytz.utc).timestamp()
+        date_from = date_from.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
         ticks = mt5.copy_ticks_from(
             symbol,       # nombre del símbolo
             date_from_mt5,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
@@ -261,13 +282,21 @@ class MT5Api:
         MT5Api.initialize()
         
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        symbol_timestamp = info.time
+        current_time = datetime.now(pytz.utc).timestamp()
+        date_from = date_from.timestamp()
+        date_to = date_to.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
+        date_to_mt5 = date_to + diff_timestamp
         flags_value = sum(flags.value)
         ticks = mt5.copy_ticks_range(
             symbol,       # nombre del símbolo
             date_from_mt5,    # fecha a partir de la cual se solicitan los ticks (hora en UTC)
-            date_to_gmt_mt5,      # fecha hasta la cual se solicitan los ticks (hora en UTC)
+            date_to_mt5,      # fecha hasta la cual se solicitan los ticks (hora en UTC)
             flags_value   # combinación de banderas que determina el tipo de ticks solicitados
         )
         if ticks is None:
@@ -327,18 +356,26 @@ class MT5Api:
         MT5Api.initialize()
         
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        symbol_timestamp = info.time
+        current_time = datetime.now(pytz.utc).timestamp()
+        date_from = date_from.timestamp()
+        date_to = date_to.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
+        date_to_mt5 = date_to + diff_timestamp
         
         if symbol is None:
             history_orders = mt5.history_orders_get(
                 date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
-                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
+                date_to_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
             )
         else:
             history_orders = mt5.history_orders_get(
                 date_from_mt5,  # Fecha a partir de la cual se solicitan las órdenes en GMT+3
-                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
+                date_to_mt5,    # Fecha hasta la cual se solicitan las órdenes en GMT+3
                 group=symbol           # Filtro de selección de órdenes según los símbolos
             )
         
@@ -363,18 +400,26 @@ class MT5Api:
         MT5Api.initialize()
         
         # Convierte las fechas a MT5
-        date_from_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_from)
-        date_to_gmt_mt5 = MT5Api.convert_utc_to_mt5_timezone(date_to)
+        info: SymbolInfo = mt5.symbol_info(symbol)
+        if info is None:
+            return None
+        symbol_timestamp = info.time
+        current_time = datetime.now(pytz.utc).timestamp()
+        date_from = date_from.timestamp()
+        date_to = date_to.timestamp()
+        diff_timestamp = symbol_timestamp - current_time
+        date_from_mt5 = date_from + diff_timestamp
+        date_to_mt5 = date_to + diff_timestamp
         
         if symbol is None:
             history_deals = mt5.history_deals_get(
                 date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
-                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
+                date_to_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
             )
         else:
             history_deals = mt5.history_deals_get(
                 date_from_mt5,  # Fecha a partir de la cual se solicitan las transacciones en GMT+3
-                date_to_gmt_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
+                date_to_mt5,    # Fecha hasta la cual se solicitan las transacciones en GMT+3
                 group=symbol           # Filtro de selección de órdenes según los símbolos
             )
         
@@ -859,21 +904,4 @@ class MT5Api:
         # Cierra la conexión con MetaTrader 5
         MT5Api.shutdown()
         return result
-    #endregion
-    
-    #region Utilities
-    def convert_utc_to_mt5_timezone(date: datetime) -> datetime:
-        """
-        Suma 3 horas a la fecha y hora proporcionada.
-
-        Args:
-            date (datetime): Fecha y hora en formato UTC.
-
-        Returns:
-            datetime: La fecha y hora resultante después de sumar 3 horas.
-        """
-        # Suma 3 horas a la fecha y hora original
-        dt_mt5 = date + timedelta(hours=3)
-        
-        return dt_mt5
     #endregion
