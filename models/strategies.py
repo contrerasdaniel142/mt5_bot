@@ -357,74 +357,71 @@ class HedgeTrailing:
                 low = self.symbol_data['low']
                 price_range = self.symbol_data['price_range']
                 
-                # Comprueba si la apertura de la barra esta en el rango
-                if open <= high and open >= low:
-                    # Comprueba si el cierre (precio actual de la barra en formacion) esta fuera del rango
-                    send_order = False
-                    buyback_range = (price_range * 0.2)
+                send_order = False
+                buyback_range = (price_range * 0.2)
+                
+                # Comprueba si el precio supera el rango
+                
+                if info.ask > high:
+                    send_order = True
+                    order_type = OrderType.MARKET_BUY
+                    range_limit = high + buyback_range
                     
-                    # Comprueba si el precio supera el rango
+                elif info.bid < low:
+                    send_order = True
+                    order_type = OrderType.MARKET_SELL
+                    range_limit = low - buyback_range
                     
-                    if info.ask > high:
-                        send_order = True
-                        order_type = OrderType.MARKET_BUY
-                        range_limit = high + buyback_range
+                # Envia la primera orden
+                if send_order:
+                    print("HedgeTrailing: Primer trade")
+                    result =MT5Api.send_order(
+                        symbol= self.symbol, 
+                        order_type= order_type, 
+                        volume=volume,
+                        magic=self.magic,
+                        comment= "1"
+                    )
+                    
+                    if result is not None:
+                        updated_symbol_data = False
+                        # Espera a que la vela termine y la obtiene
+                        rupture = True
+                        self._sleep_to_next_minute()
+                        finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
+                        send_buyback = False
                         
-                    elif info.bid < low:
-                        send_order = True
-                        order_type = OrderType.MARKET_SELL
-                        range_limit = low - buyback_range
+                        # Si no se logro obtener la ultima barra continua con otra iteracion
+                        if finished_bar is None:
+                            continue
                         
-                    # Envia la primera orden
-                    if send_order:
-                        print("HedgeTrailing: Primer trade")
-                        result =MT5Api.send_order(
-                            symbol= self.symbol, 
-                            order_type= order_type, 
-                            volume=volume,
-                            magic=self.magic,
-                            comment= "1"
-                        )
+                        close = finished_bar['close']
                         
-                        if result is not None:
-                            updated_symbol_data = False
-                            # Espera a que la vela termine y la obtiene
-                            rupture = True
-                            self._sleep_to_next_minute()
-                            finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                            send_buyback = False
-                            
-                            # Si no se logro obtener la ultima barra continua con otra iteracion
-                            if finished_bar is None:
+                        # Establece el estado de la estrategia
+                        if order_type == OrderType.MARKET_BUY:
+                            if close < high:
+                                false_rupture = True
                                 continue
-                            
-                            close = finished_bar['close']
-                            
-                            # Establece el estado de la estrategia
-                            if order_type == OrderType.MARKET_BUY:
-                                if close < high:
-                                    false_rupture = True
-                                    continue
-                                elif close < range_limit:
-                                    send_buyback = True
-                            else:
-                                if close > low:
-                                    false_rupture = True
-                                    continue
-                                elif close > range_limit:
-                                    send_buyback = True
-                                                        
-                            # Se hace recompra en caso de que la barra se encuentre en el rango limite
-                            if send_buyback:
-                                print("HedgeTrailing: Primer trade, recompra")
-                                result =MT5Api.send_order(
-                                    symbol= self.symbol, 
-                                    order_type= order_type, 
-                                    volume=volume,
-                                    magic=self.magic,
-                                    comment= "2"
-                                )
+                            elif close < range_limit:
+                                send_buyback = True
+                        else:
+                            if close > low:
+                                false_rupture = True
                                 continue
+                            elif close > range_limit:
+                                send_buyback = True
+                                                    
+                        # Se hace recompra en caso de que la barra se encuentre en el rango limite
+                        if send_buyback:
+                            print("HedgeTrailing: Primer trade, recompra")
+                            result =MT5Api.send_order(
+                                symbol= self.symbol, 
+                                order_type= order_type, 
+                                volume=volume,
+                                magic=self.magic,
+                                comment= "2"
+                            )
+                            continue
         
             if rupture and positions:
                 last_position = max(positions, key=lambda position: position.time)
