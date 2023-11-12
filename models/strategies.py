@@ -331,28 +331,36 @@ class HedgeTrailing:
             if not positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
-                    
+            
+            # Se actualizan las variables
+            if not positions and not updated_symbol_data:
+                self._preparing_symbols_data()
+                updated_symbol_data = True
+                
+                # Variables del rango
+                high = self.symbol_data['high']
+                low = self.symbol_data['low']
+                price_range = self.symbol_data['price_range']
+                volume = self.symbol_data['volume']
+                volume_max = self.symbol_data['volume_max']
+                volume_decimals = self.symbol_data['volume_decimals']
+                spread = self.symbol_data['spread']
+                
+                # Condicionales de estados
+                false_rupture= False
+                rupture = False
+                number_hedge = 1
+            
             if not positions:
-                if not updated_symbol_data:
-                    self._preparing_symbols_data()
-                    updated_symbol_data = True
                 # Hora para cerrar el programa antes
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
                 # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
                 if pre_closing_time > market_close:
                     self.is_on.value = False
                     continue
-                
-                # Se reinicia los estados
-                false_rupture = False
-                rupture = False
-                
+                                
                 # Establece las variables
-                open = last_bar['open']
-                high = self.symbol_data['high']
-                low = self.symbol_data['low']
-                price_range = self.symbol_data['price_range']
-                
+                open = last_bar['open']       
                 send_order = False
                 buyback_range = (price_range * 0.2)
                 

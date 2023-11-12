@@ -552,7 +552,10 @@ class MT5Api:
         request['symbol'] = symbol
         request['volume'] = volume
         request["type"] = order_type
-        request["type_filling"] = mt5.ORDER_FILLING_IOC
+        if info.filling_mode == 1 or info.filling_mode == 2:   
+            request["type_filling"] = mt5.ORDER_FILLING_IOC
+        else:
+            request["type_filling"] = mt5.ORDER_FILLING_FOK
         
         if stop_loss is not None:
             request["sl"] = float(stop_loss)
@@ -615,6 +618,11 @@ class MT5Api:
         if comment is None:
             comment = position.comment
         
+        if info.filling_mode == 1 or info.filling_mode == 2:   
+            type_filling = mt5.ORDER_FILLING_IOC
+        else:
+            type_filling = mt5.ORDER_FILLING_FOK
+        
         request = {
             "action": TradeActions.TRADE_ACTION_DEAL,
             "symbol": position.symbol,
@@ -623,7 +631,7 @@ class MT5Api:
             "price": position.price_current,
             "position": position.ticket,
             "comment": comment,
-            "type_filling": mt5.ORDER_FILLING_IOC
+            "type_filling": type_filling
         }
 
         order_request = mt5.order_send(request)
@@ -858,9 +866,9 @@ class MT5Api:
                         MT5Api.shutdown()
                         result = None
                     if position.type == mt5.ORDER_TYPE_BUY:
-                        r = MT5Api._close_order(mt5.ORDER_TYPE_SELL, position.symbol, position.volume, info.bid, position.ticket)
+                        r = MT5Api._close_order(mt5.ORDER_TYPE_SELL, position.symbol, position.volume, info.bid, position.ticket, info.filling_mode)
                     else:
-                        r = MT5Api._close_order(mt5.ORDER_TYPE_BUY, position.symbol, position.volume, info.ask, position.ticket)
+                        r = MT5Api._close_order(mt5.ORDER_TYPE_BUY, position.symbol, position.volume, info.ask, position.ticket, info.filling_mode)
                     # check results
                     if r is None:
                         #Cierra la conexión con MetaTrader 5
@@ -884,17 +892,23 @@ class MT5Api:
 
         return result
     
-    def _close_order(order_type, symbol, volume, price, ticket):
+    def _close_order(order_type, symbol, volume, price, ticket, filling):
         # Inicializa la conexión con la plataforma MetaTrader 5
         MT5Api.initialize()
+        
+        if filling == 1 or filling == 2:   
+            type_filling = mt5.ORDER_FILLING_IOC
+        else:
+            type_filling = mt5.ORDER_FILLING_FOK
+        
         order = {
         "action":    mt5.TRADE_ACTION_DEAL,
         "symbol":    symbol,
         "volume":    volume,
         "type":      order_type,
         "price":     price,
-        "type_filling": mt5.ORDER_FILLING_IOC,
-        "deviation": 10
+        "type_filling": type_filling,
+        #"deviation": 10
         }
         if ticket is not None:
             order["position"] = ticket
