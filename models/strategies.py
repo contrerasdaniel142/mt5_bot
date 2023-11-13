@@ -615,7 +615,7 @@ class HedgeTrailing:
         low = quantity * price_range
         
         # Establece el volumen
-        if user_risk is None:
+        if self.user_risk is None:
             volume = info.volume_min * 2
         else:
             user_risk = self.user_risk
