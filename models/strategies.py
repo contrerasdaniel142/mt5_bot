@@ -588,7 +588,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 60
-            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, number_bars)
+            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
             if info is not None and rates is not None and account_info is not None and last_minute_bar is not None:
                 break
