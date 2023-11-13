@@ -615,13 +615,16 @@ class HedgeTrailing:
         low = quantity * price_range
         
         # Establece el volumen
-        user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
-        volume = user_risk / price_range
-        volume = round(volume, symbol_data['volume_decimals'])
-        
-        if volume < (info.volume_min * 2):
+        if user_risk is None:
             volume = info.volume_min * 2
-        
+        else:
+            user_risk = self.user_risk
+            volume = user_risk / price_range
+            volume = round(volume, symbol_data['volume_decimals'])
+            
+            if volume < (info.volume_min * 2):
+                volume = info.volume_min * 2
+            
         # Guarda las variables
         symbol_data['price_range'] = price_range
         symbol_data['volume'] = volume

@@ -174,7 +174,7 @@ class BotController:
         print("Iniciando bot..")
                 
         # Establece los symbolos
-        symbol= "US30"
+        symbol= "XAUUSD"
                                 
         # Abre mt5 y espera 4 segundos
         MT5Api.initialize(4)
