@@ -680,54 +680,48 @@ class HedgeTrailing:
                 first_time = False
     
     def _trade_signal(self):
-        last_signal_is_buy = False
         while self.is_on.value:
-            if self.trend_signal.value == TrendSignal.anticipating:
+            if self.trend_signal.value == TrendSignal.anticipating or self.trend_signal.value == TrendSignal.buy:
                 if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
                     try:
                         self.trend_signal.value = TrendSignal.ready_fast
-                        last_signal_is_buy = False
+                        print(f"Tr3nd: Estado para nueva orden [ready_fast]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                    print(f"Tr3nd: Estado para nueva orden [ready_fast]")
                 elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
-                    self.trend_signal.value = TrendSignal.ready_intermediate
-                    last_signal_is_buy = False
-                    print(f"Tr3nd: Estado para nueva orden [ready_intermediate]")
-                elif self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
-                    if not last_signal_is_buy:
-                        try:
-                            self.trend_signal.value = TrendSignal.buy
-                            last_signal_is_buy = True
-                        except BrokenPipeError as e:
-                            print(f"Se produjo un error de tubería rota: {e}")
+                    try:
+                        self.trend_signal.value = TrendSignal.ready_intermediate
+                        print(f"Tr3nd: Estado para nueva orden [ready_intermediate]")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                elif self.trend_signal.value != TrendSignal.buy and self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                    try:
+                        self.trend_signal.value = TrendSignal.buy
                         print(f"Tr3nd: Estado para nueva orden [buy]")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
             
             if self.trend_signal.value == TrendSignal.ready_fast:
                 if self.intermediate_trend.value != self.main_trend.value:
                     try:
                         self.trend_signal.value = TrendSignal.anticipating
-                        last_signal_is_buy = False
+                        print(f"Tr3nd: Estado para nueva orden [anticipating]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                    print(f"Tr3nd: Estado para nueva orden [anticipating]")
                 elif self.fast_trend.value == self.main_trend.value:
                     try:
                         self.trend_signal.value = TrendSignal.buy
-                        last_signal_is_buy = True
+                        print(f"Tr3nd: Estado para nueva orden [buy]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                    print(f"Tr3nd: Estado para nueva orden [buy]")
             
             elif self.trend_signal.value == TrendSignal.ready_intermediate:
                 if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                     try:
                         self.trend_signal.value = TrendSignal.buy
-                        last_signal_is_buy = True
+                        print(f"Tr3nd: Estado para nueva orden [buy]")
                     except BrokenPipeError as e:
-                        print(f"Se produjo un error de tubería rota: {e}")
-                    print(f"Tr3nd: Estado para nueva orden [buy]")
-            
+                        print(f"Se produjo un error de tubería rota: {e}")       
 
     
     #endregion
