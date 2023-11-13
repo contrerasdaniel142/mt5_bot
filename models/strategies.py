@@ -455,7 +455,7 @@ class HedgeTrailing:
                         
                         parts = int(volume_to_even // volume_max) + 1
                         volume_part = round(volume_to_even/parts, volume_decimals)
-                        for _ in range(parts):             
+                        for _ in range(parts):
                             result =MT5Api.send_order(
                                 symbol= self.symbol, 
                                 order_type= order_type, 
