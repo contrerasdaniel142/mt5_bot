@@ -450,7 +450,7 @@ class HedgeTrailing:
                         print("HedgeTrailing: Hedge trade")
                         counter_volume = self._get_counter_volume(positions)
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = (profit / (hedge_range - (spread * 2))) + counter_volume
+                        volume_to_even = ((profit/info.trade_contract_size) / (hedge_range - (spread * 2))) + counter_volume
                         next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
                         
                         parts = int(volume_to_even // volume_max) + 1
@@ -615,16 +615,14 @@ class HedgeTrailing:
         low = quantity * price_range
         
         # Establece el volumen
-        if self.user_risk is None:
+        user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
+        user_risk = user_risk/info.trade_contract_size
+        volume = user_risk / price_range
+        volume = round(volume, symbol_data['volume_decimals'])
+        
+        if volume < (info.volume_min * 2):
             volume = info.volume_min * 2
-        else:
-            user_risk = self.user_risk
-            volume = user_risk / price_range
-            volume = round(volume, symbol_data['volume_decimals'])
-            
-            if volume < (info.volume_min * 2):
-                volume = info.volume_min * 2
-            
+        
         # Guarda las variables
         symbol_data['price_range'] = price_range
         symbol_data['volume'] = volume
