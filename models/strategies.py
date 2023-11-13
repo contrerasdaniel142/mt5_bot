@@ -368,12 +368,12 @@ class HedgeTrailing:
                 
                 # Comprueba si el precio supera el rango
                 
-                if info.ask > high:
+                if info.ask > high and self.fast_trend == StateTr3nd.bullish:
                     send_order = True
                     order_type = OrderType.MARKET_BUY
                     range_limit = high + buyback_range
                     
-                elif info.bid < low:
+                elif info.bid < low and self.fast_trend == StateTr3nd.bearish:
                     send_order = True
                     order_type = OrderType.MARKET_SELL
                     range_limit = low - buyback_range
@@ -612,7 +612,7 @@ class HedgeTrailing:
         # Obtiene las barras desde mt5
         while True:
             minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-            minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_30, 1,  10080)
+            minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  10080)
             if minute_1_rates is not None and minute_30_rates is not None:
                 break
         
