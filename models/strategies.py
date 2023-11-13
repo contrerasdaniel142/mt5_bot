@@ -32,19 +32,18 @@ from .technical_indicators import HeikenAshi, vRenko
 
 #endregion
 
-class StateTrend:
-    """
-    Clase que representa estados de tendencia.
+class StateTr3nd:
+    unassigned = 0
+    bullish = 1
+    bearish = -1
 
-    Atributos:
-    - UNASSIGNED: Estado no asignado, con valor 0.
-    - BULLISH: Estado alcista, con valor 1.
-    - BEARISH: Estado bajista, con valor -1.
-    """
-
-    UNASSIGNED = 0
-    BULLISH = 1
-    BEARISH = -1
+class TrendSignal:
+    anticipating = 0
+    rady_main = 1
+    ready_intermediate = 2
+    ready_fast = 3
+    buy = 4
+    
 
 class HedgeTrailing:
     def __init__(self, symbol: str, user_risk: float = None) -> None:
@@ -53,10 +52,7 @@ class HedgeTrailing:
         
         # Lista de symbolos para administar dentro de la estrategia
         self.symbol = symbol
-        
-        # Variable para indicar el estado del supertrend
-        self.trend_state = StateTrend.UNASSIGNED
-        
+                
         # Variable que contiene informaciond el symbolo para la estrategia
         self.symbol_data = {}
         
@@ -334,7 +330,7 @@ class HedgeTrailing:
                 continue
             
             # Se actualizan las variables
-            if not positions and not updated_symbol_data:
+            if not positions and (not updated_symbol_data or (finished_bar['close'] > high or finished_bar['close'] < low )):
                 self._preparing_symbols_data()
                 updated_symbol_data = True
                 
@@ -358,7 +354,11 @@ class HedgeTrailing:
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
                 # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
                 if pre_closing_time > market_close:
-                    self.is_on.value = False
+                    try:
+                        self.is_on.value = False
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                        
                     continue
                                 
                 # Establece las variables
@@ -379,7 +379,7 @@ class HedgeTrailing:
                     range_limit = low - buyback_range
                     
                 # Envia la primera orden
-                if send_order:
+                if send_order and self.trend_signal.value == TrendSignal.buy:
                     print("HedgeTrailing: Primer trade")
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
@@ -522,57 +522,6 @@ class HedgeTrailing:
         
         return difference
 
-    def _update_trend(self):
-        """
-        Actualiza el estado de la tendencia utilizando el indicador SuperTrend.
-
-        Este método actualiza continuamente el estado de la tendencia utilizando el indicador SuperTrend
-        con los parámetros atr_period y multiplier. Monitorea las tasas de precios en un marco de tiempo
-        de 1 minuto y ajusta el estado de la tendencia en consecuencia.
-
-        Retorna:
-            None
-        """
-        print("HedgeTrailing: Iniciando administrador de tendencia")
-        atr_period = 5  # Período para el cálculo del ATR
-        multiplier = 2  # Multiplicador para el cálculo del SuperTrend
-        first_time = True
-
-        # Obtener los datos de la tasa de 1 minuto iniciales
-        while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-            if minute_1_rates is not None:
-                break
-
-        while self.is_on.value:
-            if not first_time:
-                self._sleep_to_next_minute()
-                
-                # Obtener la última barra de 1 minuto
-                minute_1_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                
-                # En caso de que exista un error, intentara actualizar todo el trend
-                if minute_1_bar is None:
-                    while True:
-                        minute_1_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 10080)
-                        if minute_1_rates is not None:
-                            break
-                else:
-                    minute_1_rates = np.append(minute_1_rates, minute_1_bar,)
-
-            # Crear un DataFrame con los datos de la tasa de 1 minuto
-            df = pd.DataFrame(minute_1_rates)
-            
-            # Calcular el indicador SuperTrend y agregarlo al DataFrame
-            df['direction'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-            direction = int(df.iloc[-1]['direction'])
-
-            # Actualizar el estado de la tendencia si ha cambiado
-            if direction != self.trend_state.value:
-                first_time = False
-                self.trend_state.value = direction
-                print(f"HedgeTrailing: Actualizando tendencia: {direction}")
-
     def _preparing_symbols_data(self):
         """
         Prepara la data que se usara en la estrategia de HedgeTrailing.
@@ -588,7 +537,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 60
-            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, number_bars)
+            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
             if info is not None and rates is not None and account_info is not None and last_minute_bar is not None:
                 break
@@ -648,6 +597,140 @@ class HedgeTrailing:
             # Si el número no es un float, retorna 0 decimales
             return 0
     
+    def _update_trends(self):
+        print("Tr3nd: Update iniciado")
+        # Indica si es la primera vez que inicia el metodo
+        first_time = True
+        
+        # Symbolo a encontrar los trends
+        symbol = self.symbol
+
+        # Se establecen las variables para el supertrend
+        atr_period = 14
+        multiplier = 1
+        
+        # Obtiene las barras desde mt5
+        while True:
+            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
+            minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_30, 1,  10080)
+            if minute_1_rates is not None and minute_30_rates is not None:
+                break
+        
+        # Encuentra el rango optimo
+        df = pd.DataFrame(minute_30_rates)
+        atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_period)
+        price_range = np.median(atr[atr_period:])
+        
+        main_size = price_range
+        intermediate_size = main_size/2
+        fast_size = intermediate_size/2
+        
+        print(f"Tr3nd: Main brick size: {main_size}")
+        print(f"Tr3nd: Intermediate brick size: {intermediate_size}")
+        print(f"Tr3nd: Fast brick size: {fast_size}")
+        
+        renko_main = vRenko(minute_1_rates, main_size, False)
+        renko_intermediate = vRenko(minute_1_rates, intermediate_size, False)
+        renko_fast = vRenko(minute_1_rates, fast_size, False)
+                                    
+        while self.is_on.value:           
+             
+            if not first_time:
+                self._sleep_to_next_minute()
+                
+                while True:
+                    minute_1_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
+                    if minute_1_bar is not None:
+                        break           
+            
+            if first_time or renko_main.update_renko(minute_1_bar):
+                df = pd.DataFrame(renko_main.renko_data)
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+                last_bar_renko = df.iloc[-1]
+                if self.main_trend.value != last_bar_renko['supertrend']:
+                    try:
+                        self.main_trend.value = int(last_bar_renko['supertrend'])
+                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                        
+            if first_time or renko_intermediate.update_renko(minute_1_bar):
+                df = pd.DataFrame(renko_intermediate.renko_data)
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+                last_bar_renko = df.iloc[-1]
+                if self.intermediate_trend.value != last_bar_renko['supertrend']:
+                    try:
+                        self.intermediate_trend.value = int(last_bar_renko['supertrend'])
+                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                        
+            if first_time or renko_fast.update_renko(minute_1_bar):
+                df = pd.DataFrame(renko_fast.renko_data)
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+                last_bar_renko = df.iloc[-1]
+                if self.fast_trend.value != last_bar_renko['supertrend']:
+                    try:
+                        self.fast_trend.value = int(last_bar_renko['supertrend'])
+                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                        
+            if first_time:
+                first_time = False
+    
+    def _trade_signal(self):
+        while self.is_on.value:
+            
+            if self.trend_signal.value == TrendSignal.anticipating:
+                if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
+                    try:
+                        self.trend_signal.value = TrendSignal.ready_fast
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                    print(f"Tr3nd: Estado para nueva orden [ready_fast]")
+                elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                    self.trend_signal.value = TrendSignal.ready_intermediate
+                    print(f"Tr3nd: Estado para nueva orden [ready_intermediate]")
+            
+            if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                try:
+                    self.trend_signal.value = TrendSignal.buy
+                except BrokenPipeError as e:
+                    print(f"Se produjo un error de tubería rota: {e}")
+                print(f"Tr3nd: Estado para nueva orden [buy]")
+            
+            if self.trend_signal.value == TrendSignal.ready_fast:
+                if self.intermediate_trend.value != self.main_trend.value:
+                    try:
+                        self.trend_signal.value = TrendSignal.anticipating
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                    print(f"Tr3nd: Estado para nueva orden [anticipating]")
+                elif self.fast_trend.value == self.main_trend.value:
+                    try:
+                        self.trend_signal.value = TrendSignal.buy
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                    print(f"Tr3nd: Estado para nueva orden [buy]")
+            
+            elif self.trend_signal.value == TrendSignal.ready_intermediate:
+                if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                    try:
+                        self.trend_signal.value = TrendSignal.buy
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                    print(f"Tr3nd: Estado para nueva orden [buy]")
+                                
+            if self.trend_signal.value == TrendSignal.buy:
+                print(f"Tr3nd: Señal de compra")
+                time.sleep((60*3))
+                try:
+                    self.trend_signal.value = TrendSignal.anticipating
+                except BrokenPipeError as e:
+                    print(f"Se produjo un error de tubería rota: {e}")
+
+    
     #endregion
     
     #region start
@@ -667,10 +750,18 @@ class HedgeTrailing:
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
         self.symbol_data = manager.dict({})
+        self.main_trend = manager.Value("i", StateTr3nd.unassigned)
+        self.intermediate_trend = manager.Value("i", StateTr3nd.unassigned)
+        self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
+        self.trend_signal = manager.Value("i", TrendSignal.anticipating)
 
         self._preparing_symbols_data()
         
         # Crea los procesos y los inicia
+        update_trends_process = multiprocessing.Process(target=self._update_trends)
+        update_trends_process.start()
+        trade_signal_process = multiprocessing.Process(target=self._trade_signal)
+        trade_signal_process.start()
         manage_positions_process = multiprocessing.Process(target= self._manage_positions)
         manage_positions_process.start()
         hedge_buyer_process = multiprocessing.Process(target=self._hedge_buyer)
