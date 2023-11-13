@@ -467,7 +467,7 @@ class HedgeTrailing:
                                 continue
                         if result:
                             number_hedge += 1
-                            if number_hedge == 3:
+                            if number_hedge == 2:
                                 part_range = (price_range * 0.2)
                                 high = high + part_range
                                 low = low - part_range
@@ -615,7 +615,7 @@ class HedgeTrailing:
         low = quantity * price_range
         
         # Establece el volumen
-        user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
+        user_risk = (account_info.balance * 0.001) if self.user_risk is None else self.user_risk
         volume = user_risk / price_range
         volume = round(volume, symbol_data['volume_decimals'])
         
@@ -635,6 +635,8 @@ class HedgeTrailing:
   
     def count_decimal_places(self, number)-> int:
         if isinstance(number, float):
+            if number == 1.0:
+                return 0
             # Convierte el número a una cadena (string) para analizar los decimales
             number_str = str(number)
             # Divide la cadena en dos partes: la parte entera y la parte decimal
