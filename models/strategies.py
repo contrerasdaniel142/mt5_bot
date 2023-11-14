@@ -643,28 +643,6 @@ class HedgeTrailing:
                     if minute_1_bar is not None:
                         break      
             
-            if first_time or renko_main.update_renko(minute_1_bar):
-                df = pd.DataFrame(renko_main.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.main_trend.value != last_bar_renko['supertrend']:
-                    try:
-                        self.main_trend.value = int(last_bar_renko['supertrend'])
-                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
-                    except BrokenPipeError as e:
-                        print(f"Se produjo un error de tubería rota: {e}")
-                        
-            if first_time or renko_intermediate.update_renko(minute_1_bar):
-                df = pd.DataFrame(renko_intermediate.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.intermediate_trend.value != last_bar_renko['supertrend']:
-                    try:
-                        self.intermediate_trend.value = int(last_bar_renko['supertrend'])
-                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
-                    except BrokenPipeError as e:
-                        print(f"Se produjo un error de tubería rota: {e}")
-                        
             if first_time or renko_fast.update_renko(minute_1_bar):
                 df = pd.DataFrame(renko_fast.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
@@ -675,7 +653,29 @@ class HedgeTrailing:
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                        
+            
+            if first_time or renko_intermediate.update_renko(minute_1_bar):
+                df = pd.DataFrame(renko_intermediate.renko_data)
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+                last_bar_renko = df.iloc[-1]
+                if self.intermediate_trend.value != last_bar_renko['supertrend']:
+                    try:
+                        self.intermediate_trend.value = int(last_bar_renko['supertrend'])
+                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+            
+            if first_time or renko_main.update_renko(minute_1_bar):
+                df = pd.DataFrame(renko_main.renko_data)
+                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
+                last_bar_renko = df.iloc[-1]
+                if self.main_trend.value != last_bar_renko['supertrend']:
+                    try:
+                        self.main_trend.value = int(last_bar_renko['supertrend'])
+                        print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
+                    
             if first_time:
                 first_time = False
     
