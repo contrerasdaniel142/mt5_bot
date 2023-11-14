@@ -63,7 +63,7 @@ class HedgeTrailing:
         self.user_risk = user_risk
                 
         # Horario de apertura y cierre del mercado
-        self._market_opening_time = {'hour':14, 'minute':30}
+        self._market_opening_time = {'hour':14, 'minute':0}
         self._market_closed_time = {'hour':20, 'minute':55}
     
     #region Utilities
