@@ -698,12 +698,12 @@ class HedgeTrailing:
                         print(f"Tr3nd: Estado para nueva orden [ready_intermediate]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                elif self.trend_signal.value != TrendSignal.buy and self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
-                    try:
-                        self.trend_signal.value = TrendSignal.buy
-                        print(f"Tr3nd: Estado para nueva orden [buy]")
-                    except BrokenPipeError as e:
-                        print(f"Se produjo un error de tubería rota: {e}")
+                # elif self.trend_signal.value != TrendSignal.buy and self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
+                #     try:
+                #         self.trend_signal.value = TrendSignal.buy
+                #         print(f"Tr3nd: Estado para nueva orden [buy]")
+                #     except BrokenPipeError as e:
+                #         print(f"Se produjo un error de tubería rota: {e}")
             
             if self.trend_signal.value == TrendSignal.ready_fast:
                 if self.intermediate_trend.value != self.main_trend.value:
