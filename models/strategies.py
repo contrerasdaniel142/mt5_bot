@@ -322,12 +322,12 @@ class HedgeTrailing:
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
             
-            # # Hora actual
-            # current_time = datetime.now(pytz.utc)
+            # Hora actual
+            current_time = datetime.now(pytz.utc)
             
-            # if not positions and current_time > market_close:
-            #     MT5Api.send_close_all_position()
-            #     continue
+            if not positions and current_time > market_close:
+                MT5Api.send_close_all_position()
+                continue
             
             # Se actualizan las variables
             if not positions and (not updated_symbol_data or (finished_bar['close'] > high or finished_bar['close'] < low )):
@@ -349,17 +349,17 @@ class HedgeTrailing:
                 rupture = False
                 number_hedge = 1
             
-            if not positions:
+            if not positions and self.trend_signal.value == TrendSignal.buy:
                 # Hora para cerrar el programa antes
-                # pre_closing_time = current_time + timedelta(hours=1, minutes=0)
-                # # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
-                # if pre_closing_time > market_close:
-                #     try:
-                #         self.is_on.value = False
-                #     except BrokenPipeError as e:
-                #         print(f"Se produjo un error de tubería rota: {e}")
+                pre_closing_time = current_time + timedelta(hours=1, minutes=0)
+                # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
+                if pre_closing_time > market_close:
+                    try:
+                        self.is_on.value = False
+                    except BrokenPipeError as e:
+                        print(f"Se produjo un error de tubería rota: {e}")
                         
-                #     continue
+                    continue
                                 
                 # Establece las variables
                 open = last_bar['open']       
@@ -379,7 +379,7 @@ class HedgeTrailing:
                     range_limit = low - buyback_range
                     
                 # Envia la primera orden
-                if send_order and self.trend_signal.value == TrendSignal.buy:
+                if send_order:
                     print("HedgeTrailing: Primer trade")
                     result =MT5Api.send_order(
                         symbol= self.symbol, 
