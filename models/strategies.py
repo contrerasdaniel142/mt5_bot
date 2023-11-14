@@ -141,7 +141,7 @@ class HedgeTrailing:
                 low = self.symbol_data['low']
                 volume_decimals = self.symbol_data['volume_decimals']
                 price_range = self.symbol_data['price_range']
-                hedge_range = price_range/2
+                mid_range = price_range/2
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
@@ -165,13 +165,13 @@ class HedgeTrailing:
                                         
                     # Para longs
                     if type == OrderType.MARKET_BUY:
-                        limit_high = high + price_range
+                        limit_high = high + mid_range
                         if info.bid > limit_high:
                             send_partial_order = True
                                             
                     # Para shorts
                     else:
-                        limit_low = low - price_range
+                        limit_low = low - mid_range
                         if info.ask < limit_low:
                             send_partial_order = True
                     
@@ -193,13 +193,13 @@ class HedgeTrailing:
                     
                     # Para longs
                     if type == OrderType.MARKET_BUY:
-                        limit_high_hedge = high + hedge_range
+                        limit_high_hedge = high + mid_range
                         if info.bid > limit_high_hedge:
                             positions_to_close = [position for position in positions if position.type == OrderType.MARKET_SELL]
                             send_close_order = True
                     # Para shorts
                     else:
-                        limit_low_hedge = low - hedge_range
+                        limit_low_hedge = low - mid_range
                         if info.ask < limit_low_hedge:
                             positions_to_close = [position for position in positions if position.type == OrderType.MARKET_BUY]
                             send_close_order = True
@@ -254,7 +254,7 @@ class HedgeTrailing:
                 next_stop_price_range = (price_range * ((number_trailing + 2)/2))                    
                 if type == OrderType.MARKET_BUY:
                     if in_hedge and number_trailing == 1:
-                        stop_loss = high + hedge_range
+                        stop_loss = high + mid_range
                     else:
                         stop_loss = high + trailing_range
                     next_stop_loss = high + next_trailing_range
@@ -268,7 +268,7 @@ class HedgeTrailing:
                         number_trailing += 1
                 else:
                     if in_hedge and number_trailing == 1:
-                        stop_loss = low - hedge_range
+                        stop_loss = low - mid_range
                     else:
                         stop_loss = low - trailing_range
                     next_stop_loss = low - next_trailing_range
@@ -300,7 +300,7 @@ class HedgeTrailing:
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         price_range = self.symbol_data['price_range']
-        hedge_range = price_range/2
+        mid_range = price_range/2
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
@@ -338,7 +338,7 @@ class HedgeTrailing:
                 high = self.symbol_data['high']
                 low = self.symbol_data['low']
                 price_range = self.symbol_data['price_range']
-                hedge_range = price_range/2
+                mid_range = price_range/2
                 volume = self.symbol_data['volume']
                 volume_max = self.symbol_data['volume_max']
                 volume_decimals = self.symbol_data['volume_decimals']
@@ -450,7 +450,7 @@ class HedgeTrailing:
                         print("HedgeTrailing: Hedge trade")
                         counter_volume = self._get_counter_volume(positions)
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = ((profit/info.trade_contract_size) / (hedge_range - (spread * 2))) + counter_volume
+                        volume_to_even = ((profit/info.trade_contract_size) / (mid_range - (spread * 2))) + counter_volume
                         next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
                         
                         parts = int(volume_to_even // volume_max) + 1
@@ -472,7 +472,7 @@ class HedgeTrailing:
                                 high = high + part_range
                                 low = low - part_range
                                 price_range = price_range - part_range
-                                hedge_range = hedge_range - part_range
+                                mid_range = mid_range - part_range
                             false_rupture = False
                             continue
             
@@ -566,7 +566,7 @@ class HedgeTrailing:
         # Establece el volumen
         user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
         user_risk = user_risk/info.trade_contract_size
-        volume = user_risk / price_range
+        volume = user_risk / (price_range/2)
         volume = round(volume, symbol_data['volume_decimals'])
         
         if volume < (info.volume_min * 2):
