@@ -682,7 +682,7 @@ class HedgeTrailing:
     def _trade_signal(self):
         while self.is_on.value:
             
-            if self.main_trend.value == StateTr3nd.unassigned and self.intermediate_trend.value == StateTr3nd.unassigned and self.fast_trend.value == StateTr3nd.unassigned:
+            if self.main_trend.value == StateTr3nd.unassigned or self.intermediate_trend.value == StateTr3nd.unassigned or self.fast_trend.value == StateTr3nd.unassigned:
                 continue
             
             if self.trend_signal.value == TrendSignal.anticipating or self.trend_signal.value == TrendSignal.buy:
