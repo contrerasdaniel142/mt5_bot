@@ -368,12 +368,12 @@ class HedgeTrailing:
                 
                 # Comprueba si el precio supera el rango
                 
-                if info.ask > high and self.fast_trend == StateTr3nd.bullish:
+                if info.ask > high and self.fast_trend.value == StateTr3nd.bullish:
                     send_order = True
                     order_type = OrderType.MARKET_BUY
                     range_limit = high + buyback_range
                     
-                elif info.bid < low and self.fast_trend == StateTr3nd.bearish:
+                elif info.bid < low and self.fast_trend.value == StateTr3nd.bearish:
                     send_order = True
                     order_type = OrderType.MARKET_SELL
                     range_limit = low - buyback_range
