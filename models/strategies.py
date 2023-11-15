@@ -600,6 +600,7 @@ class HedgeTrailing:
         # Se establecen las variables para el supertrend
         atr_period = 14
         multiplier = 1
+        first_time = True
         
         # Obtiene las barras desde mt5
         while True:
@@ -631,7 +632,7 @@ class HedgeTrailing:
                 if minute_last_bar is not None:
                     break      
             
-            if renko_fast.update_renko(minute_last_bar):
+            if first_time or renko_fast.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_fast.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -642,7 +643,7 @@ class HedgeTrailing:
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if renko_intermediate.update_renko(minute_last_bar):
+            if first_time or renko_intermediate.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_intermediate.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -653,7 +654,7 @@ class HedgeTrailing:
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if renko_main.update_renko(minute_last_bar):
+            if first_time or renko_main.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_main.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -663,6 +664,9 @@ class HedgeTrailing:
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
+            
+            if first_time:
+                first_time = False
             
     
     def _trade_signal(self):
