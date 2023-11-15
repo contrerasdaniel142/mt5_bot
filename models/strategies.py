@@ -523,7 +523,7 @@ class HedgeTrailing:
         """
         Prepara la data que se usara en la estrategia de HedgeTrailing.
         """
-        print("HedgeTrailing: Preparando la data...")
+        #print("HedgeTrailing: Preparando la data...")
         
         # Variable auxiliar
         symbol_data = {}
