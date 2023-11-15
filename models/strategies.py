@@ -604,7 +604,7 @@ class HedgeTrailing:
         # Obtiene las barras desde mt5
         while True:
             minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  120)
-            minute_range_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  120)
+            minute_range_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  3000)
             if minute_1_rates is not None and minute_range_rates is not None:
                 break
         
