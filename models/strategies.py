@@ -141,7 +141,7 @@ class HedgeTrailing:
                 low = self.symbol_data['low']
                 volume_decimals = self.symbol_data['volume_decimals']
                 price_range = self.symbol_data['price_range']
-                hedge_range = price_range/2
+                hedge_range = price_range
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
@@ -300,7 +300,7 @@ class HedgeTrailing:
         high = self.symbol_data['high']
         low = self.symbol_data['low']
         price_range = self.symbol_data['price_range']
-        hedge_range = price_range/2
+        hedge_range = price_range
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
@@ -338,7 +338,7 @@ class HedgeTrailing:
                 high = self.symbol_data['high']
                 low = self.symbol_data['low']
                 price_range = self.symbol_data['price_range']
-                hedge_range = price_range/2
+                hedge_range = price_range
                 volume = self.symbol_data['volume']
                 volume_max = self.symbol_data['volume_max']
                 volume_decimals = self.symbol_data['volume_decimals']
@@ -537,7 +537,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 60
-            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_5, 1, number_bars)
+            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
             if info is not None and rates is not None and account_info is not None and last_minute_bar is not None:
                 break
