@@ -310,7 +310,6 @@ class HedgeTrailing:
         false_rupture= False
         rupture = False
         number_hedge = 1
-        updated_symbol_data = True
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -330,9 +329,8 @@ class HedgeTrailing:
                 continue
             
             # Se actualizan las variables
-            if not positions and (not updated_symbol_data or (finished_bar['close'] > high or finished_bar['close'] < low )):
+            if not positions and self.trend_signal.value != TrendSignal.buy and (last_bar['close'] > high or last_bar['close'] < low ):
                 self._preparing_symbols_data()
-                updated_symbol_data = True
                 
                 # Variables del rango
                 high = self.symbol_data['high']
@@ -390,7 +388,6 @@ class HedgeTrailing:
                     )
                     
                     if result is not None:
-                        updated_symbol_data = False
                         # Espera a que la vela termine y la obtiene
                         rupture = True
                         self._sleep_to_next_minute()
