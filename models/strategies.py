@@ -573,7 +573,7 @@ class HedgeTrailing:
         symbol_data['high'] = high
         symbol_data['low'] = low
                 
-        print(symbol_data)
+        #print(symbol_data)
         
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
