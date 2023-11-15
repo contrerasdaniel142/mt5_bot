@@ -724,7 +724,7 @@ class HedgeTrailing:
             
             if self.trend_signal.value == TrendSignal.buy:
                 # Mantiene un tiempo determinado la señal de compra
-                time.sleep(60*3)
+                time.sleep(60*1)
                 try:
                     self.trend_signal.value = TrendSignal.anticipating
                     print(f"Tr3nd: Estado para nueva orden [buy]")
