@@ -528,7 +528,7 @@ class HedgeTrailing:
         # Variable auxiliar
         symbol_data = {}
         
-        self._sleep_to_next_minute()
+        #self._sleep_to_next_minute()
         
         while True:
             info = MT5Api.get_symbol_info(self.symbol)
