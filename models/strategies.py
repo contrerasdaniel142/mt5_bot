@@ -593,10 +593,7 @@ class HedgeTrailing:
             return 0
     
     def _update_trends(self):
-        print("Tr3nd: Update iniciado")
-        # Indica si es la primera vez que inicia el metodo
-        first_time = True
-        
+        print("Tr3nd: Update iniciado")        
         # Symbolo a encontrar los trends
         symbol = self.symbol
 
@@ -606,13 +603,13 @@ class HedgeTrailing:
         
         # Obtiene las barras desde mt5
         while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  10080)
-            minute_30_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  10080)
-            if minute_1_rates is not None and minute_30_rates is not None:
+            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  120)
+            minute_range_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  120)
+            if minute_1_rates is not None and minute_range_rates is not None:
                 break
         
         # Encuentra el rango optimo
-        df = pd.DataFrame(minute_30_rates)
+        df = pd.DataFrame(minute_range_rates)
         atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_period)
         price_range = np.median(atr[atr_period:])
         
@@ -629,16 +626,12 @@ class HedgeTrailing:
         renko_fast = vRenko(minute_1_rates, fast_size, False)
                                     
         while self.is_on.value:           
-             
-            if not first_time:
-                self._sleep_to_next_minute()
-                
-                while True:
-                    minute_1_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1, 1)
-                    if minute_1_bar is not None:
-                        break      
+            while True:
+                minute_last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
+                if minute_last_bar is not None:
+                    break      
             
-            if first_time or renko_fast.update_renko(minute_1_bar):
+            if renko_fast.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_fast.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -649,7 +642,7 @@ class HedgeTrailing:
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if first_time or renko_intermediate.update_renko(minute_1_bar):
+            if renko_intermediate.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_intermediate.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -660,7 +653,7 @@ class HedgeTrailing:
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if first_time or renko_main.update_renko(minute_1_bar):
+            if renko_main.update_renko(minute_last_bar):
                 df = pd.DataFrame(renko_main.renko_data)
                 df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
                 last_bar_renko = df.iloc[-1]
@@ -670,9 +663,7 @@ class HedgeTrailing:
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
-                    
-            if first_time:
-                first_time = False
+            
     
     def _trade_signal(self):
         
@@ -722,7 +713,7 @@ class HedgeTrailing:
                 time.sleep(60*1)
                 try:
                     self.trend_signal.value = TrendSignal.anticipating
-                    print(f"Tr3nd: Estado para nueva orden [buy]")
+                    print(f"Tr3nd: Estado para nueva orden [anticipating]")
                 except BrokenPipeError as e:
                     print(f"Se produjo un error de tubería rota: {e}") 
 

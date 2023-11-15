@@ -158,7 +158,7 @@ class vRenko:
         
         return True         
             
-    def update_renko(self, rates)-> bool:
+    def update_renko(self, rates:ndarray)-> bool:
         """
         Actualiza el gráfico Renko basado en la barras proporcionada de MT5.
 
