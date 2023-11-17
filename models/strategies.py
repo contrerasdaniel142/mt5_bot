@@ -303,6 +303,7 @@ class HedgeTrailing:
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
+        balance = self.symbol_data['initial_balance']
         spread = self.symbol_data['spread']
         
         # Condicionales de estados
@@ -376,7 +377,7 @@ class HedgeTrailing:
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = ((profit/info.trade_contract_size) / (price_range - (spread * 2)))
+                        volume_to_even = (((profit + (balance*0.01))/info.trade_contract_size) / (price_range - (spread * 3)))
                         next_step = int(last_position.comment) + 1
                         
                         parts = int(volume_to_even // volume_max) + 1
@@ -418,6 +419,7 @@ class HedgeTrailing:
         symbol_data['volume_max'] = info.volume_max
         symbol_data['spread'] = info.spread * info.point
         symbol_data['price_decimals'] = info.digits
+        symbol_data['initial_balance'] = account_info.balance
         
         # Encuentra el rango optimo
         atr_timeperiod = 14
