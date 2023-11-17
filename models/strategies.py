@@ -325,7 +325,7 @@ class HedgeTrailing:
                 MT5Api.send_close_all_position()
                 continue
                         
-            if not positions and self.trend_signal.value == TrendSignal.buy:
+            if not positions and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
                 rupture = False
                 
@@ -405,7 +405,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 360
-            range_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, number_bars)
+            range_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
             if info is not None and range_rates is not None and account_info is not None and last_minute_bar is not None:
                 break
@@ -478,10 +478,6 @@ class HedgeTrailing:
         intermediate_size = self.symbol_data['intermediate_range']
         fast_size = self.symbol_data['fast_range']
         
-        print(f"Tr3nd: Main brick size: {main_size}")
-        print(f"Tr3nd: Intermediate brick size: {intermediate_size}")
-        print(f"Tr3nd: Fast brick size: {fast_size}")
-        
         renko_main = vRenko(minute_1_rates, main_size, False)
         renko_intermediate = vRenko(minute_1_rates, intermediate_size, False)
         renko_fast = vRenko(minute_1_rates, fast_size, False)
@@ -531,47 +527,47 @@ class HedgeTrailing:
             if self.main_trend.value == StateTrend.unassigned or self.intermediate_trend.value == StateTrend.unassigned or self.fast_trend.value == StateTrend.unassigned:
                 continue
 
-            if self.trend_signal.value == TrendSignal.anticipating:
+            if self.trade_signal.value == TrendSignal.anticipating:
                 if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
                     try:
-                        self.trend_signal.value = TrendSignal.ready_fast
+                        self.trade_signal.value = TrendSignal.ready_fast
                         print(f"Tr3nd: Estado para nueva orden [ready_fast]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
                 elif self.intermediate_trend.value != self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                     try:
-                        self.trend_signal.value = TrendSignal.ready_intermediate
+                        self.trade_signal.value = TrendSignal.ready_intermediate
                         print(f"Tr3nd: Estado para nueva orden [ready_intermediate]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
                             
-            if self.trend_signal.value == TrendSignal.ready_fast:
+            if self.trade_signal.value == TrendSignal.ready_fast:
                 if self.intermediate_trend.value != self.main_trend.value:
                     try:
-                        self.trend_signal.value = TrendSignal.anticipating
+                        self.trade_signal.value = TrendSignal.anticipating
                         print(f"Tr3nd: Estado para nueva orden [anticipating]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
                 elif self.fast_trend.value == self.main_trend.value:
                     try:
-                        self.trend_signal.value = TrendSignal.buy
+                        self.trade_signal.value = TrendSignal.buy
                         print(f"Tr3nd: Estado para nueva orden [buy]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            elif self.trend_signal.value == TrendSignal.ready_intermediate:
+            elif self.trade_signal.value == TrendSignal.ready_intermediate:
                 if self.intermediate_trend.value == self.main_trend.value and self.main_trend.value == self.fast_trend.value:
                     try:
-                        self.trend_signal.value = TrendSignal.buy
+                        self.trade_signal.value = TrendSignal.buy
                         print(f"Tr3nd: Estado para nueva orden [buy]")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if self.trend_signal.value == TrendSignal.buy:               
+            if self.trade_signal.value == TrendSignal.buy:               
                 # Mantiene un tiempo determinado la señal de compra
                 time.sleep(10)
                 try:
-                    self.trend_signal.value = TrendSignal.anticipating
+                    self.trade_signal.value = TrendSignal.anticipating
                     print(f"Tr3nd: Estado para nueva orden [anticipating]")
                 except BrokenPipeError as e:
                     print(f"Se produjo un error de tubería rota: {e}") 
@@ -599,7 +595,7 @@ class HedgeTrailing:
         self.main_trend = manager.Value("i", StateTrend.unassigned)
         self.intermediate_trend = manager.Value("i", StateTrend.unassigned)
         self.fast_trend = manager.Value("i", StateTrend.unassigned)
-        self.trend_signal = manager.Value("i", TrendSignal.anticipating)
+        self.trade_signal = manager.Value("i", TrendSignal.anticipating)
 
         self._preparing_symbols_data()
         
