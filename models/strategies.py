@@ -32,7 +32,7 @@ from .technical_indicators import HeikenAshi, vRenko
 
 #endregion
 
-class StateTr3nd:
+class StateTrend:
     unassigned = 0
     bullish = 1
     bearish = -1
@@ -124,7 +124,15 @@ class HedgeTrailing:
         
         # Envía un mensaje de inicio al canal de Telegram
         print("HedgeTrailing: Iniciando administrador de posiciones")
-                
+        
+        # Variables del rango
+        volume_decimals = self.symbol_data['volume_decimals']
+        price_range = self.symbol_data['fast_range']
+        hedge_range = price_range
+        number_trailing = 1
+        in_hedge = False
+        trailing_stop = False
+        
         while self.is_on.value:
             # Se obtienen las posiciones y la información del símbolo de MetaTrader 5
             while True:
@@ -136,12 +144,6 @@ class HedgeTrailing:
             # Reinicia las variables en caso de que ya no haya posiciones abiertas
             if not positions:
                 # Comienza el administrador de posiciones
-                # Variables del rango
-                high = self.symbol_data['high']
-                low = self.symbol_data['low']
-                volume_decimals = self.symbol_data['volume_decimals']
-                price_range = self.symbol_data['price_range']
-                hedge_range = price_range
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
@@ -160,18 +162,18 @@ class HedgeTrailing:
                 type = last_position.type
                 
                 # Para el caso del primer trade
-                if number_step == 1 or number_step == 2:
+                if number_step == 1:
                     send_partial_order = False
                                         
                     # Para longs
                     if type == OrderType.MARKET_BUY:
-                        limit_high = high + price_range
+                        limit_high = last_position.price_open + price_range
                         if info.bid > limit_high:
                             send_partial_order = True
                                             
                     # Para shorts
                     else:
-                        limit_low = low - price_range
+                        limit_low = last_position.price_open - price_range
                         if info.ask < limit_low:
                             send_partial_order = True
                     
@@ -193,13 +195,13 @@ class HedgeTrailing:
                     
                     # Para longs
                     if type == OrderType.MARKET_BUY:
-                        limit_high_hedge = high + hedge_range
+                        limit_high_hedge = last_position.price_open + hedge_range
                         if info.bid > limit_high_hedge:
                             positions_to_close = [position for position in positions if position.type == OrderType.MARKET_SELL]
                             send_close_order = True
                     # Para shorts
                     else:
-                        limit_low_hedge = low - hedge_range
+                        limit_low_hedge = last_position.price_open - hedge_range
                         if info.ask < limit_low_hedge:
                             positions_to_close = [position for position in positions if position.type == OrderType.MARKET_BUY]
                             send_close_order = True
@@ -224,13 +226,13 @@ class HedgeTrailing:
                                         
                 # Para longs
                 if type == OrderType.MARKET_BUY:
-                    limit_high = high + price_range
+                    limit_high = last_position.price_open + price_range
                     if info.bid > limit_high:
                         send_partial_order = True
                                         
                 # Para shorts
                 else:
-                    limit_low = low - price_range
+                    limit_low = last_position.price_open - price_range
                     if info.ask < limit_low:
                         send_partial_order = True
                 
@@ -254,11 +256,11 @@ class HedgeTrailing:
                 next_stop_price_range = (price_range * ((number_trailing + 2)/2))                    
                 if type == OrderType.MARKET_BUY:
                     if in_hedge and number_trailing == 1:
-                        stop_loss = high + hedge_range
+                        stop_loss = last_position.price_open + hedge_range
                     else:
-                        stop_loss = high + trailing_range
-                    next_stop_loss = high + next_trailing_range
-                    next_stop_price = high + next_stop_price_range
+                        stop_loss = last_position.price_open + trailing_range
+                    next_stop_loss = last_position.price_open + next_trailing_range
+                    next_stop_price = last_position.price_open + next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if info.bid <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
@@ -268,11 +270,11 @@ class HedgeTrailing:
                         number_trailing += 1
                 else:
                     if in_hedge and number_trailing == 1:
-                        stop_loss = low - hedge_range
+                        stop_loss = last_position.price_open - hedge_range
                     else:
-                        stop_loss = low - trailing_range
-                    next_stop_loss = low - next_trailing_range
-                    next_stop_price = low - next_stop_price_range
+                        stop_loss = last_position.price_open - trailing_range
+                    next_stop_loss = last_position.price_open - next_trailing_range
+                    next_stop_price = last_position.price_open - next_stop_price_range
                     # Cierra todas las posiciones si el precio cae por debajo del stop loss
                     if info.ask >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
@@ -297,19 +299,14 @@ class HedgeTrailing:
         market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
         
         # Variables del rango
-        high = self.symbol_data['high']
-        low = self.symbol_data['low']
-        price_range = self.symbol_data['price_range']
-        hedge_range = price_range
+        price_range = self.symbol_data['fast_range']
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
         spread = self.symbol_data['spread']
         
         # Condicionales de estados
-        false_rupture= False
         rupture = False
-        number_hedge = 1
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -327,27 +324,11 @@ class HedgeTrailing:
             if positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
-            
-            # Se actualizan las variables
-            if not positions and self.trend_signal.value != TrendSignal.buy and (last_bar['close'] > high or last_bar['close'] < low ):
-                self._preparing_symbols_data()
-                
-                # Variables del rango
-                high = self.symbol_data['high']
-                low = self.symbol_data['low']
-                price_range = self.symbol_data['price_range']
-                hedge_range = price_range
-                volume = self.symbol_data['volume']
-                volume_max = self.symbol_data['volume_max']
-                volume_decimals = self.symbol_data['volume_decimals']
-                spread = self.symbol_data['spread']
-                
-                # Condicionales de estados
-                false_rupture= False
-                rupture = False
-                number_hedge = 1
-            
+                        
             if not positions and self.trend_signal.value == TrendSignal.buy:
+                # Condicionales de estados
+                rupture = False
+                
                 # Hora para cerrar el programa antes
                 pre_closing_time = current_time + timedelta(hours=1, minutes=0)
                 # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
@@ -359,96 +340,44 @@ class HedgeTrailing:
                         
                     continue
                                 
-                # Establece las variables
-                open = last_bar['open']       
-                send_order = False
-                buyback_range = (price_range * 0.2)
-                
-                # Comprueba si el precio supera el rango
-                
-                if info.ask > high and self.fast_trend.value == StateTr3nd.bullish:
-                    send_order = True
+                if self.fast_trend.value == StateTrend.bullish:
                     order_type = OrderType.MARKET_BUY
-                    range_limit = high + buyback_range
                     
-                elif info.bid < low and self.fast_trend.value == StateTr3nd.bearish:
-                    send_order = True
+                else:
                     order_type = OrderType.MARKET_SELL
-                    range_limit = low - buyback_range
+
+                print("HedgeTrailing: Primer trade")
+                result =MT5Api.send_order(
+                    symbol= self.symbol, 
+                    order_type= order_type, 
+                    volume=volume,
+                    magic=self.magic,
+                    comment= "1"
+                )
                     
-                # Envia la primera orden
-                if send_order:
-                    print("HedgeTrailing: Primer trade")
-                    result =MT5Api.send_order(
-                        symbol= self.symbol, 
-                        order_type= order_type, 
-                        volume=volume,
-                        magic=self.magic,
-                        comment= "1"
-                    )
-                    
-                    if result is not None:
-                        # Espera a que la vela termine y la obtiene
-                        rupture = True
-                        self._sleep_to_next_minute()
-                        finished_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 1, 1)
-                        send_buyback = False
+                if result is not None:
+                    rupture = True
                         
-                        # Si no se logro obtener la ultima barra continua con otra iteracion
-                        if finished_bar is None:
-                            continue
-                        
-                        close = finished_bar['close']
-                        
-                        # Establece el estado de la estrategia
-                        if order_type == OrderType.MARKET_BUY:
-                            if close < high:
-                                false_rupture = True
-                                continue
-                            elif close < range_limit:
-                                send_buyback = True
-                        else:
-                            if close > low:
-                                false_rupture = True
-                                continue
-                            elif close > range_limit:
-                                send_buyback = True
-                                                    
-                        # Se hace recompra en caso de que la barra se encuentre en el rango limite
-                        if send_buyback:
-                            print("HedgeTrailing: Primer trade, recompra")
-                            result =MT5Api.send_order(
-                                symbol= self.symbol, 
-                                order_type= order_type, 
-                                volume=volume,
-                                magic=self.magic,
-                                comment= "2"
-                            )
-                            continue
-        
+            
             if rupture and positions:
                 last_position = max(positions, key=lambda position: position.time)
                 if float(last_position.comment) != 0:
                     # Establece las variables
-                    open = last_bar['open']
                     last_type = last_position.type
                     send_order = False
                     # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                    if last_type == OrderType.MARKET_BUY:
-                        if info.bid < low:
-                            order_type = OrderType.MARKET_SELL
-                            send_order = True
-                    elif last_type == OrderType.MARKET_SELL:
-                        if info.ask > high:
-                            order_type =  OrderType.MARKET_BUY
-                            send_order = True
+                    if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
+                        order_type = OrderType.MARKET_SELL
+                        send_order = True
+                    elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
+                        order_type =  OrderType.MARKET_BUY
+                        send_order = True
                     
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
-                        counter_volume = self._get_counter_volume(positions)
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = ((profit/info.trade_contract_size) / (hedge_range - (spread * 2))) + counter_volume
-                        next_step = int(last_position.comment) + 1 if int(last_position.comment) != 1 else 3
+                        volume_to_even = ((profit/info.trade_contract_size) / (price_range - (spread * 2)))
+                        next_step = int(last_position.comment) + 1
                         
                         parts = int(volume_to_even // volume_max) + 1
                         volume_part = round(volume_to_even/parts, volume_decimals)
@@ -462,62 +391,6 @@ class HedgeTrailing:
                             )
                             if not result:
                                 continue
-                        if result:
-                            number_hedge += 1
-                            if number_hedge == 2:
-                                part_range = (price_range * 0.2)
-                                high = high + part_range
-                                low = low - part_range
-                                price_range = price_range - part_range
-                                hedge_range = hedge_range - part_range
-                            false_rupture = False
-                            continue
-            
-            if false_rupture and positions:
-                last_position = max(positions, key=lambda position: position.time)
-                if float(last_position.comment) != 0:
-                    # Establece las variables
-                    open = finished_bar['open']
-                    close = finished_bar['close']
-                    last_type = last_position.type
-                    send_buyback = False
-                    buyback_range = (price_range * 0.2)
-                    # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                    if last_type == OrderType.MARKET_BUY:
-                        if open <= high and close > high:
-                            range_limit = high + buyback_range
-                            if close < range_limit:
-                                send_buyback = True
-                    elif last_type == OrderType.MARKET_SELL:
-                        if open >= low and close < low:
-                            range_limit = low - buyback_range
-                            if close > range_limit:
-                                send_buyback = True
-                    
-                    if send_buyback:
-                        print("HedgeTrailing: Falsa ruptura trade")
-                        result =MT5Api.send_order(
-                            symbol= self.symbol,
-                            order_type= last_type,
-                            volume=volume,
-                            magic=self.magic,
-                            comment= "2"
-                        )
-                        if result:
-                            false_rupture = False
-                            continue
-        
-    def _get_counter_volume(self, positions: List[TradePosition])->float:
-        
-        buys = [position for position in positions if position.type == OrderType.MARKET_BUY]
-        sells = [position for position in positions if position.type == OrderType.MARKET_SELL]
-
-        total_buys = sum(position.volume for position in buys)
-        total_sells = sum(position.volume for position in sells)
-
-        difference = abs(total_sells - total_buys)
-        
-        return difference
 
     def _preparing_symbols_data(self):
         """
@@ -531,10 +404,10 @@ class HedgeTrailing:
         while True:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
-            number_bars = 60
-            rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_3, 1, number_bars)
+            number_bars = 360
+            range_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_15, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
-            if info is not None and rates is not None and account_info is not None and last_minute_bar is not None:
+            if info is not None and range_rates is not None and account_info is not None and last_minute_bar is not None:
                 break
         
         # Establece variables             
@@ -548,32 +421,27 @@ class HedgeTrailing:
         
         # Encuentra el rango optimo
         atr_timeperiod = 14
-        df = pd.DataFrame(rates)
+        df = pd.DataFrame(range_rates)
         atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_timeperiod)
-        price_range = np.median(atr[atr_timeperiod:])
+        main_range = np.median(atr[atr_timeperiod:])
         
-        # Establece el high y low
-        current_price = last_minute_bar[-1]['close']
-        quantity = int(current_price/price_range)
-        high = (quantity + 1) * price_range
-        low = quantity * price_range
+        # Establece los rangos
+        symbol_data['main_range'] = main_range
+        symbol_data['intermediate_range'] = main_range/2
+        symbol_data['fast_range'] = main_range/4
         
         # Establece el volumen
         user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
         user_risk = user_risk/info.trade_contract_size
-        volume = user_risk / price_range
+        volume = user_risk / symbol_data['fast_range']
         volume = round(volume, symbol_data['volume_decimals'])
         
         if volume < (info.volume_min * 2):
             volume = info.volume_min * 2
         
-        # Guarda las variables
-        symbol_data['price_range'] = price_range
         symbol_data['volume'] = volume
-        symbol_data['high'] = high
-        symbol_data['low'] = low
                 
-        #print(symbol_data)
+        print(symbol_data)
         
         # Actualiza la variable compartida
         self.symbol_data.update(symbol_data)
@@ -598,25 +466,17 @@ class HedgeTrailing:
         symbol = self.symbol
 
         # Se establecen las variables para el supertrend
-        atr_period = 14
-        multiplier = 1
         first_time = True
         
         # Obtiene las barras desde mt5
         while True:
-            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  3000)
-            minute_range_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_15, 1,  10080)
-            if minute_1_rates is not None and minute_range_rates is not None:
+            minute_1_rates = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 1,  1440)
+            if minute_1_rates is not None:
                 break
         
-        # Encuentra el rango optimo
-        df = pd.DataFrame(minute_range_rates)
-        atr = ta.atr(high=df['high'], low=df['low'], close=df['close'], length=atr_period)
-        price_range = np.median(atr[atr_period:])
-        
-        main_size = price_range
-        intermediate_size = main_size/2
-        fast_size = intermediate_size/2
+        main_size = self.symbol_data['main_range']
+        intermediate_size = self.symbol_data['intermediate_range']
+        fast_size = self.symbol_data['fast_range']
         
         print(f"Tr3nd: Main brick size: {main_size}")
         print(f"Tr3nd: Intermediate brick size: {intermediate_size}")
@@ -630,37 +490,34 @@ class HedgeTrailing:
             while True:
                 minute_last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
                 if minute_last_bar is not None:
-                    break      
+                    break
             
             if first_time or renko_fast.update_renko(minute_last_bar):
-                df = pd.DataFrame(renko_fast.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.fast_trend.value != last_bar_renko['supertrend']:
+                last_bar_renko = renko_fast.renko_data[-1]
+                type = 1 if last_bar_renko['type'] == 'up' else -1
+                if self.fast_trend.value != type:
                     try:
-                        self.fast_trend.value = int(last_bar_renko['supertrend'])
+                        self.fast_trend.value = type
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
             if first_time or renko_intermediate.update_renko(minute_last_bar):
-                df = pd.DataFrame(renko_intermediate.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.intermediate_trend.value != last_bar_renko['supertrend']:
+                last_bar_renko = renko_intermediate.renko_data[-1]
+                type = 1 if last_bar_renko['type'] == 'up' else -1
+                if self.intermediate_trend.value != type:
                     try:
-                        self.intermediate_trend.value = int(last_bar_renko['supertrend'])
+                        self.intermediate_trend.value = type
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
             if first_time or renko_main.update_renko(minute_last_bar):
-                df = pd.DataFrame(renko_main.renko_data)
-                df['supertrend'] = ta.supertrend(df['high'], df['low'], df['close'], length=atr_period, multiplier=multiplier).iloc[:, 1]
-                last_bar_renko = df.iloc[-1]
-                if self.main_trend.value != last_bar_renko['supertrend']:
+                last_bar_renko = renko_main.renko_data[-1]
+                type = 1 if last_bar_renko['type'] == 'up' else -1
+                if self.main_trend.value != type:
                     try:
-                        self.main_trend.value = int(last_bar_renko['supertrend'])
+                        self.main_trend.value = type
                         print(f"Tr3nd: Main {self.main_trend.value} Intermediate {self.intermediate_trend.value} Fast {self.fast_trend.value}")
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
@@ -668,14 +525,12 @@ class HedgeTrailing:
             if first_time:
                 first_time = False
             
-    
     def _trade_signal(self):
-        
         while self.is_on.value:
             
-            if self.main_trend.value == StateTr3nd.unassigned or self.intermediate_trend.value == StateTr3nd.unassigned or self.fast_trend.value == StateTr3nd.unassigned:
+            if self.main_trend.value == StateTrend.unassigned or self.intermediate_trend.value == StateTrend.unassigned or self.fast_trend.value == StateTrend.unassigned:
                 continue
-            
+
             if self.trend_signal.value == TrendSignal.anticipating:
                 if self.main_trend.value == self.intermediate_trend.value and self.main_trend.value != self.fast_trend.value:
                     try:
@@ -712,9 +567,9 @@ class HedgeTrailing:
                     except BrokenPipeError as e:
                         print(f"Se produjo un error de tubería rota: {e}")
             
-            if self.trend_signal.value == TrendSignal.buy:
+            if self.trend_signal.value == TrendSignal.buy:               
                 # Mantiene un tiempo determinado la señal de compra
-                time.sleep(60*1)
+                time.sleep(10)
                 try:
                     self.trend_signal.value = TrendSignal.anticipating
                     print(f"Tr3nd: Estado para nueva orden [anticipating]")
@@ -741,9 +596,9 @@ class HedgeTrailing:
         manager = multiprocessing.Manager()
         self.is_on = manager.Value("b", True)
         self.symbol_data = manager.dict({})
-        self.main_trend = manager.Value("i", StateTr3nd.unassigned)
-        self.intermediate_trend = manager.Value("i", StateTr3nd.unassigned)
-        self.fast_trend = manager.Value("i", StateTr3nd.unassigned)
+        self.main_trend = manager.Value("i", StateTrend.unassigned)
+        self.intermediate_trend = manager.Value("i", StateTrend.unassigned)
+        self.fast_trend = manager.Value("i", StateTrend.unassigned)
         self.trend_signal = manager.Value("i", TrendSignal.anticipating)
 
         self._preparing_symbols_data()
