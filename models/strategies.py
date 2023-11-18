@@ -391,6 +391,7 @@ class HedgeTrailing:
                                 comment= str(next_step)
                             )
                             if not result:
+                                MT5Api.send_close_all_position()
                                 continue
 
     def _preparing_symbols_data(self):
