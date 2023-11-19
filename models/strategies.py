@@ -443,10 +443,13 @@ class HedgeTrailing:
         symbol_data['fast_range'] = main_range/4
         
         # Establece el volumen
-        user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
-        user_risk = user_risk/info.trade_contract_size
-        volume = user_risk / symbol_data['fast_range']
-        volume = round(volume, symbol_data['volume_decimals'])
+        if self.user_risk == 0:
+            volume = info.volume_min * 2
+        else:
+            user_risk = (account_info.balance * 0.01) if self.user_risk is None else self.user_risk
+            user_risk = user_risk/info.trade_contract_size
+            volume = user_risk / symbol_data['fast_range']
+            volume = round(volume, symbol_data['volume_decimals'])
         
         if volume < (info.volume_min * 2):
             volume = info.volume_min * 2
