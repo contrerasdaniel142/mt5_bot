@@ -299,11 +299,10 @@ class HedgeTrailing:
         market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
         
         # Variables del rango
-        price_range = self.symbol_data['fast_range']
+        fast_range = self.symbol_data['fast_range']
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
-        balance = self.symbol_data['initial_balance']
         spread = self.symbol_data['spread']
         
         # Condicionales de estados
@@ -355,9 +354,10 @@ class HedgeTrailing:
                     magic=self.magic,
                     comment= "1"
                 )
-                    
+                
                 if result is not None:
                     rupture = True
+                    first_type = order_type
                         
             
             if rupture and positions:
@@ -366,18 +366,27 @@ class HedgeTrailing:
                     # Establece las variables
                     last_type = last_position.type
                     send_order = False
-                    # Verifica si despues del falso rompimiento vuelve a existir una ruptura en la misma direccion
-                    if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
-                        order_type = OrderType.MARKET_SELL
-                        send_order = True
-                    elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
-                        order_type =  OrderType.MARKET_BUY
-                        send_order = True
                     
+                    if first_type == OrderType.MARKET_BUY:
+                        if last_type == OrderType.MARKET_BUY and self.intermediate_trend.value == StateTrend.bearish:
+                            order_type = OrderType.MARKET_SELL
+                            send_order = True
+                        elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
+                            order_type =  OrderType.MARKET_BUY
+                            send_order = True
+                    
+                    elif first_type == OrderType.MARKET_SELL:
+                        if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
+                            order_type = OrderType.MARKET_SELL
+                            send_order = True
+                        elif last_type == OrderType.MARKET_SELL and self.intermediate_trend.value == StateTrend.bullish:
+                            order_type =  OrderType.MARKET_BUY
+                            send_order = True
+                                        
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = (((profit + (balance*0.01))/info.trade_contract_size) / (price_range - (spread * 3)))
+                        volume_to_even = ((profit/info.trade_contract_size) / (fast_range - (spread * 3))) + volume
                         next_step = int(last_position.comment) + 1
                         
                         parts = int(volume_to_even // volume_max) + 1
@@ -406,7 +415,7 @@ class HedgeTrailing:
         while True:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
-            number_bars = 360
+            number_bars = 5040
             range_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_30, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
             if info is not None and range_rates is not None and account_info is not None and last_minute_bar is not None:
