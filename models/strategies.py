@@ -297,6 +297,7 @@ class HedgeTrailing:
         # Horario de cierre
         current_time = datetime.now(pytz.utc)   # Hora actual
         market_close = current_time.replace(hour=self._market_closed_time['hour'], minute=self._market_closed_time['minute'], second=0)
+        pre_closing_time = market_close - timedelta(hours= 1)
         
         # Variables del rango
         fast_range = self.symbol_data['fast_range']
@@ -320,8 +321,13 @@ class HedgeTrailing:
             
             # Hora actual
             current_time = datetime.now(pytz.utc)
-            
-            if positions and current_time > market_close:
+            if not positions and current_time > pre_closing_time:
+                try:
+                    self.is_on.value = False
+                    continue
+                except BrokenPipeError as e:
+                    print(f"Se produjo un error de tubería rota: {e}")         
+            elif positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
                         
@@ -329,17 +335,6 @@ class HedgeTrailing:
                 # Condicionales de estados
                 rupture = False
                 
-                # Hora para cerrar el programa antes
-                pre_closing_time = current_time + timedelta(hours=1, minutes=0)
-                # Si el programa no se encuentra aun en horario de pre cierre puede seguir operando
-                if pre_closing_time > market_close:
-                    try:
-                        self.is_on.value = False
-                    except BrokenPipeError as e:
-                        print(f"Se produjo un error de tubería rota: {e}")
-                        
-                    continue
-                                
                 if self.fast_trend.value == StateTrend.bullish:
                     order_type = OrderType.MARKET_BUY
                     
@@ -367,21 +362,12 @@ class HedgeTrailing:
                     last_type = last_position.type
                     send_order = False
                     
-                    if first_type == OrderType.MARKET_BUY:
-                        if last_type == OrderType.MARKET_BUY and self.intermediate_trend.value == StateTrend.bearish:
-                            order_type = OrderType.MARKET_SELL
-                            send_order = True
-                        elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
-                            order_type =  OrderType.MARKET_BUY
-                            send_order = True
-                    
-                    elif first_type == OrderType.MARKET_SELL:
-                        if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
-                            order_type = OrderType.MARKET_SELL
-                            send_order = True
-                        elif last_type == OrderType.MARKET_SELL and self.intermediate_trend.value == StateTrend.bullish:
-                            order_type =  OrderType.MARKET_BUY
-                            send_order = True
+                    if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
+                        order_type = OrderType.MARKET_SELL
+                        send_order = True
+                    elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
+                        order_type =  OrderType.MARKET_BUY
+                        send_order = True
                                         
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
