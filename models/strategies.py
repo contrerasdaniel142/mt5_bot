@@ -268,7 +268,7 @@ class HedgeTrailing:
                     if info.bid <= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.bid >= next_stop_price:
+                    elif info.ask >= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
                 else:
@@ -282,7 +282,7 @@ class HedgeTrailing:
                     if info.ask >= stop_loss:
                         print(f"HedgeTrailing: stop loss alcanzado {stop_loss}")
                         MT5Api.send_close_all_position()
-                    elif info.ask <= next_stop_price:
+                    elif info.bid <= next_stop_price:
                         print(f"HedgeTrailing: stop loss en {next_stop_loss}")
                         number_trailing += 1
 
@@ -322,17 +322,17 @@ class HedgeTrailing:
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
             
-            # Hora actual
-            current_time = datetime.now(pytz.utc)
-            if not positions and current_time > pre_closing_time:
-                try:
-                    self.is_on.value = False
-                    continue
-                except BrokenPipeError as e:
-                    print(f"Se produjo un error de tubería rota: {e}")         
-            elif positions and current_time > market_close:
-                MT5Api.send_close_all_position()
-                continue
+            # # Hora actual
+            # current_time = datetime.now(pytz.utc)
+            # if not positions and current_time > pre_closing_time:
+            #     try:
+            #         self.is_on.value = False
+            #         continue
+            #     except BrokenPipeError as e:
+            #         print(f"Se produjo un error de tubería rota: {e}")         
+            # elif positions and current_time > market_close:
+            #     MT5Api.send_close_all_position()
+            #     continue
                         
             if not positions and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
@@ -486,7 +486,7 @@ class HedgeTrailing:
         renko_intermediate = vRenko(minute_1_rates, intermediate_size, False)
         renko_fast = vRenko(minute_1_rates, fast_size, False)
                                     
-        while self.is_on.value:           
+        while self.is_on.value:       
             while True:
                 minute_last_bar = MT5Api.get_rates_from_pos(symbol, TimeFrame.MINUTE_1, 0, 1)
                 if minute_last_bar is not None:
