@@ -61,6 +61,9 @@ class HedgeTrailing:
                 
         # El tamaño del lote
         self.user_risk = user_risk
+        
+        # La temporalidad de las barras que se usara
+        self.time_frame = TimeFrame.HOUR_2
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':14, 'minute':0}
@@ -402,7 +405,7 @@ class HedgeTrailing:
             info = MT5Api.get_symbol_info(self.symbol)
             account_info = MT5Api.get_account_info()
             number_bars = 5040
-            range_rates = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.HOUR_1, 1, number_bars)
+            range_rates = MT5Api.get_rates_from_pos(self.symbol, self.time_frame, 1, number_bars)
             last_minute_bar = MT5Api.get_rates_from_pos(self.symbol, TimeFrame.MINUTE_1, 0, 1)
             if info is not None and range_rates is not None and account_info is not None and last_minute_bar is not None:
                 break
