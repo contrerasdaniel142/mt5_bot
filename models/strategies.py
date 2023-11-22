@@ -63,7 +63,7 @@ class HedgeTrailing:
         self.user_risk = user_risk
         
         # La temporalidad de las barras que se usara
-        self.time_frame = TimeFrame.HOUR_2
+        self.time_frame = TimeFrame.MINUTE_30
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':14, 'minute':0}
@@ -303,7 +303,7 @@ class HedgeTrailing:
         pre_closing_time = market_close - timedelta(hours= 1)
         
         # Variables del rango
-        fast_range = self.symbol_data['fast_range']
+        price_range = self.symbol_data['intermediate_range']
         volume = self.symbol_data['volume']
         volume_max = self.symbol_data['volume_max']
         volume_decimals = self.symbol_data['volume_decimals']
@@ -322,17 +322,17 @@ class HedgeTrailing:
                 if info is not None and positions is not None and last_bar is not None and finished_bar is not None:
                     break
             
-            # # Hora actual
-            # current_time = datetime.now(pytz.utc)
-            # if not positions and current_time > pre_closing_time:
-            #     try:
-            #         self.is_on.value = False
-            #         continue
-            #     except BrokenPipeError as e:
-            #         print(f"Se produjo un error de tubería rota: {e}")         
-            # elif positions and current_time > market_close:
-            #     MT5Api.send_close_all_position()
-            #     continue
+            # Hora actual
+            current_time = datetime.now(pytz.utc)
+            if not positions and current_time > pre_closing_time:
+                try:
+                    self.is_on.value = False
+                    continue
+                except BrokenPipeError as e:
+                    print(f"Se produjo un error de tubería rota: {e}")         
+            elif positions and current_time > market_close:
+                MT5Api.send_close_all_position()
+                continue
                         
             if not positions and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
@@ -365,17 +365,17 @@ class HedgeTrailing:
                     last_type = last_position.type
                     send_order = False
                     
-                    if last_type == OrderType.MARKET_BUY and self.fast_trend.value == StateTrend.bearish:
+                    if last_type == OrderType.MARKET_BUY and self.intermediate_trend.value == StateTrend.bearish:
                         order_type = OrderType.MARKET_SELL
                         send_order = True
-                    elif last_type == OrderType.MARKET_SELL and self.fast_trend.value == StateTrend.bullish:
+                    elif last_type == OrderType.MARKET_SELL and self.intermediate_trend.value == StateTrend.bullish:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                                         
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = ((profit/info.trade_contract_size) / (fast_range - (spread * 3))) + volume
+                        volume_to_even = ((profit/info.trade_contract_size) / (price_range - (spread * 3))) + volume
                         next_step = int(last_position.comment) + 1
                         
                         parts = int(volume_to_even // volume_max) + 1
