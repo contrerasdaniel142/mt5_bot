@@ -375,7 +375,7 @@ class HedgeTrailing:
                     if send_order:
                         print("HedgeTrailing: Hedge trade")
                         profit = abs(sum(position.profit for position in positions))
-                        volume_to_even = ((profit/info.trade_contract_size) / (price_range - (spread * 3))) + volume
+                        volume_to_even = ((profit/info.trade_contract_size) / ((price_range/2) - (spread * 1))) + volume
                         next_step = int(last_position.comment) + 1
                         
                         parts = int(volume_to_even // volume_max) + 1
