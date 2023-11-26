@@ -150,9 +150,9 @@ class HedgeTrailing:
                 number_trailing = 1
                 in_hedge = False
                 trailing_stop = False
-                continue              
+                continue        
             
-            last_position = max(positions, key=lambda position: position.time)
+            last_position = max(positions, key=lambda position: int(position.comment))
             
             # Para el manejo de posiciones tendremos en cuenta como se maneja el cierre en mt5
             # Compras al precio ask.
@@ -341,7 +341,6 @@ class HedgeTrailing:
             if first_trade and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
                 rupture = False
-                first_trade = False
                 
                 if self.fast_trend.value == StateTrend.bullish:
                     order_type = OrderType.MARKET_BUY
@@ -360,6 +359,7 @@ class HedgeTrailing:
                 
                 if result is not None:
                     rupture = True
+                    first_trade = False
                     first_type = order_type
                         
             
