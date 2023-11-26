@@ -311,6 +311,7 @@ class HedgeTrailing:
         
         # Condicionales de estados
         rupture = False
+        first_trade = True
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -333,10 +334,14 @@ class HedgeTrailing:
             elif positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
-                        
-            if self.trade_signal.value == TrendSignal.buy:
+            
+            if self.trade_signal.value != TrendSignal.buy:
+                first_trade = True
+            
+            if first_trade and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
                 rupture = False
+                first_trade = False
                 
                 if self.fast_trend.value == StateTrend.bullish:
                     order_type = OrderType.MARKET_BUY
