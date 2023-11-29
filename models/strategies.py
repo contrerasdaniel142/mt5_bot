@@ -63,7 +63,7 @@ class HedgeTrailing:
         self.user_risk = user_risk
         
         # La temporalidad de las barras que se usara
-        self.time_frame = TimeFrame.MINUTE_30
+        self.time_frame = TimeFrame.HOUR_1
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':14, 'minute':30}
@@ -378,28 +378,28 @@ class HedgeTrailing:
                         send_order = True
                                         
                     if send_order:
-                        print("HedgeTrailing: Close trade")
-                        for position in positions:
-                            MT5Api.send_close_position(position)
+                        # print("HedgeTrailing: Close trade")
+                        # for position in positions:
+                        #     MT5Api.send_close_position(position)
                         
-                        # print("HedgeTrailing: Hedge trade")
-                        # profit = abs(sum(position.profit for position in positions))
-                        # volume_to_even = ((profit/info.trade_contract_size) / ((price_range/2) - (spread * 1))) + volume
-                        # next_step = int(last_position.comment) + 1
+                        print("HedgeTrailing: Hedge trade")
+                        profit = abs(sum(position.profit for position in positions))
+                        volume_to_even = ((profit/info.trade_contract_size) / ((price_range/2) - (spread * 1))) + volume
+                        next_step = int(last_position.comment) + 1
                         
-                        # parts = int(volume_to_even // volume_max) + 1
-                        # volume_part = round(volume_to_even/parts, volume_decimals)
-                        # for _ in range(parts):
-                        #     result =MT5Api.send_order(
-                        #         symbol= self.symbol, 
-                        #         order_type= order_type, 
-                        #         volume=volume_part,
-                        #         magic=self.magic,
-                        #         comment= str(next_step)
-                        #     )
-                        #     if not result:
-                        #         MT5Api.send_close_all_position()
-                        #         continue
+                        parts = int(volume_to_even // volume_max) + 1
+                        volume_part = round(volume_to_even/parts, volume_decimals)
+                        for _ in range(parts):
+                            result =MT5Api.send_order(
+                                symbol= self.symbol, 
+                                order_type= order_type, 
+                                volume=volume_part,
+                                magic=self.magic,
+                                comment= str(next_step)
+                            )
+                            if not result:
+                                MT5Api.send_close_all_position()
+                                continue
 
     def _preparing_symbols_data(self):
         """
