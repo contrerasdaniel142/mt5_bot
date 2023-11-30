@@ -63,7 +63,7 @@ class HedgeTrailing:
         self.user_risk = user_risk
         
         # La temporalidad de las barras que se usara
-        self.time_frame = TimeFrame.HOUR_1
+        self.time_frame = TimeFrame.MINUTE_30
                 
         # Horario de apertura y cierre del mercado
         self._market_opening_time = {'hour':14, 'minute':30}
@@ -311,7 +311,6 @@ class HedgeTrailing:
         
         # Condicionales de estados
         rupture = False
-        first_trade = True
         
         while self.is_on.value:
             # Se obtiene las variables de mt5
@@ -334,11 +333,8 @@ class HedgeTrailing:
             elif positions and current_time > market_close:
                 MT5Api.send_close_all_position()
                 continue
-            
-            if self.trade_signal.value != TrendSignal.buy:
-                first_trade = True
-            
-            if first_trade and self.trade_signal.value == TrendSignal.buy:
+                        
+            if not positions and self.trade_signal.value == TrendSignal.buy:
                 # Condicionales de estados
                 rupture = False
                 
@@ -359,7 +355,6 @@ class HedgeTrailing:
                 
                 if result is not None:
                     rupture = True
-                    first_trade = False
                     first_type = order_type
                         
             
@@ -377,11 +372,7 @@ class HedgeTrailing:
                         order_type =  OrderType.MARKET_BUY
                         send_order = True
                                         
-                    if send_order:
-                        # print("HedgeTrailing: Close trade")
-                        # for position in positions:
-                        #     MT5Api.send_close_position(position)
-                        
+                    if send_order:                        
                         print("HedgeTrailing: Hedge trade")
                         profit = abs(sum(position.profit for position in positions))
                         volume_to_even = ((profit/info.trade_contract_size) / ((price_range/2) - (spread * 1))) + volume
